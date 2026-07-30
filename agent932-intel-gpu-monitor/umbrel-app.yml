@@ -4,7 +4,7 @@ category: utilities
 name: Intel GPU Monitor
 version: "1.0.0"
 tagline: Real-time Intel GPU monitoring for your home server
-icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/apps/agent932-intel-gpu-monitor/assets/agent932-intel-gpu-monitor.svg
+icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-intel-gpu-monitor/assets/agent932-intel-gpu-monitor.svg
 description: >-
   Intel GPU Monitor provides real-time monitoring of Intel integrated GPUs for Umbrel.
   Perfect for seeing which apps are using hardware acceleration and monitoring GPU
@@ -34,22 +34,7 @@ dependencies: []
 repo: https://github.com/agent932/umbrel-apps
 support: https://github.com/agent932/umbrel-apps/issues
 port: 8847
-gallery:
-  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/apps/agent932-intel-gpu-monitor/assets/screenshot1.png
-  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/apps/agent932-intel-gpu-monitor/assets/screenshot2.png
-form:
-  - type: text
-    name: plex_url
-    label: "Plex Server URL (optional)"
-    placeholder: "http://plex:32400"
-    hint: "URL of your Plex server for transcoding details. Leave blank to disable Plex integration."
-    required: false
-  - type: password
-    name: plex_token
-    label: "Plex Access Token (optional)"
-    placeholder: "Your Plex token"
-    hint: "Plex access token for API access. Get from https://plex.tv/devices"
-    required: false
+gallery: []
 widgets:
   - id: "stats"
     type: "four-stats"

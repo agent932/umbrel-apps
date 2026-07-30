@@ -13,6 +13,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8847
+      # Optional Plex integration: set these to see what is being transcoded.
+      # umbrelOS has no settings form for community apps, so edit them here in
+      # ~/umbrel/app-data/agent932-intel-gpu-monitor/docker-compose.yml and
+      # restart the app. Get a token from https://plex.tv/devices
       - PLEX_URL=${plex_url:-}
       - PLEX_TOKEN=${plex_token:-}
     privileged: true

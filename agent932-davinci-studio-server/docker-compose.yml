@@ -13,6 +13,9 @@ services:
       - "5432:5432"
       - "50059:50059"
     environment:
+      # umbrelOS has no settings form for community apps, so set your timezone
+      # here in ~/umbrel/app-data/agent932-davinci-studio-server/docker-compose.yml
+      # and restart the app, e.g. TZ=America/Edmonton
       - TZ=${TZ:-Europe/London}
     volumes:
       - ${APP_DATA_DIR}/data/hooks:/var/studio-server/hooks
