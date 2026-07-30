@@ -1,0 +1,69 @@
+manifestVersion: 1
+id: agent932-teslamate
+category: automation
+name: TeslaMate
+version: "4.0.1"
+tagline: A self-hosted data logger for your Tesla
+icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-teslamate/assets/agent932-teslamate.svg
+description: >-
+  TeslaMate is a powerful, self-hosted data logger for your Tesla. It polls your
+  car through the Tesla API and records every drive, charge, update and sleep
+  cycle, then visualises it all in a set of ready-made Grafana dashboards.
+
+
+  First-run setup: open TeslaMate and sign in with a Tesla API refresh token.
+  TeslaMate no longer accepts an email and password directly — generate a token
+  with a helper app such as Tesla Auth, Auth app for Tesla (iOS) or Tesla Tokens
+  (Android). See https://docs.teslamate.org/docs/guides/tokens for the current
+  list.
+
+
+  Dashboards: the bundled Grafana runs alongside the app on its own port and is
+  not covered by your Umbrel login, so it keeps its own account. Open
+  http://umbrel.local:8842 and sign in with username "admin" and the password
+  shown on this app's tile.
+
+
+  Features:
+
+  - Vehicle location, drives and parking history on a map
+
+  - Charging sessions with cost, energy added and efficiency
+
+  - Battery degradation and projected range over time
+
+  - Consumption, efficiency and driving statistics per trip
+
+  - Geofences with automatic naming of your home, work and favourite chargers
+
+  - Sleep tracking so the car is not kept awake by polling
+
+  - MQTT publishing for Home Assistant and other automation platforms
+
+  - 20+ preconfigured Grafana dashboards
+
+
+  Notes:
+
+  - Your Tesla API tokens are encrypted at rest with a key derived from your
+  Umbrel device seed.
+
+  - The bundled MQTT broker is published on port 1884 (not the usual 1883) so it
+  does not collide with a Mosquitto app you may already be running.
+
+  - TeslaMate is not affiliated with, endorsed by, or sponsored by Tesla, Inc.
+releaseNotes: ""
+
+developer: TeslaMate
+website: https://teslamate.org
+dependencies: []
+repo: https://github.com/teslamate-org/teslamate
+support: https://github.com/teslamate-org/teslamate/discussions
+
+port: 8841
+gallery: []
+path: ""
+
+defaultUsername: "admin"
+defaultPassword: ""
+deterministicPassword: true

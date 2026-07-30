@@ -1,0 +1,78 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: agent932-teslamate_teslamate_1
+      APP_PORT: 4000
+
+  teslamate:
+    image: teslamate/teslamate:4.0.1@sha256:e77ec65007aafb40d736ed2c89675112fe8d960886ea9d7de3255f2b5360269f
+    restart: on-failure
+    stop_grace_period: 1m
+    depends_on:
+      - database
+      - mosquitto
+    environment:
+      - ENCRYPTION_KEY=${APP_TESLAMATE_ENCRYPTION_KEY}
+      - DATABASE_HOST=database
+      - DATABASE_NAME=teslamate
+      - DATABASE_USER=teslamate
+      - DATABASE_PASS=${APP_TESLAMATE_DB_PASSWORD}
+      - MQTT_HOST=mosquitto
+      # Used only to build absolute URLs; app_proxy fronts the real requests.
+      - VIRTUAL_HOST=${DEVICE_DOMAIN_NAME}
+      # Set TZ to your own timezone (e.g. America/Edmonton) to get local times
+      # in the TeslaMate UI. Grafana renders times in the browser's timezone.
+      - TZ=${TZ:-UTC}
+    volumes:
+      # Drop TeslaFi/other exports here to import historical data.
+      - ${APP_DATA_DIR}/data/import:/opt/app/import
+    cap_drop:
+      - all
+
+  database:
+    image: postgres:18-trixie@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      - POSTGRES_DB=teslamate
+      - POSTGRES_USER=teslamate
+      - POSTGRES_PASSWORD=${APP_TESLAMATE_DB_PASSWORD}
+      # Postgres 18 defaults PGDATA to /var/lib/postgresql/18/docker. Pin it so
+      # the data directory stays put across major image upgrades.
+      - PGDATA=/var/lib/postgresql/data
+    volumes:
+      - ${APP_DATA_DIR}/data/postgres:/var/lib/postgresql/data
+
+  grafana:
+    image: teslamate/grafana:4.0.1@sha256:f2afcd9bdc849e65ef53c765be8590a0f0f8416709f501aa179760ea97035cf8
+    restart: on-failure
+    stop_grace_period: 1m
+    user: "1000:1000"
+    depends_on:
+      - database
+    environment:
+      - DATABASE_HOST=database
+      - DATABASE_NAME=teslamate
+      - DATABASE_USER=teslamate
+      - DATABASE_PASS=${APP_TESLAMATE_DB_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${APP_PASSWORD}
+      - GF_SERVER_ROOT_URL=http://${DEVICE_DOMAIN_NAME}:8842
+    # Grafana is a second web UI, so it cannot share app_proxy with TeslaMate.
+    # It is published directly and protected by its own login instead.
+    ports:
+      - "8842:3000"
+    volumes:
+      - ${APP_DATA_DIR}/data/grafana:/var/lib/grafana
+
+  mosquitto:
+    image: eclipse-mosquitto:2@sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797
+    restart: on-failure
+    stop_grace_period: 1m
+    command: mosquitto -c /mosquitto-no-auth.conf
+    # Published so Home Assistant and other MQTT clients can subscribe. 1884
+    # avoids colliding with the Mosquitto app, which uses 1883.
+    ports:
+      - "1884:1883"
