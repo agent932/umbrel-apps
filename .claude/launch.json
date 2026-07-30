@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "intel-gpu-monitor",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["agent932-intel-gpu-monitor/server.js"],
+      "port": 8847
+    }
+  ]
+}
