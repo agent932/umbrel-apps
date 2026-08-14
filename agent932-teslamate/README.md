@@ -12,9 +12,9 @@ Upstream project: <https://github.com/teslamate-org/teslamate>
 
 | Service | Image | Purpose |
 | :-- | :-- | :-- |
-| `teslamate` | `teslamate/teslamate:4.0.1` | Web UI and Tesla API poller |
+| `teslamate` | `teslamate/teslamate:4.1.1` | Web UI and Tesla API poller |
 | `database` | `postgres:18-trixie` | Stores all logged data |
-| `grafana` | `teslamate/grafana:4.0.1` | Dashboards |
+| `grafana` | `teslamate/grafana:4.1.1` | Dashboards |
 | `mosquitto` | `eclipse-mosquitto:2` | MQTT broker for Home Assistant etc. |
 
 ## Ports

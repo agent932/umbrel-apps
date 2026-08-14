@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-teslamate
 category: automation
 name: TeslaMate
-version: "4.0.1"
+version: "4.1.1"
 tagline: A self-hosted data logger for your Tesla
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-teslamate/assets/agent932-teslamate.svg
 description: >-
@@ -52,7 +52,26 @@ description: >-
   does not collide with a Mosquitto app you may already be running.
 
   - TeslaMate is not affiliated with, endorsed by, or sponsored by Tesla, Inc.
-releaseNotes: ""
+releaseNotes: >-
+  Updates TeslaMate and its Grafana dashboards to 4.1.1.
+
+
+  4.1.0 improved phase detection during AC charging. Your existing charging
+  sessions are recalculated once on the first start after this update, so the
+  app can take noticeably longer than usual to come up if you have a large
+  history. This is normal — give it time rather than restarting it.
+
+
+  4.1.1 fixes a startup crash affecting installs that use MQTT without a custom
+  namespace, which includes this package's default setup.
+
+
+  Home Assistant users with hand-written sensor YAML: charge_energy_added now
+  reports state_class total_increasing, which changes how long-term statistics
+  are recorded.
+
+
+  Full release notes: https://github.com/teslamate-org/teslamate/releases
 
 developer: TeslaMate
 website: https://teslamate.org
