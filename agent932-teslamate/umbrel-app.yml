@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-teslamate
 category: automation
 name: TeslaMate
-version: "4.1.1"
+version: "4.2.0"
 tagline: A self-hosted data logger for your Tesla
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-teslamate/assets/agent932-teslamate.svg
 description: >-
@@ -53,22 +53,25 @@ description: >-
 
   - TeslaMate is not affiliated with, endorsed by, or sponsored by Tesla, Inc.
 releaseNotes: >-
-  Updates TeslaMate and its Grafana dashboards to 4.1.1.
+  Updates TeslaMate and its Grafana dashboards to 4.2.0.
 
 
-  4.1.0 improved phase detection during AC charging. Your existing charging
-  sessions are recalculated once on the first start after this update, so the
-  app can take noticeably longer than usual to come up if you have a large
-  history. This is normal — give it time rather than restarting it.
+  With Fleet Telemetry streaming enabled, TeslaMate now checks every 10 minutes
+  instead of every 30 whether the car has fallen asleep, so sleep transitions
+  appear in the dashboards up to 20 minutes sooner. This costs no extra API
+  calls and does not keep the car awake.
 
 
-  4.1.1 fixes a startup crash affecting installs that use MQTT without a custom
-  namespace, which includes this package's default setup.
+  Cybertruck is now identified correctly across the UI and MQTT, and a startup
+  crash in the charging recalculation on unusual DC charging data is fixed.
 
 
-  Home Assistant users with hand-written sensor YAML: charge_energy_added now
-  reports state_class total_increasing, which changes how long-term statistics
-  are recorded.
+  Home Assistant MQTT discovery users: discovery now uses Home Assistant's
+  device-based format and existing entities migrate automatically, but several
+  automation-visible changes come with it — the Health sensor is inverted, enum
+  states are humanised, the update-available sensor becomes an update entity,
+  active route distance reports miles instead of kilometres, and the derived psi
+  tire pressure sensors are removed.
 
 
   Full release notes: https://github.com/teslamate-org/teslamate/releases
