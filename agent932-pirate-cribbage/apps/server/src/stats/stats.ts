@@ -1,14 +1,15 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   type MatchForStats,
   type PlayerStats,
   type RoundRecord,
   type Seat,
+  TIERS,
   computeStats,
   parseCard,
 } from "@pirate/engine";
 import type { Db } from "../db/client.js";
-import { matchPlayers, matches, roundPlayers, rounds } from "../db/schema.js";
+import { matchPlayers, matches, roundPlayers, rounds, users } from "../db/schema.js";
 
 export type Variant = "all" | "classic" | "pirate";
 
@@ -26,23 +27,55 @@ const BUCKETS = [
   { key: "all", label: "All" },
 ];
 
-export async function statsFor(db: Db, userId: string, variant: Variant): Promise<StatsBucket[]> {
+interface LoadedMatch {
+  /** Which columns the match counts toward. */
+  buckets: string[];
+  match: MatchForStats;
+}
+
+/** Load one player's finished matches (optionally only those against `opponentId`) ready for computeStats. */
+async function loadMatches(
+  db: Db,
+  userId: string,
+  variant: Variant,
+  opponentId?: string,
+): Promise<LoadedMatch[]> {
   const mine = await db
     .select({
       id: matches.id,
       mode: matches.mode,
       aiLevel: matches.aiLevel,
       variant: matches.variant,
+      ranked: matches.ranked,
       firstDealer: matches.firstDealer,
       winner: matches.winner,
       skunk: matches.skunk,
       endedAt: matches.endedAt,
       seat: matchPlayers.seat,
+      tier: matchPlayers.tier,
     })
     .from(matchPlayers)
     .innerJoin(matches, eq(matches.id, matchPlayers.matchId))
     .where(eq(matchPlayers.userId, userId));
-  const chosen = mine.filter((m) => variant === "all" || m.variant === variant);
+  let chosen = mine.filter((m) => variant === "all" || m.variant === variant);
+  if (opponentId) {
+    const theirs = chosen.length
+      ? await db
+          .select({ matchId: matchPlayers.matchId })
+          .from(matchPlayers)
+          .where(
+            and(
+              eq(matchPlayers.userId, opponentId),
+              inArray(
+                matchPlayers.matchId,
+                chosen.map((m) => m.id),
+              ),
+            ),
+          )
+      : [];
+    const shared = new Set(theirs.map((t) => t.matchId));
+    chosen = chosen.filter((m) => shared.has(m.id));
+  }
   const ids = chosen.map((m) => m.id);
 
   const roundRows = ids.length
@@ -92,10 +125,13 @@ export async function statsFor(db: Db, userId: string, variant: Variant): Promis
     roundsByMatch.set(r.matchId, list);
   }
 
-  const forStats = chosen.map((m) => {
+  return chosen.map((m) => {
     const rs = roundsByMatch.get(m.id) ?? [];
+    const buckets = ["all", m.mode === "ai" ? `ai-${m.aiLevel}` : "online"];
+    // Ranked games also count toward the tier you were in when the game started.
+    if (m.ranked && m.tier) buckets.push(`ranked-${m.tier}`);
     return {
-      bucket: m.mode === "ai" ? `ai-${m.aiLevel}` : "online",
+      buckets,
       match: {
         mySeat: m.seat as Seat,
         firstDealer: m.firstDealer as Seat,
@@ -107,12 +143,36 @@ export async function statsFor(db: Db, userId: string, variant: Variant): Promis
       } satisfies MatchForStats,
     };
   });
+}
 
-  return BUCKETS.map(({ key, label }) => ({
+/**
+ * Stats columns: each computer level, Online, one per ranked tier you've played in
+ * (plus your current tier), and All — like the columns of the original stats sheet.
+ */
+export async function statsFor(db: Db, userId: string, variant: Variant): Promise<StatsBucket[]> {
+  const loaded = await loadMatches(db, userId, variant);
+  const [me] = await db
+    .select({ rating: users.rating, rankedGames: users.rankedGames })
+    .from(users)
+    .where(eq(users.id, userId));
+  const played = new Set(loaded.flatMap((l) => l.buckets));
+  const current =
+    me && me.rankedGames > 0 ? [...TIERS].reverse().find((t) => me.rating >= t.min)!.key : null;
+  const tiers = TIERS.filter((t) => played.has(`ranked-${t.key}`) || t.key === current).map(
+    (t) => ({
+      key: `ranked-${t.key}`,
+      label: t.name,
+    }),
+  );
+  const columns = [...BUCKETS.slice(0, 4), ...tiers, BUCKETS[4]!];
+  return columns.map(({ key, label }) => ({
     key,
     label,
-    stats: computeStats(
-      forStats.filter((f) => key === "all" || f.bucket === key).map((f) => f.match),
-    ),
+    stats: computeStats(loaded.filter((l) => l.buckets.includes(key)).map((l) => l.match)),
   }));
+}
+
+/** Your record against one other player (the "Friends" section of the stats sheet). */
+export async function headToHead(db: Db, userId: string, opponentId: string) {
+  return computeStats((await loadMatches(db, userId, "all", opponentId)).map((l) => l.match));
 }

@@ -1,16 +1,18 @@
 import type { FastifyInstance } from "fastify";
 import { IllegalActionError } from "@pirate/engine";
 import type { Db } from "../db/client.js";
+import { areFriends } from "../friends/friends.js";
 import { Matchmaker } from "./matchmaker.js";
+import type { Presence } from "./presence.js";
 import { ClientMessage, type ServerMessage } from "./protocol.js";
 import { type Client, RoomError, RoomManager, type Timing } from "./rooms.js";
 
 export async function onlineRoutes(
   app: FastifyInstance,
-  { db, timing }: { db: Db; timing?: Timing },
+  { db, timing, presence }: { db: Db; timing?: Timing; presence: Presence },
 ) {
   const rooms = new RoomManager(db, timing);
-  const matchmaker = new Matchmaker(rooms);
+  const matchmaker = new Matchmaker(rooms, presence, (a, b) => areFriends(db, a, b));
   app.addHook("onClose", async () => rooms.close());
 
   app.get("/api/online/active", async (req, reply) => {
@@ -64,6 +66,15 @@ export async function onlineRoutes(
           case "forfeit":
             await rooms.forfeitByUser(msg.gameId, user.id);
             break;
+          case "challenge":
+            await matchmaker.challenge(seeker, msg.friendId, msg.menu);
+            break;
+          case "acceptChallenge":
+            await matchmaker.acceptChallenge(seeker, msg.challengeId);
+            break;
+          case "declineChallenge":
+            matchmaker.declineChallenge(seeker, msg.challengeId);
+            break;
         }
       } catch (e) {
         // Rule and room errors are meant for the player; anything else stays in the server log.
@@ -73,7 +84,9 @@ export async function onlineRoutes(
       }
     });
 
+    presence.add(user.id, client);
     socket.on("close", () => {
+      presence.remove(user.id, client);
       matchmaker.cancel(client);
       for (const id of watching) rooms.leave(id, client);
     });

@@ -7,3 +7,4 @@ export * from "./describe.js";
 export * from "./stats.js";
 export * from "./analyzer.js";
 export * from "./cribTable.js";
+export * from "./rating.js";

@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.4.0"
+version: "0.5.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Online play: Quick Match against other players, or send a friend an invite
-  link. Games run on your Umbrel, survive reconnects and restarts, and have a
-  move timer so nobody can stall. Online results go in the Ship's Log.
+  Crew and ranked play: add friends by username, see who's online, challenge
+  them directly, and track your head-to-head record. Ranked matches (classic
+  rules) move your rating through Bronze, Silver, Gold, Platinum and Diamond,
+  with a leaderboard and a stats column for each tier.
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage

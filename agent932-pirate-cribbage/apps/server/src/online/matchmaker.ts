@@ -1,6 +1,7 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { CLASSIC_RULES, PIRATE_RULES, type RuleSet } from "@pirate/engine";
 import type { Menu } from "./protocol.js";
+import type { Presence } from "./presence.js";
 import { type Client, RoomError, type RoomManager } from "./rooms.js";
 
 export interface Seeker {
@@ -10,11 +11,12 @@ export interface Seeker {
 }
 
 export function rulesFor(menu: Menu): RuleSet {
-  if (menu.variant === "classic") return CLASSIC_RULES;
+  if (menu.ranked || menu.variant === "classic") return CLASSIC_RULES;
   return { ...PIRATE_RULES, pirate: { ...PIRATE_RULES.pirate!, powerCost: menu.powerCost } };
 }
 
-const menuKey = (m: Menu) => `${m.variant}:${m.variant === "pirate" ? m.powerCost : 0}`;
+const menuKey = (m: Menu) =>
+  m.ranked ? "ranked" : `${m.variant}:${m.variant === "pirate" ? m.powerCost : 0}`;
 const INVITE_TTL_MS = 60 * 60 * 1000;
 
 /** Quick Match queues (one per rule set) and invite codes. In memory: they only matter while people wait. */
@@ -22,7 +24,17 @@ export class Matchmaker {
   private queues = new Map<string, Seeker>();
   private invites = new Map<string, { host: Seeker; menu: Menu; expires: number }>();
 
-  constructor(private rooms: RoomManager) {}
+  private challenges = new Map<
+    string,
+    { from: Seeker; toUserId: string; menu: Menu; expires: number }
+  >();
+
+  constructor(
+    private rooms: RoomManager,
+    private presence: Presence,
+    /** Challenges are only for friends. */
+    private canChallenge: (from: string, to: string) => Promise<boolean>,
+  ) {}
 
   /** Pair with whoever is waiting for the same rules, or wait. Returns the new game id when paired. */
   async queue(seeker: Seeker, menu: Menu): Promise<string | null> {
@@ -35,7 +47,7 @@ export class Matchmaker {
       return null;
     }
     this.queues.delete(key);
-    const gameId = await this.rooms.create(waiting, seeker, rulesFor(menu));
+    const gameId = await this.rooms.create(waiting, seeker, rulesFor(menu), menu.ranked);
     waiting.client.send({ t: "matched", gameId });
     seeker.client.send({ t: "matched", gameId });
     return gameId;
@@ -58,10 +70,51 @@ export class Matchmaker {
     if (invite.host.userId === guest.userId)
       throw new RoomError("You can't join your own invite — send the link to a friend");
     this.invites.delete(code.toUpperCase());
-    const gameId = await this.rooms.create(invite.host, guest, rulesFor(invite.menu));
+    const gameId = await this.rooms.create(
+      invite.host,
+      guest,
+      rulesFor(invite.menu),
+      invite.menu.ranked,
+    );
     invite.host.client.send({ t: "matched", gameId });
     guest.client.send({ t: "matched", gameId });
     return gameId;
+  }
+
+  /** Challenge a friend directly. They get a prompt wherever they're signed in. */
+  async challenge(from: Seeker, toUserId: string, menu: Menu): Promise<string> {
+    if (!(await this.canChallenge(from.userId, toUserId)))
+      throw new RoomError("You can only challenge friends");
+    if (!this.presence.isOnline(toUserId)) throw new RoomError("They're not online right now");
+    const challengeId = randomUUID();
+    this.challenges.set(challengeId, { from, toUserId, menu, expires: Date.now() + 5 * 60 * 1000 });
+    this.presence.notify(toUserId, {
+      t: "challenge",
+      challengeId,
+      from: { id: from.userId, username: from.username },
+      menu,
+    });
+    from.client.send({ t: "challengeSent", challengeId, to: toUserId });
+    return challengeId;
+  }
+
+  async acceptChallenge(guest: Seeker, challengeId: string): Promise<string> {
+    const c = this.challenges.get(challengeId);
+    if (!c || c.toUserId !== guest.userId || c.expires < Date.now()) {
+      throw new RoomError("That challenge is no longer open");
+    }
+    this.challenges.delete(challengeId);
+    const gameId = await this.rooms.create(c.from, guest, rulesFor(c.menu), c.menu.ranked);
+    c.from.client.send({ t: "matched", gameId });
+    guest.client.send({ t: "matched", gameId });
+    return gameId;
+  }
+
+  declineChallenge(guest: Seeker, challengeId: string) {
+    const c = this.challenges.get(challengeId);
+    if (!c || c.toUserId !== guest.userId) return;
+    this.challenges.delete(challengeId);
+    c.from.client.send({ t: "challengeDeclined", challengeId, by: guest.username });
   }
 
   /** Forget anything this connection was waiting for (it cancelled, or disconnected). */
@@ -69,5 +122,6 @@ export class Matchmaker {
     for (const [key, s] of this.queues) if (s.client === client) this.queues.delete(key);
     for (const [code, inv] of this.invites)
       if (inv.host.client === client) this.invites.delete(code);
+    for (const [id, c] of this.challenges) if (c.from.client === client) this.challenges.delete(id);
   }
 }

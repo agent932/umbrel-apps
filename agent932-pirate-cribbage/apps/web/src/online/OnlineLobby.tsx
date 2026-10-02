@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import { tierFor } from "@pirate/engine";
+import { useAuth } from "../auth.js";
 import type { Menu } from "./protocol.js";
 import { socket } from "./socket.js";
 
@@ -8,6 +10,7 @@ type Status = { kind: "idle" } | { kind: "searching" } | { kind: "invite"; code:
 /** Quick Match and invites. Shown on the home screen to signed-in players. */
 export function OnlineLobby() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const [variant, setVariant] = useState<Menu["variant"]>("pirate");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [active, setActive] = useState<string[]>([]);
@@ -42,7 +45,18 @@ export function OnlineLobby() {
       className="flex flex-col gap-4 rounded-2xl border border-gold/30 bg-sea-deep/60 p-5"
       aria-label="Play online"
     >
-      <h2 className="font-pirate text-2xl text-gold">Play online</h2>
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="font-pirate text-2xl text-gold">Play online</h2>
+        {user && (
+          <Link
+            href="/leaderboard"
+            className="text-sm text-parchment/80 hover:text-gold"
+            title="Ranked rating"
+          >
+            {tierFor(user.rating).name} · {user.rating}
+          </Link>
+        )}
+      </div>
 
       {active.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -89,6 +103,17 @@ export function OnlineLobby() {
             onClick={() => (setError(null), socket.send({ t: "createInvite", menu }))}
           >
             Invite a friend
+          </button>
+          <button
+            type="button"
+            className="btn-secondary col-span-2"
+            title="Classic rules; wins and losses move your rating"
+            onClick={() => (
+              setError(null),
+              socket.send({ t: "queue", menu: { variant: "classic", powerCost: 0, ranked: true } })
+            )}
+          >
+            🏆 Ranked match (classic rules)
           </button>
         </div>
       )}

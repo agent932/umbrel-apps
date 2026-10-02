@@ -11,6 +11,7 @@ import {
   shuffle,
   viewFor,
 } from "@pirate/engine";
+import { AuthProvider } from "../auth.js";
 import { GameScreen } from "../screens/GameScreen.js";
 import { OnlineLobby } from "./OnlineLobby.js";
 import type { ServerMessage } from "./protocol.js";
@@ -44,7 +45,18 @@ class FakeSocket {
   }
 }
 
-beforeEach(() => vi.stubGlobal("WebSocket", FakeSocket));
+beforeEach(() => {
+  vi.stubGlobal("WebSocket", FakeSocket);
+  // The lobby asks who's signed in; answer as a signed-in player without a real server.
+  const me = {
+    id: "u1",
+    username: "deckhand",
+    email: "d@example.test",
+    rating: 1000,
+    rankedGames: 0,
+  };
+  vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ user: me }), { status: 200 }));
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const opened = () => act(() => new Promise((r) => setTimeout(r, 5)));
@@ -55,7 +67,9 @@ describe("online lobby", () => {
     const { hook } = memoryLocation({ path: "/" });
     render(
       <Router hook={hook}>
-        <OnlineLobby />
+        <AuthProvider>
+          <OnlineLobby />
+        </AuthProvider>
       </Router>,
     );
     await opened();
@@ -81,7 +95,9 @@ describe("online lobby", () => {
     const loc = memoryLocation({ path: "/", record: true });
     render(
       <Router hook={loc.hook}>
-        <OnlineLobby />
+        <AuthProvider>
+          <OnlineLobby />
+        </AuthProvider>
       </Router>,
     );
     await opened();

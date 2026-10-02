@@ -9,6 +9,11 @@
   --font-pirate: "Pirata One", "Georgia", serif;
 }
 
+/* Matches the bottom of the body gradient, so over-scrolling on phones never flashes white. */
+html {
+  background: var(--color-sea-deep);
+}
+
 body {
   background: radial-gradient(circle at 50% 0%, var(--color-sea), var(--color-sea-deep));
   color: var(--color-parchment);

@@ -6,9 +6,12 @@ import { type LocalGame, loadGame, newLocalGame, saveGame } from "./game/localGa
 import { type MenuChoice, rulesFor } from "./game/menu.js";
 import { useLocalGame } from "./game/useLocalGame.js";
 import { useRemoteGame } from "./game/useRemoteGame.js";
+import { ChallengeToast } from "./online/ChallengeToast.js";
 import { JoinInvite, OnlineLobby } from "./online/OnlineLobby.js";
 import { useOnlineGame } from "./online/useOnlineGame.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
+import { FriendsScreen } from "./screens/FriendsScreen.js";
+import { LeaderboardScreen } from "./screens/LeaderboardScreen.js";
 import { GameScreen } from "./screens/GameScreen.js";
 import { HomeScreen } from "./screens/HomeScreen.js";
 import { StatsScreen } from "./screens/StatsScreen.js";
@@ -54,7 +57,7 @@ function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) 
 }
 
 function Routes({ botDelay }: { botDelay?: number }) {
-  const { user, loading } = useAuth();
+  const { user, loading, refresh: refreshUser } = useAuth();
   const [, navigate] = useLocation();
   const [session, setSession] = useState<Session | null>(null);
   // Bumped whenever a new game starts so the game screen remounts with fresh state.
@@ -136,7 +139,15 @@ function Routes({ botDelay }: { botDelay?: number }) {
       <Route path="/online/:id">
         {(params) =>
           loading ? null : user ? (
-            <OnlinePlay key={params.id} gameId={params.id} onExit={() => navigate("/")} />
+            <OnlinePlay
+              key={params.id}
+              gameId={params.id}
+              onExit={() => {
+                // A ranked game may have moved your rating.
+                void refreshUser();
+                navigate("/");
+              }}
+            />
           ) : (
             <Redirect to="/login" />
           )
@@ -166,6 +177,12 @@ function Routes({ botDelay }: { botDelay?: number }) {
       <Route path="/signup">
         <AuthScreen mode="signup" />
       </Route>
+      <Route path="/friends">
+        {loading ? null : user ? <FriendsScreen /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/leaderboard">
+        {loading ? null : user ? <LeaderboardScreen /> : <Redirect to="/login" />}
+      </Route>
       <Route path="/stats">
         {loading ? null : user ? <StatsScreen /> : <Redirect to="/login" />}
       </Route>
@@ -180,6 +197,7 @@ export function App({ botDelay }: { botDelay?: number } = {}) {
   return (
     <AuthProvider>
       <Routes botDelay={botDelay} />
+      <ChallengeToast />
     </AuthProvider>
   );
 }

@@ -9,7 +9,13 @@ import {
 import type { Db } from "../db/client.js";
 import { matchPlayers, matches, roundPlayers, rounds } from "../db/schema.js";
 
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+export interface RatingChange {
+  before: number;
+  after: number;
+  tier: string;
+}
 
 /** Hand analyzer score for one player's discard, or null if they never discarded this round. */
 export function analyzerScore(seat: RoundSeatRecord, isDealer: boolean): number | null {
@@ -25,10 +31,12 @@ export async function recordMatch(
     mode: "ai" | "online";
     aiLevel: "easy" | "medium" | "hard" | null;
     createdAt: Date;
+    ranked?: boolean;
   },
   players: [string | null, string | null],
   state: GameState,
   forfeitedBy: Seat | null = null,
+  ratings: RatingChange[] | null = null,
 ) {
   const labels = (cards: Card[]) => cards.map(cardLabel);
   await tx.insert(matches).values({
@@ -41,6 +49,7 @@ export async function recordMatch(
     winner: state.winner!,
     skunk: state.skunk,
     forfeitedBy,
+    ranked: game.ranked ?? false,
     startedAt: game.createdAt,
     endedAt: new Date(),
   });
@@ -50,6 +59,9 @@ export async function recordMatch(
       seat,
       userId: players[seat],
       finalScore: state.scores[seat],
+      ratingBefore: ratings?.[seat]?.before ?? null,
+      ratingAfter: ratings?.[seat]?.after ?? null,
+      tier: ratings?.[seat]?.tier ?? null,
     })),
   );
   if (state.history.length === 0) return;

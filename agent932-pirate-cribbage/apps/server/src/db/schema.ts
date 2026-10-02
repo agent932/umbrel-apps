@@ -24,6 +24,9 @@ export const users = pgTable(
     username: text("username").notNull(),
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
+    /** Elo rating for ranked play. */
+    rating: integer("rating").notNull().default(1000),
+    rankedGames: integer("ranked_games").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
@@ -47,6 +50,30 @@ export const sessions = pgTable(
   (t) => [index("sessions_user").on(t.userId)],
 );
 
+/** One row per pair of players. `userId` sent the request; it's "pending" until `friendId` accepts. */
+export const friendships = pgTable(
+  "friendships",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    friendId: uuid("friend_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").$type<"pending" | "accepted">().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.friendId] }),
+    index("friendships_friend").on(t.friendId),
+    // Only one row per pair, whichever direction it was sent.
+    uniqueIndex("friendships_pair").on(
+      sql`least(${t.userId}, ${t.friendId})`,
+      sql`greatest(${t.userId}, ${t.friendId})`,
+    ),
+  ],
+);
+
 /** Games in progress (and finished ones, until cleaned up). The full engine state lives here. */
 export const games = pgTable(
   "games",
@@ -59,6 +86,7 @@ export const games = pgTable(
     aiLevel: text("ai_level").$type<"easy" | "medium" | "hard">(),
     /** Seat 1's player in online games (`userId` is seat 0). Null against the computer. */
     user2Id: uuid("user2_id").references(() => users.id, { onDelete: "cascade" }),
+    ranked: boolean("ranked").notNull().default(false),
     state: jsonb("state").$type<GameState>().notNull(),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -82,6 +110,7 @@ export const matches = pgTable("matches", {
   skunk: smallint("skunk").notNull(),
   /** Seat that forfeited (left or timed out), if the game didn't finish normally. */
   forfeitedBy: smallint("forfeited_by"),
+  ranked: boolean("ranked").notNull().default(false),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
 });
@@ -96,6 +125,10 @@ export const matchPlayers = pgTable(
     /** Null for the computer. */
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     finalScore: integer("final_score").notNull(),
+    /** Ranked matches only: rating and tier going in, and rating after. */
+    ratingBefore: integer("rating_before"),
+    ratingAfter: integer("rating_after"),
+    tier: text("tier"),
   },
   (t) => [primaryKey({ columns: [t.matchId, t.seat] }), index("match_players_user").on(t.userId)],
 );

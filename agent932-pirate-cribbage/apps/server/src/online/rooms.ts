@@ -1,4 +1,4 @@
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   type Action,
   type GameEvent,
@@ -11,15 +11,17 @@ import {
   createGame,
   cryptoRandom,
   other,
+  rateGame,
   redactEvent,
   shuffle,
+  tierFor,
   toAct,
   viewFor,
 } from "@pirate/engine";
 import type { Db } from "../db/client.js";
 import { games, users } from "../db/schema.js";
 import type { ClientAction } from "../games/actions.js";
-import { recordMatch } from "../games/record.js";
+import { type RatingChange, type Tx, recordMatch } from "../games/record.js";
 import { toEngineAction } from "../games/toEngine.js";
 import type { ServerMessage } from "./protocol.js";
 
@@ -67,6 +69,7 @@ class Room {
     readonly players: [Player, Player],
     public state: GameState,
     readonly createdAt: Date,
+    readonly ranked: boolean,
   ) {}
 
   run<T>(fn: () => Promise<T>): Promise<T> {
@@ -95,15 +98,21 @@ export class RoomManager {
   ) {}
 
   /** Start a game between two players. Seats are assigned at random, as is the first dealer. */
-  async create(a: Player, b: Player, rules: RuleSet): Promise<string> {
+  async create(a: Player, b: Player, rules: RuleSet, ranked = false): Promise<string> {
     const players: [Player, Player] = cryptoRandom() < 0.5 ? [a, b] : [b, a];
     let state = createGame(cryptoRandom() < 0.5 ? 0 : 1, rules);
     state = applyAction(state, { type: "deal", deck: shuffle(createDeck(), cryptoRandom) }).state;
     const [row] = await this.db
       .insert(games)
-      .values({ userId: players[0].userId, user2Id: players[1].userId, mode: "online", state })
+      .values({
+        userId: players[0].userId,
+        user2Id: players[1].userId,
+        mode: "online",
+        state,
+        ranked,
+      })
       .returning({ id: games.id, createdAt: games.createdAt });
-    const room = new Room(row!.id, players, state, row!.createdAt);
+    const room = new Room(row!.id, players, state, row!.createdAt, ranked);
     this.rooms.set(room.id, room);
     this.schedule(room);
     return room.id;
@@ -131,6 +140,7 @@ export class RoomManager {
       ],
       row.state,
       row.createdAt,
+      row.ranked,
     );
     this.rooms.set(room.id, room);
     this.schedule(room);
@@ -279,14 +289,49 @@ export class RoomManager {
 
   private async finish(room: Room, forfeitedBy: Seat | null) {
     this.clearTimers(room);
-    await recordMatch(
-      this.db,
-      { id: room.id, mode: "online", aiLevel: null, createdAt: room.createdAt },
-      [room.players[0].userId, room.players[1].userId],
-      room.state,
-      forfeitedBy,
-    );
+    await this.db.transaction(async (tx) => {
+      const ratings = room.ranked ? await this.rate(tx, room) : null;
+      await recordMatch(
+        tx,
+        {
+          id: room.id,
+          mode: "online",
+          aiLevel: null,
+          createdAt: room.createdAt,
+          ranked: room.ranked,
+        },
+        [room.players[0].userId, room.players[1].userId],
+        room.state,
+        forfeitedBy,
+        ratings,
+      );
+    });
     this.rooms.delete(room.id);
+  }
+
+  /** Update both players' Elo ratings (rows locked, so two games ending at once can't clash). */
+  private async rate(tx: Tx, room: Room): Promise<RatingChange[]> {
+    const rows = await tx
+      .select({ id: users.id, rating: users.rating })
+      .from(users)
+      .where(or(eq(users.id, room.players[0].userId), eq(users.id, room.players[1].userId)))
+      .for("update");
+    const seats = [0, 1] as Seat[];
+    const before = seats.map((s) => rows.find((r) => r.id === room.players[s].userId)!.rating);
+    const w = room.state.winner!;
+    const result = rateGame(before[w]!, before[other(w)]!);
+    const after = seats.map((s) => (s === w ? result.winner : result.loser));
+    for (const s of seats) {
+      await tx
+        .update(users)
+        .set({ rating: after[s]!, rankedGames: sql`${users.rankedGames} + 1` })
+        .where(eq(users.id, room.players[s].userId));
+    }
+    return seats.map((s) => ({
+      before: before[s]!,
+      after: after[s]!,
+      tier: tierFor(before[s]!).key,
+    }));
   }
 
   /** Restart the move clock. When it runs out, the server moves for whoever is holding things up. */

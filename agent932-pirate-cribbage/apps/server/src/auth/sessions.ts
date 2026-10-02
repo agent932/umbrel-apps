@@ -12,6 +12,8 @@ export interface SessionUser {
   id: string;
   username: string;
   email: string;
+  rating: number;
+  rankedGames: number;
 }
 
 export async function createSession(
@@ -26,7 +28,13 @@ export async function createSession(
 
 export async function userForToken(db: Db, token: string): Promise<SessionUser | null> {
   const [row] = await db
-    .select({ id: users.id, username: users.username, email: users.email })
+    .select({
+      id: users.id,
+      username: users.username,
+      email: users.email,
+      rating: users.rating,
+      rankedGames: users.rankedGames,
+    })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, new Date())))

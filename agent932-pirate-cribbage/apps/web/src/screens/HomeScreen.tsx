@@ -79,6 +79,9 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
             <span className="mr-auto text-parchment/80">
               Ahoy, <b className="text-gold">{user.username}</b>
             </span>
+            <Link href="/friends" className="text-parchment hover:text-gold">
+              Crew
+            </Link>
             <Link href="/stats" className="text-parchment hover:text-gold">
               Ship's Log
             </Link>
@@ -189,9 +192,7 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
 
       {children}
 
-      <p className="text-center text-xs text-parchment/50">
-        Friends lists and ranked play are on the horizon.
-      </p>
+      <p className="text-center text-xs text-parchment/50">Fair winds, matey.</p>
     </main>
   );
 }

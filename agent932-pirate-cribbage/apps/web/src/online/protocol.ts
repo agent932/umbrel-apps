@@ -5,6 +5,7 @@ import type { UiAction } from "../game/types.js";
 export interface Menu {
   variant: "classic" | "pirate";
   powerCost: 0 | 2;
+  ranked?: boolean;
 }
 
 export type ClientMessage =
@@ -15,7 +16,10 @@ export type ClientMessage =
   | { t: "joinInvite"; code: string }
   | { t: "watch"; gameId: string }
   | { t: "act"; gameId: string; action: UiAction }
-  | { t: "forfeit"; gameId: string };
+  | { t: "forfeit"; gameId: string }
+  | { t: "challenge"; friendId: string; menu: Menu }
+  | { t: "acceptChallenge"; challengeId: string }
+  | { t: "declineChallenge"; challengeId: string };
 
 export type StateMessage = {
   t: "state";
@@ -38,4 +42,8 @@ export type ServerMessage =
   | { t: "presence"; gameId: string; online: [boolean, boolean] }
   | { t: "timeout"; gameId: string; seat: Seat }
   | { t: "forfeit"; gameId: string; seat: Seat }
+  | { t: "challenge"; challengeId: string; from: { id: string; username: string }; menu: Menu }
+  | { t: "challengeSent"; challengeId: string; to: string }
+  | { t: "challengeDeclined"; challengeId: string; by: string }
+  | { t: "friends" }
   | { t: "error"; message: string; gameId?: string };

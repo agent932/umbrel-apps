@@ -1,6 +1,7 @@
 // Dev helper: a scripted online opponent. Signs in as the second test account (see .env.example),
 // joins Quick Match (or an invite code), and plays with the medium bot's choices.
-//   npx tsx scripts/dev-opponent.ts [classic|pirate] [inviteCode]
+//   npx tsx scripts/dev-opponent.ts [classic|pirate|wait] [inviteCode]
+// "wait" just stays online and accepts friend challenges.
 import WebSocket from "ws";
 import { chooseDiscard, choosePlay, type PlayerView } from "@pirate/engine";
 
@@ -54,9 +55,11 @@ ws.on("close", (code) => {
   console.log("connection closed", code);
   process.exit(1);
 });
-ws.on("open", () =>
-  send(code ? { t: "joinInvite", code } : { t: "queue", menu: { variant, powerCost: 0 } }),
-);
+ws.on("open", () => {
+  if (code) send({ t: "joinInvite", code });
+  else if (variant !== "wait") send({ t: "queue", menu: { variant, powerCost: 0 } });
+  else console.log("online and waiting for challenges…");
+});
 ws.on("message", (raw) => {
   const m = JSON.parse(String(raw));
   if (m.t === "matched") {
@@ -66,6 +69,10 @@ ws.on("message", (raw) => {
   }
   if (m.t === "error") console.log("error:", m.message);
   if (m.t === "queued") console.log(`waiting in the ${variant} Quick Match queue…`);
+  if (m.t === "challenge") {
+    console.log(`accepting ${m.from.username}'s challenge`);
+    send({ t: "acceptChallenge", challengeId: m.challengeId });
+  }
   if (m.t === "state") {
     if (m.step.view.phase === "gameOver") {
       console.log("game over, winner seat", m.step.view.winner);

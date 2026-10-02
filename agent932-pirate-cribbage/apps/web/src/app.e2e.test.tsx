@@ -2,7 +2,7 @@
  * The real web app against the real server (in-memory Postgres): fetch is routed straight into
  * Fastify, with a cookie jar, so sign-up, server games and stats all run end to end.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { testApp } from "../../server/src/test/testApp.js";
@@ -11,7 +11,19 @@ import { App } from "./App.js";
 let server: Awaited<ReturnType<typeof testApp>>;
 let cookie = "";
 
+/** This test doesn't cover online play; a silent socket keeps the challenge listener quiet. */
+class SilentSocket {
+  static OPEN = 1;
+  readyState = 0;
+  onopen = null;
+  onmessage = null;
+  onclose = null;
+  send() {}
+  close() {}
+}
+
 beforeAll(async () => {
+  vi.stubGlobal("WebSocket", SilentSocket);
   server = await testApp();
   globalThis.fetch = (async (input: string, init: RequestInit = {}) => {
     const res = await server.app.inject({
@@ -28,7 +40,10 @@ beforeAll(async () => {
     });
   }) as typeof fetch;
 });
-afterAll(async () => server.close());
+afterAll(async () => {
+  vi.unstubAllGlobals();
+  await server.close();
+});
 
 describe("signed-in play, end to end", () => {
   it("signs up, plays a server game to the end, and sees it in the Ship's Log", async () => {

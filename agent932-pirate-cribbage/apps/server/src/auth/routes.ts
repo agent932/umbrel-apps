@@ -93,7 +93,13 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
         email: body.email,
         passwordHash: await hashPassword(body.password),
       })
-      .returning({ id: users.id, username: users.username, email: users.email });
+      .returning({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        rating: users.rating,
+        rankedGames: users.rankedGames,
+      });
     await startSession(reply, user!.id);
     return reply.code(201).send({ user });
   });
@@ -116,7 +122,15 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
       return reply.code(401).send({ error: "Wrong username or password" });
     }
     await startSession(reply, row.id);
-    return { user: { id: row.id, username: row.username, email: row.email } };
+    return {
+      user: {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        rating: row.rating,
+        rankedGames: row.rankedGames,
+      },
+    };
   });
 
   app.post("/api/auth/logout", async (req, reply) => {

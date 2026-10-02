@@ -1,166 +1,24 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { WebSocket } from "ws";
-import { type PlayerView, chooseDiscard, choosePlay } from "@pirate/engine";
 import { signUp, testApp } from "../test/testApp.js";
-import type { ClientAction } from "../games/actions.js";
+import {
+  LONG,
+  type StateMsg,
+  connect,
+  matchedPair,
+  move,
+  nextMove,
+  playOut,
+} from "../test/wsClient.js";
 import type { ServerMessage } from "./protocol.js";
 import type { Timing } from "./rooms.js";
-
-type StateMsg = Extract<ServerMessage, { t: "state" }>;
 
 let t: Awaited<ReturnType<typeof testApp>>;
 afterEach(async () => t?.close());
 
-const LONG: Timing = { turnMs: 60_000, nextRoundMs: 60_000, disconnectMs: 60_000 };
-
-/**
- * A WebSocket test client. Every message is kept in arrival order; `next` hands out each
- * matching message once (oldest first), and `after` waits for one that arrives after a point.
- */
-async function connect(app: typeof t.app, cookie?: string) {
-  await app.ready();
-  const messages: ServerMessage[] = [];
-  const taken = new Set<number>();
-  const listeners = new Set<() => void>();
-  let resolveClosed: (code: number) => void = () => {};
-  const closed = new Promise<number>((r) => (resolveClosed = r));
-  // Listeners go on in onInit, before the socket opens, so the server's first message isn't missed.
-  const ws: WebSocket = await app.injectWS("/api/ws", cookie ? { headers: { cookie } } : {}, {
-    onInit: (socket: WebSocket) => {
-      socket.on("message", (raw) => {
-        messages.push(JSON.parse(String(raw)) as ServerMessage);
-        for (const l of [...listeners]) l();
-      });
-      socket.on("close", (code) => resolveClosed(code));
-    },
-  });
-
-  function waitFor<T extends ServerMessage>(find: () => T | undefined, ms: number): Promise<T> {
-    const found = find();
-    if (found) return Promise.resolve(found);
-    return new Promise<T>((resolve, reject) => {
-      const check = () => {
-        const m = find();
-        if (!m) return;
-        listeners.delete(check);
-        clearTimeout(timer);
-        resolve(m);
-      };
-      const timer = setTimeout(() => {
-        listeners.delete(check);
-        reject(
-          new Error(
-            `timed out; last messages: ${JSON.stringify(messages.slice(-2)).slice(0, 400)}`,
-          ),
-        );
-      }, ms);
-      listeners.add(check);
-    });
-  }
-
-  return {
-    ws,
-    messages,
-    closed,
-    send: (m: object) => ws.send(JSON.stringify(m)),
-    next<T extends ServerMessage>(pred: (m: ServerMessage) => boolean, ms = 5000): Promise<T> {
-      return waitFor(() => {
-        const i = messages.findIndex((m, idx) => !taken.has(idx) && pred(m));
-        if (i < 0) return undefined;
-        taken.add(i);
-        return messages[i] as T;
-      }, ms);
-    },
-    after<T extends ServerMessage>(
-      index: number,
-      pred: (m: ServerMessage) => boolean,
-      ms = 5000,
-    ): Promise<T> {
-      return waitFor(() => messages.slice(index).find(pred) as T | undefined, ms);
-    },
-    latestState(): StateMsg | undefined {
-      return messages.filter((m): m is StateMsg => m.t === "state").at(-1);
-    },
-  };
-}
-type TestClient = Awaited<ReturnType<typeof connect>>;
-
-/** Two signed-up players, connected, paired through Quick Match, and watching their game. */
-async function matchedPair(timing: Timing = LONG, variant: "classic" | "pirate" = "classic") {
+/** A fresh app with the given clocks, and two matched players on it. */
+async function pair(timing: Timing = LONG, variant: "classic" | "pirate" = "classic") {
   t = await testApp(undefined, timing);
-  const anne = await signUp(t.app, "Anne");
-  const bonny = await signUp(t.app, "Bonny");
-  const a = await connect(t.app, anne.cookie);
-  const b = await connect(t.app, bonny.cookie);
-  await a.next((m) => m.t === "hello");
-  await b.next((m) => m.t === "hello");
-  a.send({ t: "queue", menu: { variant } });
-  await a.next((m) => m.t === "queued");
-  b.send({ t: "queue", menu: { variant } });
-  const { gameId } = await a.next<Extract<ServerMessage, { t: "matched" }>>(
-    (m) => m.t === "matched",
-  );
-  await b.next((m) => m.t === "matched");
-  a.send({ t: "watch", gameId });
-  b.send({ t: "watch", gameId });
-  const sa = await a.next<StateMsg>((m) => m.t === "state");
-  const sb = await b.next<StateMsg>((m) => m.t === "state");
-  return { gameId, a, b, sa, sb, anne, bonny };
-}
-
-/** What a sensible player sends next, from what the server shows them. */
-function nextMove(view: PlayerView, readyForNext: boolean): ClientAction | null {
-  const mine = view.toAct.includes(view.seat);
-  switch (view.phase) {
-    case "discard":
-      return view.hand.length === 6
-        ? { type: "discard", cards: chooseDiscard(view.hand, view.dealer === view.seat) }
-        : null;
-    case "cut":
-      return mine ? { type: "cut" } : null;
-    case "preplay":
-      return view.needsReady ? { type: "ready" } : null;
-    case "pegging":
-      return mine ? { type: "play", card: choosePlay(view) } : null;
-    case "roundEnd":
-      return readyForNext ? null : { type: "nextRound" };
-    default:
-      return null;
-  }
-}
-
-/** Send a move and wait for the server's answer (new state, a "waiting" note, or an error). */
-async function move(c: TestClient, gameId: string, action: ClientAction) {
-  const mark = c.messages.length;
-  c.send({ t: "act", gameId, action });
-  const reply = await c.after(mark, (m) => m.t === "state" || m.t === "waiting" || m.t === "error");
-  if (reply.t === "error") throw new Error(reply.message);
-  return reply;
-}
-
-/** The latest round-summary readiness this client has heard about. */
-function readyForNext(c: TestClient, s: StateMsg) {
-  const last = c.messages.filter((m) => m.t === "waiting" || m.t === "state").at(-1);
-  const ready = last?.t === "waiting" ? last.ready : s.nextRoundReady;
-  return ready.includes(s.seat);
-}
-
-/** Both clients play themselves until the game ends. */
-async function playOut(gameId: string, clients: TestClient[]) {
-  for (let i = 0; i < 4000; i++) {
-    let moved = false;
-    for (const c of clients) {
-      const s = c.latestState();
-      if (!s) continue;
-      if (s.step.view.phase === "gameOver") return s;
-      const action = nextMove(s.step.view, readyForNext(c, s));
-      if (!action) continue;
-      await move(c, gameId, action);
-      moved = true;
-    }
-    if (!moved) await new Promise((r) => setTimeout(r, 5));
-  }
-  throw new Error("Game did not finish");
+  return matchedPair(t, { variant });
 }
 
 describe("online play", () => {
@@ -172,7 +30,7 @@ describe("online play", () => {
   });
 
   it("pairs two players through Quick Match and shows each only their own hand", async () => {
-    const { sa, sb } = await matchedPair();
+    const { sa, sb } = await pair();
     expect(new Set([sa.seat, sb.seat])).toEqual(new Set([0, 1]));
     expect(sa.names).toEqual(sb.names);
     expect([...sa.names].sort()).toEqual(["Anne", "Bonny"]);
@@ -199,7 +57,7 @@ describe("online play", () => {
   });
 
   it("plays a whole online game and records it for both players", async () => {
-    const { gameId, a, b, anne, bonny } = await matchedPair();
+    const { gameId, a, b, anne, bonny } = await pair();
     const end = await playOut(gameId, [a, b]);
     expect(end.step.view.winner).not.toBeNull();
 
@@ -218,13 +76,13 @@ describe("online play", () => {
   }, 60_000);
 
   it("plays a pirate game online", async () => {
-    const { gameId, a, b } = await matchedPair(LONG, "pirate");
+    const { gameId, a, b } = await pair(LONG, "pirate");
     const end = await playOut(gameId, [a, b]);
     expect(end.step.view.phase).toBe("gameOver");
   }, 60_000);
 
   it("rejects illegal moves and moves from people not in the game", async () => {
-    const { gameId, a, sa } = await matchedPair();
+    const { gameId, a, sa } = await pair();
     a.send({ t: "act", gameId, action: { type: "play", card: sa.step.view.hand[0] } });
     expect(await a.next((m) => m.t === "error")).toMatchObject({ message: "Not time to play" });
 
@@ -242,7 +100,7 @@ describe("online play", () => {
   });
 
   it("starts the next round only when both players are ready", async () => {
-    const { gameId, a, b } = await matchedPair();
+    const { gameId, a, b } = await pair();
     // Play until the first round summary.
     for (let i = 0; i < 400; i++) {
       const phases = [a, b].map((c) => c.latestState()!.step.view.phase);
@@ -269,7 +127,7 @@ describe("online play", () => {
   }, 30_000);
 
   it("moves for a player who runs out of time", async () => {
-    const { a, b } = await matchedPair({ turnMs: 150, nextRoundMs: 150, disconnectMs: 60_000 });
+    const { a, b } = await pair({ turnMs: 150, nextRoundMs: 150, disconnectMs: 60_000 });
     // Nobody discards; the server throws for them.
     expect(await a.next((m) => m.t === "timeout", 3000)).toMatchObject({ t: "timeout" });
     const s = await b.next<StateMsg>(
@@ -280,7 +138,7 @@ describe("online play", () => {
   });
 
   it("gives the game to the opponent when a player stays disconnected", async () => {
-    const { gameId, a, b, sa } = await matchedPair({
+    const { gameId, a, b, sa } = await pair({
       turnMs: 60_000,
       nextRoundMs: 60_000,
       disconnectMs: 150,
@@ -303,7 +161,7 @@ describe("online play", () => {
   });
 
   it("lets a player reconnect in time and pick up where they left off", async () => {
-    const { gameId, a, sa, anne } = await matchedPair({
+    const { gameId, a, sa, anne } = await pair({
       turnMs: 60_000,
       nextRoundMs: 60_000,
       disconnectMs: 500,
@@ -320,14 +178,14 @@ describe("online play", () => {
   });
 
   it("forfeits on request", async () => {
-    const { gameId, a, b, sa } = await matchedPair();
+    const { gameId, a, b, sa } = await pair();
     a.send({ t: "forfeit", gameId });
     const f = await b.next<Extract<ServerMessage, { t: "forfeit" }>>((m) => m.t === "forfeit");
     expect(f.seat).toBe(sa.seat);
   });
 
   it("resumes a game after a server restart", async () => {
-    const { gameId, sa, anne } = await matchedPair();
+    const { gameId, sa, anne } = await pair();
     const app2 = await t.restart();
     const c = await connect(app2, anne.cookie);
     c.send({ t: "watch", gameId });

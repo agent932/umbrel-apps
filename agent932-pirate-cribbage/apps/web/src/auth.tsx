@@ -7,6 +7,8 @@ interface AuthState {
   login: (login: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Re-read the signed-in user (e.g. after a ranked game changes your rating). */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -31,13 +33,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (await api<{ user: User }>("/api/auth/signup", { body: { username, email, password } })).user,
     );
   }, []);
+  const refresh = useCallback(async () => {
+    setUser((await api<{ user: User | null }>("/api/auth/me")).user);
+  }, []);
   const logout = useCallback(async () => {
     await api("/api/auth/logout", { body: {} });
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

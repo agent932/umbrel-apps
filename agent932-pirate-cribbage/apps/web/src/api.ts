@@ -28,6 +28,22 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  rating: number;
+  rankedGames: number;
+}
+
+export interface Friend {
+  id: string;
+  username: string;
+  rating: number;
+  tier: string;
+  online: boolean;
+}
+
+export interface FriendsResponse {
+  friends: Friend[];
+  incoming: Friend[];
+  outgoing: Friend[];
 }
 
 export interface Step {
