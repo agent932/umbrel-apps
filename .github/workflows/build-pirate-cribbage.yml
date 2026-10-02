@@ -1,0 +1,72 @@
+name: Build Pirate Cribbage
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "agent932-pirate-cribbage/**"
+      - ".github/workflows/build-pirate-cribbage.yml"
+  push:
+    branches: [main]
+    paths:
+      - "agent932-pirate-cribbage/**"
+      - ".github/workflows/build-pirate-cribbage.yml"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pirate-cribbage
+
+defaults:
+  run:
+    working-directory: agent932-pirate-cribbage
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: agent932-pirate-cribbage/.nvmrc
+          cache: npm
+          cache-dependency-path: agent932-pirate-cribbage/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  image:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: agent932-pirate-cribbage
+          file: agent932-pirate-cribbage/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          # Links the package to this repo so it shows up here and can inherit its visibility.
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

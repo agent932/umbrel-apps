@@ -1,0 +1,34 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: agent932-pirate-cribbage_web_1
+      APP_PORT: 3000
+      # The game has its own player accounts and is meant to be shared with
+      # friends, so skip the Umbrel login.
+      PROXY_AUTH_ADD: "false"
+
+  web:
+    image: ghcr.io/agent932/pirate-cribbage:latest
+    restart: on-failure
+    stop_grace_period: 1m
+    depends_on:
+      - database
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgres://pirate:${APP_PIRATE_CRIBBAGE_DB_PASSWORD}@database:5432/pirate_cribbage
+      - SESSION_SECRET=${APP_PIRATE_CRIBBAGE_SESSION_SECRET}
+      - MIGRATE_ON_START=true
+
+  database:
+    image: postgres:17-alpine
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      - POSTGRES_DB=pirate_cribbage
+      - POSTGRES_USER=pirate
+      - POSTGRES_PASSWORD=${APP_PIRATE_CRIBBAGE_DB_PASSWORD}
+    volumes:
+      - ${APP_DATA_DIR}/data/postgres:/var/lib/postgresql/data

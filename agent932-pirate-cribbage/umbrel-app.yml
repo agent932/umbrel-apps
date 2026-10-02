@@ -1,0 +1,46 @@
+manifestVersion: 1
+id: agent932-pirate-cribbage
+category: gaming
+name: Pirate Cribbage
+version: "0.1.0"
+tagline: Online 2-player cribbage with stats, ranks and pirate rules
+icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
+description: >-
+  Pirate Cribbage is a self-hosted online cribbage game. Create an account,
+  play against the computer or against friends online, and track detailed
+  stats for every match: win rates, pegging, hand and crib averages, hand
+  distributions and a discard analyzer.
+
+
+  Play classic cribbage, or switch on Pirate Rules for a few swashbuckling
+  twists.
+
+
+  Playing with friends outside your home network: the game has its own
+  player accounts, so it is published without the Umbrel login in front of it.
+  Point a Cloudflare Tunnel (or Tailscale) at port 8121 to let friends join.
+
+
+  Features:
+
+  - Player accounts and friends
+
+  - Play vs computer (Easy, Medium, Hard) or online
+
+  - Ranked play with tiers
+
+  - Detailed per-mode and head-to-head stats
+releaseNotes: "First preview release."
+
+developer: agent932
+website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage
+dependencies: []
+repo: https://github.com/agent932/umbrel-apps
+support: https://github.com/agent932/umbrel-apps/issues
+
+port: 8121
+gallery: []
+path: ""
+
+defaultUsername: ""
+defaultPassword: ""
