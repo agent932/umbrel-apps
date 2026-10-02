@@ -1,0 +1,31 @@
+# Production stack (self-hosted, e.g. on Umbrel).
+# Set POSTGRES_PASSWORD in a .env file next to this compose file before starting.
+services:
+  app:
+    build: .
+    image: pirate-cribbage:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://pirate:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/pirate_cribbage
+    ports:
+      - "${APP_PORT:-8121}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pirate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: pirate_cribbage
+    volumes:
+      - pirate-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pirate -d pirate_cribbage"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pirate-db:

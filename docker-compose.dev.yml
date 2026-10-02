@@ -1,0 +1,19 @@
+# Local development database only. Run the app itself with `npm run dev`.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pirate
+      POSTGRES_PASSWORD: pirate
+      POSTGRES_DB: pirate_cribbage
+    ports:
+      - "5432:5432"
+    volumes:
+      - pirate-dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pirate -d pirate_cribbage"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pirate-dev-db:

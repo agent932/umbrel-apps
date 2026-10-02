@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sea: #0b2a3a;
+  --color-sea-deep: #061a25;
+  --color-parchment: #f3e5c0;
+  --color-gold: #d4a017;
+  --color-rum: #7a3b12;
+  --font-pirate: "Pirata One", "Georgia", serif;
+}
+
+body {
+  background: radial-gradient(circle at 50% 0%, var(--color-sea), var(--color-sea-deep));
+  color: var(--color-parchment);
+  min-height: 100dvh;
+}
