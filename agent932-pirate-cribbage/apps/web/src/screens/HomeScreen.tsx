@@ -1,19 +1,16 @@
 import { useState } from "react";
-import {
-  type BotLevel,
-  CLASSIC_RULES,
-  PIRATE_RULES,
-  POWER_INFO,
-  POWERS,
-  type RuleSet,
-} from "@pirate/engine";
+import { Link } from "wouter";
+import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
+import { useAuth } from "../auth.js";
 import { POWER_ICONS } from "../components/PowerBar.js";
-import type { LocalGameOptions } from "../game/localGame.js";
+import type { MenuChoice } from "../game/menu.js";
 
 interface Props {
   canResume: boolean;
   onResume: () => void;
-  onStart: (options: LocalGameOptions) => void;
+  onStart: (choice: MenuChoice) => void;
+  starting?: boolean;
+  error?: string | null;
 }
 
 function Choice<T extends string>({
@@ -58,24 +55,53 @@ function Choice<T extends string>({
   );
 }
 
-export function HomeScreen({ canResume, onResume, onStart }: Props) {
+export function HomeScreen({ canResume, onResume, onStart, starting, error }: Props) {
+  const { user, logout } = useAuth();
   const [level, setLevel] = useState<BotLevel | "hard">("medium");
   const [mode, setMode] = useState<"classic" | "pirate">("pirate");
   const [cost, setCost] = useState<"free" | "plunder">("free");
 
   function start() {
-    const rules: RuleSet =
-      mode === "classic"
-        ? CLASSIC_RULES
-        : {
-            ...PIRATE_RULES,
-            pirate: { ...PIRATE_RULES.pirate!, powerCost: cost === "plunder" ? 2 : 0 },
-          };
-    onStart({ level: level as BotLevel, rules });
+    onStart({
+      level: level as BotLevel,
+      variant: mode,
+      powerCost: mode === "pirate" && cost === "plunder" ? 2 : 0,
+    });
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-10">
+    <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-6">
+      <nav className="flex items-center justify-end gap-3 text-sm" aria-label="Account">
+        {user ? (
+          <>
+            <span className="mr-auto text-parchment/80">
+              Ahoy, <b className="text-gold">{user.username}</b>
+            </span>
+            <Link href="/stats" className="text-parchment hover:text-gold">
+              Ship's Log
+            </Link>
+            <button
+              type="button"
+              className="text-parchment/70 hover:text-gold"
+              onClick={() => void logout()}
+            >
+              Log out
+            </button>
+          </>
+        ) : (
+          <>
+            <Link href="/login" className="text-parchment hover:text-gold">
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-lg border border-gold/60 px-3 py-1 hover:bg-gold/10"
+            >
+              Sign up
+            </Link>
+          </>
+        )}
+      </nav>
       <header className="text-center">
         <h1 className="font-pirate text-5xl text-gold sm:text-6xl">Pirate Cribbage</h1>
         <p className="mt-2 text-parchment/80">
@@ -144,13 +170,23 @@ export function HomeScreen({ canResume, onResume, onStart }: Props) {
             </details>
           </>
         )}
-        <button type="button" className="btn-primary" onClick={start}>
+        {error && (
+          <p role="alert" className="text-sm text-red-300">
+            {error}
+          </p>
+        )}
+        <button type="button" className="btn-primary" onClick={start} disabled={starting}>
           Set sail ⛵
         </button>
+        <p className="text-center text-xs text-parchment/60">
+          {user
+            ? "This game counts toward your Ship's Log."
+            : "Playing as a guest: sign up to keep your stats."}
+        </p>
       </section>
 
       <p className="text-center text-xs text-parchment/50">
-        Online play, accounts and stats are on the horizon.
+        Online play against other pirates is on the horizon.
       </p>
     </main>
   );

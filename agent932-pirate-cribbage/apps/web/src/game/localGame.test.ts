@@ -17,12 +17,12 @@ describe("local game", () => {
       game = step(game, action);
       for (const seat of [YOU, BOT]) {
         if (game.state.scores[seat] !== before[seat])
-          expect(game.backPegs[seat]).toBe(before[seat]);
+          expect(game.p.backPegs[seat]).toBe(before[seat]);
       }
     }
     expect(game.state.phase).toBe("gameOver");
-    expect(game.feed[0]!.text).toMatch(/won/);
-    expect(game.feed.length).toBeLessThanOrEqual(40);
+    expect(game.p.feed[0]!.text).toMatch(/won/);
+    expect(game.p.feed.length).toBeLessThanOrEqual(40);
   });
 
   it("collects the show for the round summary and clears it on the next deal", () => {
@@ -37,9 +37,9 @@ describe("local game", () => {
       );
     }
     if (game.state.phase === "roundEnd") {
-      expect(game.show.map((e) => e.type)).toEqual(["hand", "hand", "crib"]);
+      expect(game.p.show.map((e: { type: string }) => e.type)).toEqual(["hand", "hand", "crib"]);
       game = step(step(game, { type: "nextRound" }), dealAction());
-      expect(game.show).toEqual([]);
+      expect(game.p.show).toEqual([]);
     }
   });
 

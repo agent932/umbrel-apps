@@ -5,32 +5,27 @@ import {
   type PowerId,
   cardLabel,
   cardValue,
-  cryptoRandom,
   sameCard,
-  viewFor,
 } from "@pirate/engine";
 import { Board } from "../components/Board.js";
 import { Card } from "../components/Card.js";
 import { POWER_ICONS, PowerBar } from "../components/PowerBar.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
-import { BOT, type LocalGame, YOU, names } from "../game/localGame.js";
-import { useLocalGame } from "../game/useLocalGame.js";
+import { BOT, YOU } from "../game/localGame.js";
+import type { FeedItem, GameController } from "../game/types.js";
 
 interface Props {
-  initial: LocalGame;
+  game: GameController;
   onExit: () => void;
   onPlayAgain: () => void;
-  botDelay?: number;
 }
 
-export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
-  const { game, act, error } = useLocalGame(initial, botDelay);
-  const { state, options } = game;
-  const view = viewFor(state, YOU);
-  const label = names(options.level);
-  const pirate = state.rules.pirate;
+export function GameScreen({ game, onExit, onPlayAgain }: Props) {
+  const { p, names: label, act, error } = game;
+  const view = p.view;
+  const pirate = view.rules.pirate;
   // The selection belongs to one situation; when the phase or hand changes it's dropped.
-  const situation = `${state.round}:${state.phase}:${view.hand.map(cardLabel).join()}`;
+  const situation = `${view.round}:${view.phase}:${view.hand.map(cardLabel).join()}`;
   const [selection, setSelection] = useState({ situation, cards: [] as CardType[] });
   const selected = selection.situation === situation ? selection.cards : [];
   const setSelected = (update: (cards: CardType[]) => CardType[]) =>
@@ -42,10 +37,10 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
       isSelected(c) ? sel.filter((s) => !sameCard(s, c)) : sel.length < max ? [...sel, c] : sel,
     );
 
-  const myTurnToPeg = state.phase === "pegging" && view.toAct.includes(YOU);
-  const mustDiscard = state.phase === "discard" && view.hand.length === 6;
-  const mustCut = state.phase === "cut" && view.toAct.includes(YOU);
-  const inPreplay = state.phase === "preplay" && view.needsReady;
+  const myTurnToPeg = view.phase === "pegging" && view.toAct.includes(YOU);
+  const mustDiscard = view.phase === "discard" && view.hand.length === 6;
+  const mustCut = view.phase === "cut" && view.toAct.includes(YOU);
+  const inPreplay = view.phase === "preplay" && view.needsReady;
   const count = view.pegging?.count ?? 0;
 
   // In pre-play, the cards you threw to the crib can be picked again for Rebury.
@@ -62,53 +57,39 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
 
   function triggerPower(power: PowerId) {
     switch (power) {
-      case "spyglass":
-        return act({ type: "spyglass", seat: YOU });
-      case "crowsNest":
-        return act({
-          type: "crowsNest",
-          seat: YOU,
-          index: Math.floor(cryptoRandom() * state.deck.length),
-        });
       case "parley":
-        return act({ type: "parley", seat: YOU, card: selected[0]! });
       case "pickpocket":
-        return act({
-          type: "pickpocket",
-          seat: YOU,
-          card: selected[0]!,
-          index: Math.floor(cryptoRandom() * view.opponentCardCount),
-        });
+        return act({ type: power, card: selected[0]! });
       case "rebury":
-        return act({ type: "rebury", seat: YOU, cards: selected });
-      case "belay":
-        return act({ type: "belay", seat: YOU });
+        return act({ type: "rebury", cards: selected });
+      default:
+        return act({ type: power });
     }
   }
 
   function onCardClick(c: CardType) {
     if (mustDiscard) return toggle(c, 2);
     if (inPreplay) return toggle(c, 2);
-    if (myTurnToPeg) return act({ type: "play", seat: YOU, card: c });
+    if (myTurnToPeg) return act({ type: "play", card: c });
   }
 
   const prompt = mustDiscard
-    ? `Throw two cards to ${state.dealer === YOU ? "your" : "Cap'n Bot's"} crib`
-    : state.phase === "discard"
+    ? `Throw two cards to ${view.dealer === YOU ? "your" : "Cap'n Bot's"} crib`
+    : view.phase === "discard"
       ? "Waiting for Cap'n Bot to discard…"
       : mustCut
         ? "Cut the deck"
-        : state.phase === "cut"
+        : view.phase === "cut"
           ? "Cap'n Bot is cutting…"
           : inPreplay
             ? "Use Pickpocket or Rebury, or set sail"
-            : state.phase === "preplay"
+            : view.phase === "preplay"
               ? "Waiting for Cap'n Bot…"
               : myTurnToPeg
                 ? `Your play — the count is ${count}`
-                : state.phase === "pegging"
+                : view.phase === "pegging"
                   ? "Cap'n Bot is thinking…"
-                  : state.phase === "deal"
+                  : view.phase === "deal"
                     ? "Shuffling…"
                     : "";
 
@@ -116,7 +97,7 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
     ? view.pegging.played.slice(view.pegging.played.length - view.pegging.pile.length)
     : [];
   const cribLabel =
-    view.cribOwner === YOU || (view.cribOwner === null && state.dealer === YOU)
+    view.cribOwner === YOU || (view.cribOwner === null && view.dealer === YOU)
       ? "Your crib"
       : "Bot's crib";
 
@@ -127,17 +108,17 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
           ← Harbour
         </button>
         <span className="text-parchment/70">
-          Round {Math.max(state.round, 1)} · {pirate ? "Pirate rules" : "Classic"}
+          Round {Math.max(view.round, 1)} · {pirate ? "Pirate rules" : "Classic"}
         </span>
       </header>
 
       <PlayerStrip
         name={label[BOT]}
-        score={state.scores[BOT]}
-        dealer={state.dealer === BOT}
+        score={view.scores[BOT]}
+        dealer={view.dealer === BOT}
         powersLeft={view.opponentPowersLeft}
       >
-        {view.spied && state.phase === "discard" ? (
+        {view.spied && view.phase === "discard" ? (
           <div className="flex gap-1" aria-label="Opponent's hand seen through the spyglass">
             {view.spied.map((c) => (
               <Card key={cardLabel(c)} card={c} small />
@@ -155,7 +136,7 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
         )}
       </PlayerStrip>
 
-      <Board scores={state.scores} backPegs={game.backPegs} rules={state.rules} names={label} />
+      <Board scores={view.scores} backPegs={p.backPegs} rules={view.rules} names={label} />
 
       <section className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
         <div className="flex flex-col items-center gap-1 text-[11px] text-parchment/70">
@@ -217,9 +198,9 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
         </div>
       </section>
 
-      <Feed items={game.feed.slice(0, 4)} />
+      <Feed items={p.feed.slice(0, 4)} />
 
-      <PlayerStrip name={label[YOU]} score={state.scores[YOU]} dealer={state.dealer === YOU} you>
+      <PlayerStrip name={label[YOU]} score={view.scores[YOU]} dealer={view.dealer === YOU} you>
         <p className="text-sm text-parchment/85" aria-live="polite">
           {view.pegging ? prompt : ""}
         </p>
@@ -260,28 +241,18 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
               type="button"
               className="btn-primary"
               disabled={selected.length !== 2}
-              onClick={() => act({ type: "discard", seat: YOU, cards: selected })}
+              onClick={() => act({ type: "discard", cards: selected })}
             >
               Throw to crib
             </button>
           )}
           {mustCut && (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() =>
-                act({ type: "cut", index: Math.floor(cryptoRandom() * state.deck.length) })
-              }
-            >
+            <button type="button" className="btn-primary" onClick={() => act({ type: "cut" })}>
               Cut the deck
             </button>
           )}
           {inPreplay && (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => act({ type: "ready", seat: YOU })}
-            >
+            <button type="button" className="btn-primary" onClick={() => act({ type: "ready" })}>
               Set sail ⛵
             </button>
           )}
@@ -303,23 +274,22 @@ export function GameScreen({ initial, onExit, onPlayAgain, botDelay }: Props) {
         )}
       </section>
 
-      {state.phase === "roundEnd" && (
+      {view.phase === "roundEnd" && (
         <RoundSummary
-          show={game.show}
-          cut={state.cut}
+          show={p.show}
+          cut={view.cut}
           names={label}
           onNext={() => act({ type: "nextRound" })}
         />
       )}
 
-      {state.phase === "gameOver" && (
-        <Modal title={state.winner === YOU ? "Victory! 🏴‍☠️" : "Defeat…"}>
+      {view.phase === "gameOver" && (
+        <Modal title={view.winner === YOU ? "Victory! 🏴‍☠️" : "Defeat…"}>
           <p className="mb-3 text-center">
-            {state.winner === YOU ? "Ye won" : "Cap'n Bot won"} {state.scores[YOU]}–
-            {state.scores[BOT]}
-            {state.skunk === 2 ? " — a double skunk!" : state.skunk === 1 ? " — a skunk!" : "."}
+            {view.winner === YOU ? "Ye won" : "Cap'n Bot won"} {view.scores[YOU]}–{view.scores[BOT]}
+            {view.skunk === 2 ? " — a double skunk!" : view.skunk === 1 ? " — a skunk!" : "."}
           </p>
-          {game.show.length > 0 && <ShowList show={game.show} cut={state.cut} names={label} />}
+          {p.show.length > 0 && <ShowList show={p.show} cut={view.cut} names={label} />}
           <div className="mt-4 flex gap-2">
             <button type="button" className="btn-primary flex-1" onClick={onPlayAgain} autoFocus>
               Play again
@@ -378,7 +348,7 @@ function PlayerStrip({
   );
 }
 
-function Feed({ items }: { items: LocalGame["feed"] }) {
+function Feed({ items }: { items: FeedItem[] }) {
   return (
     <ol className="flex min-h-20 flex-col gap-0.5 text-sm" aria-label="Game log">
       <AnimatePresence initial={false}>

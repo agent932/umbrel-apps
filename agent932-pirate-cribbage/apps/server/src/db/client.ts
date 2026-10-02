@@ -1,7 +1,13 @@
 import { drizzle } from "drizzle-orm/postgres-js";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import postgres from "postgres";
-import { config } from "../config.js";
 import * as schema from "./schema.js";
 
-export const sql = postgres(config.databaseUrl, { max: 10 });
-export const db = drizzle(sql, { schema });
+/** Works with both postgres-js (production) and PGlite (tests). */
+export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
+
+export function connect(url: string) {
+  const client = postgres(url, { max: 10 });
+  const db = drizzle(client, { schema }) as unknown as Db;
+  return { db, close: () => client.end(), ping: async () => (await client`select 1`, true) };
+}

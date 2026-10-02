@@ -12,7 +12,8 @@
     "@pirate/engine": "*",
     "motion": "^14.0.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "wouter": "^3.13.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

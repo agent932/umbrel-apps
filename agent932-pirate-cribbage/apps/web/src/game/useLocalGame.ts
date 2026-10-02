@@ -6,7 +6,17 @@ import {
   cryptoRandom,
   powerBlocker,
 } from "@pirate/engine";
-import { BOT, type LocalGame, YOU, dealAction, saveGame, step } from "./localGame.js";
+import {
+  BOT,
+  type LocalGame,
+  YOU,
+  dealAction,
+  names,
+  saveGame,
+  step,
+  toEngineAction,
+} from "./localGame.js";
+import type { GameController, UiAction } from "./types.js";
 
 /** How long the bot "thinks" before each move, so the player can follow along. */
 export const BOT_DELAY_MS = 750;
@@ -14,16 +24,16 @@ export const BOT_DELAY_MS = 750;
 export const BELAY_WINDOW_MS = 2500;
 const DEAL_DELAY_MS = 350;
 
-export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS) {
+export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameController {
   const [game, setGame] = useState(initial);
   const [error, setError] = useState<string | null>(null);
-  // Latest state for `act`, so rapid clicks never apply an action to a stale game.
+  // Latest state for `apply`, so rapid clicks never apply an action to a stale game.
   const gameRef = useRef(game);
   useLayoutEffect(() => {
     gameRef.current = game;
   }, [game]);
 
-  const act = useCallback((action: Action) => {
+  const apply = useCallback((action: Action) => {
     try {
       const next = step(gameRef.current, action);
       gameRef.current = next;
@@ -41,18 +51,23 @@ export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS) {
   useEffect(() => {
     const { state, options } = game;
     if (state.phase === "deal") {
-      const t = setTimeout(() => act(dealAction()), DEAL_DELAY_MS);
+      const t = setTimeout(() => apply(dealAction()), DEAL_DELAY_MS);
       return () => clearTimeout(t);
     }
     const move = botAction(state, BOT, options.level, cryptoRandom);
     if (!move) return;
     const canBelay = move.type === "play" && powerBlocker(state, YOU, "belay") === null;
-    const t = setTimeout(
-      () => act(move),
-      canBelay && botDelay > 0 ? botDelay + BELAY_WINDOW_MS : botDelay,
-    );
+    const delay = canBelay && botDelay > 0 ? botDelay + BELAY_WINDOW_MS : botDelay;
+    const t = setTimeout(() => apply(move), delay);
     return () => clearTimeout(t);
-  }, [game, act, botDelay]);
+  }, [game, apply, botDelay]);
 
-  return { game, act, error, clearError: () => setError(null) };
+  return {
+    p: game.p,
+    names: names(game.options.level),
+    level: game.options.level,
+    act: (a: UiAction) => apply(toEngineAction(gameRef.current.state, a)),
+    error,
+    ranked: false,
+  };
 }

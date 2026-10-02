@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.1.0"
+version: "0.2.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -30,7 +30,10 @@ description: >-
   - Ranked play with tiers
 
   - Detailed per-mode and head-to-head stats
-releaseNotes: "First preview release."
+releaseNotes: >-
+  Player accounts and the Ship's Log: sign up, play Cap'n Bot, and every
+  finished game is recorded with detailed stats (win rates, pegging, hand and
+  crib averages, hand distributions). Guests can still play without an account.
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage

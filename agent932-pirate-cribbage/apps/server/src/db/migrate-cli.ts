@@ -1,8 +1,9 @@
 // `npm run db:migrate` — applies migrations from apps/server/drizzle.
-import { fileURLToPath } from "node:url";
-import { sql } from "./client.js";
-import { runMigrations } from "./migrate.js";
+import { config } from "../config.js";
+import { connect } from "./client.js";
+import { defaultMigrationsFolder, runMigrations } from "./migrate.js";
 
-await runMigrations(fileURLToPath(new URL("../../drizzle", import.meta.url)));
-await sql.end();
+const { db, close } = connect(config.databaseUrl);
+await runMigrations(db, defaultMigrationsFolder);
+await close();
 console.log("Migrations applied");

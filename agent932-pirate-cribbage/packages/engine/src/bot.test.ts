@@ -71,6 +71,8 @@ describe("describeEvent", () => {
     expect(lines.some((l) => l.startsWith("The cut is"))).toBe(true);
     expect(lines.some((l) => /hand: /.test(l))).toBe(true);
     expect(lines.at(-1)).toMatch(/won/);
+    expect(lines.join("\n")).not.toMatch(/You's/);
+    expect(lines.some((l) => l.startsWith("Your hand") || l.startsWith("Your crib"))).toBe(true);
   });
 });
 

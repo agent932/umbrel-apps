@@ -12,5 +12,6 @@
     {
       "path": "../../packages/engine"
     }
-  ]
+  ],
+  "exclude": ["src/**/*.e2e.test.tsx"]
 }

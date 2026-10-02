@@ -49,6 +49,7 @@ export function handScoreParts(score: HandScore): string[] {
  */
 export function describeEvent(event: GameEvent, names: readonly [string, string]): string | null {
   const who = (seat: Seat) => names[seat];
+  const whose = (seat: Seat) => (names[seat] === "You" ? "Your" : `${names[seat]}'s`);
   switch (event.type) {
     case "cut":
       return `The cut is ${cardText(event.card)}`;
@@ -66,7 +67,7 @@ export function describeEvent(event: GameEvent, names: readonly [string, string]
     case "crib": {
       const parts = handScoreParts(event.score);
       const label = event.type === "crib" ? "crib" : "hand";
-      return `${who(event.seat)}'s ${label}: ${event.score.total === 0 ? "nineteen (zero)" : `${event.score.total} — ${parts.join(", ")}`}`;
+      return `${whose(event.seat)} ${label}: ${event.score.total === 0 ? "nineteen (zero)" : `${event.score.total} — ${parts.join(", ")}`}`;
     }
     case "treasure":
       return `${who(event.seat)} dug up buried treasure on hole ${event.hole}! +${event.points}`;

@@ -1,7 +1,6 @@
 import {
   type Action,
   type BotLevel,
-  type GameEvent,
   type GameState,
   type RuleSet,
   type Seat,
@@ -9,8 +8,11 @@ import {
   createDeck,
   createGame,
   cryptoRandom,
-  describeEvent,
+  shuffle,
+  viewFor,
 } from "@pirate/engine";
+import { initialPresentation, present } from "./present.js";
+import type { Presentation, UiAction } from "./types.js";
 
 export const YOU: Seat = 0;
 export const BOT: Seat = 1;
@@ -20,23 +22,11 @@ export interface LocalGameOptions {
   rules: RuleSet;
 }
 
-export interface FeedItem {
-  id: number;
-  text: string;
-  seat: Seat | null;
-  points: number;
-}
-
-/** Everything the table needs, and what gets saved to localStorage. */
+/** A guest game run entirely in the browser; saved to localStorage. */
 export interface LocalGame {
   options: LocalGameOptions;
   state: GameState;
-  /** Where each peg was before its last move (the "back peg" on a real board). */
-  backPegs: [number, number];
-  feed: FeedItem[];
-  /** Hand and crib counts from the most recent show, for the round summary. */
-  show: Extract<GameEvent, { type: "hand" | "crib" }>[];
-  nextId: number;
+  p: Presentation;
 }
 
 export function names(level: BotLevel): [string, string] {
@@ -45,72 +35,56 @@ export function names(level: BotLevel): [string, string] {
 
 export function newLocalGame(options: LocalGameOptions): LocalGame {
   const firstDealer: Seat = cryptoRandom() < 0.5 ? YOU : BOT;
+  const state = createGame(firstDealer, options.rules);
+  return { options, state, p: initialPresentation(viewFor(state, YOU)) };
+}
+
+const randomIndex = (n: number) => Math.floor(cryptoRandom() * n);
+
+/** Fill in the seat and any randomness, as the server does for online games. */
+export function toEngineAction(state: GameState, a: UiAction): Action {
+  switch (a.type) {
+    case "cut":
+      return { type: "cut", index: randomIndex(state.deck.length) };
+    case "crowsNest":
+      return { type: "crowsNest", seat: YOU, index: randomIndex(state.deck.length) };
+    case "pickpocket":
+      return {
+        type: "pickpocket",
+        seat: YOU,
+        card: a.card,
+        index: randomIndex(state.hands[BOT].length),
+      };
+    case "nextRound":
+      return { type: "nextRound" };
+    case "discard":
+    case "rebury":
+      return { type: a.type, seat: YOU, cards: a.cards };
+    case "play":
+    case "parley":
+      return { type: a.type, seat: YOU, card: a.card };
+    case "ready":
+    case "spyglass":
+    case "belay":
+      return { type: a.type, seat: YOU };
+  }
+}
+
+/** Apply an engine action. Throws IllegalActionError for bad moves. */
+export function step(game: LocalGame, action: Action): LocalGame {
+  const { state, events } = applyAction(game.state, action);
   return {
-    options,
-    state: createGame(firstDealer, options.rules),
-    backPegs: [0, 0],
-    feed: [],
-    show: [],
-    nextId: 1,
+    ...game,
+    state,
+    p: present(game.p, events, viewFor(state, YOU), names(game.options.level)),
   };
 }
 
-function eventPoints(e: GameEvent): number {
-  switch (e.type) {
-    case "played":
-      return e.score.total;
-    case "hand":
-    case "crib":
-      return e.score.total;
-    case "go":
-    case "lastCard":
-    case "heels":
-    case "treasure":
-    case "kraken":
-      return e.points;
-    case "power":
-      return -e.cost;
-    default:
-      return 0;
-  }
-}
-
-/** Apply an action and fold its events into the feed. Throws IllegalActionError for bad moves. */
-export function step(game: LocalGame, action: Action): LocalGame {
-  const { state, events } = applyAction(game.state, action);
-  const backPegs: [number, number] = [...game.backPegs];
-  for (const seat of [0, 1] as Seat[]) {
-    if (state.scores[seat] !== game.state.scores[seat]) backPegs[seat] = game.state.scores[seat];
-  }
-
-  let nextId = game.nextId;
-  const feed = [...game.feed];
-  const label = names(game.options.level);
-  for (const e of events) {
-    const text = describeEvent(e, label);
-    if (!text) continue;
-    const seat = "seat" in e ? e.seat : e.type === "gameOver" ? e.winner : null;
-    feed.unshift({ id: nextId++, text, seat, points: eventPoints(e) });
-  }
-
-  const showEvents = events.filter(
-    (e): e is LocalGame["show"][number] => e.type === "hand" || e.type === "crib",
-  );
-  const show = action.type === "deal" ? [] : [...game.show, ...showEvents];
-  return { ...game, state, backPegs, feed: feed.slice(0, 40), show, nextId };
-}
-
 export function dealAction(): Action {
-  // Shuffle with crypto randomness; the engine checks the deck is a full 52.
-  const deck = createDeck();
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(cryptoRandom() * (i + 1));
-    [deck[i], deck[j]] = [deck[j]!, deck[i]!];
-  }
-  return { type: "deal", deck };
+  return { type: "deal", deck: shuffle(createDeck(), cryptoRandom) };
 }
 
-const STORAGE_KEY = "pirate-cribbage:local-game";
+const STORAGE_KEY = "pirate-cribbage:local-game:v2";
 
 export function saveGame(game: LocalGame | null) {
   try {

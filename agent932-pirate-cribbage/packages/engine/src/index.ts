@@ -4,3 +4,4 @@ export * from "./pegScore.js";
 export * from "./game.js";
 export * from "./bot.js";
 export * from "./describe.js";
+export * from "./stats.js";
