@@ -14,3 +14,12 @@ body {
   color: var(--color-parchment);
   min-height: 100dvh;
 }
+
+@layer components {
+  .btn-primary {
+    @apply rounded-xl bg-gold px-5 py-2.5 font-semibold text-sea-deep shadow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-secondary {
+    @apply rounded-xl border border-gold/60 px-5 py-2.5 font-semibold text-parchment transition hover:bg-gold/10;
+  }
+}

@@ -1,5 +1,5 @@
-import { type Card, cardValue, createDeck, removeCards, sameCard } from "./cards.js";
-import type { PlayerView } from "./game.js";
+import { type Card, cardValue, createDeck, removeCards, sameCard, shuffle } from "./cards.js";
+import { type Action, type GameState, type PlayerView, type Seat, toAct, viewFor } from "./game.js";
 import { scoreHand } from "./handScore.js";
 import { scorePeg } from "./pegScore.js";
 
@@ -87,4 +87,53 @@ export function chooseParley(hand: readonly Card[], isDealer: boolean): Card | n
 
 export function holds(hand: readonly Card[], card: Card): boolean {
   return hand.some((c) => sameCard(c, card));
+}
+
+export type BotLevel = "easy" | "medium";
+
+/**
+ * The action a bot in `seat` takes now, or null when it has nothing to do.
+ * Deal and nextRound are not seat actions; the game host performs them.
+ */
+export function botAction(
+  state: GameState,
+  seat: Seat,
+  level: BotLevel,
+  random: () => number = Math.random,
+): Action | null {
+  if (!toAct(state).includes(seat)) return null;
+  const view = viewFor(state, seat);
+  const isDealer = state.dealer === seat;
+  const pick = <T>(items: readonly T[]) => items[Math.floor(random() * items.length)]!;
+
+  switch (state.phase) {
+    case "discard": {
+      if (level === "medium" && view.powersNow.includes("parley")) {
+        const swap = chooseParley(view.hand, isDealer);
+        if (swap) return { type: "parley", seat, card: swap };
+      }
+      const cards =
+        level === "easy"
+          ? shuffle(view.hand, random).slice(0, 2)
+          : chooseDiscard(view.hand, isDealer);
+      return { type: "discard", seat, cards };
+    }
+    case "cut":
+      return { type: "cut", index: Math.floor(random() * state.deck.length) };
+    case "preplay":
+      return { type: "ready", seat };
+    case "pegging": {
+      if (level === "easy") {
+        const count = view.pegging!.count;
+        return {
+          type: "play",
+          seat,
+          card: pick(view.hand.filter((c) => count + cardValue(c) <= 31)),
+        };
+      }
+      return { type: "play", seat, card: choosePlay(view) };
+    }
+    default:
+      return null;
+  }
 }

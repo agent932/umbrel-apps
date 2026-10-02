@@ -1,35 +1,50 @@
-import { useEffect, useState } from "react";
-import { cardLabel, createDeck } from "@pirate/engine";
+import { useState } from "react";
+import {
+  type LocalGame,
+  type LocalGameOptions,
+  loadGame,
+  newLocalGame,
+  saveGame,
+} from "./game/localGame.js";
+import { GameScreen } from "./screens/GameScreen.js";
+import { HomeScreen } from "./screens/HomeScreen.js";
 
-interface Health {
-  status: string;
-  db: string;
-}
+export function App({ botDelay }: { botDelay?: number } = {}) {
+  const [game, setGame] = useState<LocalGame | null>(null);
+  // Bumped on "play again" so the game screen remounts with fresh state.
+  const [gameKey, setGameKey] = useState(0);
+  const [saved, setSaved] = useState(() => loadGame());
 
-export function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState(false);
+  const start = (options: LocalGameOptions) => {
+    setGame(newLocalGame(options));
+    setGameKey((k) => k + 1);
+  };
 
-  useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json() as Promise<Health>)
-      .then(setHealth)
-      .catch(() => setError(true));
-  }, []);
-
-  const sample = createDeck().slice(0, 5).map(cardLabel).join(" ");
-
+  if (!game) {
+    return (
+      <HomeScreen
+        canResume={!!saved}
+        onResume={() => {
+          setGame(saved);
+          setGameKey((k) => k + 1);
+        }}
+        onStart={start}
+      />
+    );
+  }
   return (
-    <main className="mx-auto flex max-w-xl flex-col items-center gap-6 px-4 py-16 text-center">
-      <h1 className="font-pirate text-5xl text-gold sm:text-6xl">Pirate Cribbage</h1>
-      <p className="text-lg">Fifteen-two, fifteen-four, and a pair be six, matey.</p>
-      <div className="rounded-lg border border-gold/40 bg-sea-deep/60 px-6 py-4 font-mono text-sm">
-        <p>Engine sample: {sample}</p>
-        <p>
-          Server:{" "}
-          {error ? "unreachable" : health ? `${health.status} (db ${health.db})` : "checking…"}
-        </p>
-      </div>
-    </main>
+    <GameScreen
+      key={gameKey}
+      initial={game}
+      botDelay={botDelay}
+      onExit={() => {
+        setSaved(loadGame());
+        setGame(null);
+      }}
+      onPlayAgain={() => {
+        saveGame(null);
+        start(game.options);
+      }}
+    />
   );
 }
