@@ -57,13 +57,13 @@ function Choice<T extends string>({
 
 export function HomeScreen({ canResume, onResume, onStart, starting, error }: Props) {
   const { user, logout } = useAuth();
-  const [level, setLevel] = useState<BotLevel | "hard">("medium");
+  const [level, setLevel] = useState<BotLevel>("medium");
   const [mode, setMode] = useState<"classic" | "pirate">("pirate");
   const [cost, setCost] = useState<"free" | "plunder">("free");
 
   function start() {
     onStart({
-      level: level as BotLevel,
+      level,
       variant: mode,
       powerCost: mode === "pirate" && cost === "plunder" ? 2 : 0,
     });
@@ -124,7 +124,7 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error }: Pr
           options={[
             { value: "easy", label: "Easy", note: "Deckhand" },
             { value: "medium", label: "Medium", note: "Bosun" },
-            { value: "hard", label: "Hard", note: "Coming soon", disabled: true },
+            { value: "hard", label: "Hard", note: "Captain" },
           ]}
         />
         <Choice

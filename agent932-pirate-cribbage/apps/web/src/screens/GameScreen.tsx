@@ -280,6 +280,8 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
           cut={view.cut}
           names={label}
           onNext={() => act({ type: "nextRound" })}
+          decision={view.myDiscardDecision}
+          isDealer={view.dealer === YOU}
         />
       )}
 

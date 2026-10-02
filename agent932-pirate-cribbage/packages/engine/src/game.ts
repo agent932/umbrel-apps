@@ -126,6 +126,8 @@ export interface RoundSeatRecord {
   pirateBonus: number;
   /** Pirate powers used this round. */
   powers: PowerUse[];
+  /** The six cards held and the two thrown at the moment of discarding, for the hand analyzer. */
+  atDiscard: { hand: Card[]; discarded: Card[] } | null;
 }
 
 export interface RoundRecord {
@@ -244,6 +246,7 @@ const emptySeat = (): RoundSeatRecord => ({
   heelsPoints: 0,
   pirateBonus: 0,
   powers: [],
+  atDiscard: null,
 });
 
 export function canPlay(state: GameState, seat: Seat): boolean {
@@ -399,6 +402,7 @@ function discard(ctx: Ctx, seat: Seat, cards: Card[]) {
   } catch (e) {
     fail((e as Error).message);
   }
+  state.current!.seats[seat].atDiscard = { hand: [...state.hands[seat]], discarded: [...cards] };
   state.hands[seat] = kept;
   state.crib.push(...cards);
   state.current!.seats[seat].discarded = [...cards];
@@ -711,6 +715,8 @@ export interface PlayerView {
   needsReady: boolean;
   /** Cards this player threw to the crib this round. */
   myDiscards: Card[];
+  /** This player's six cards and throw at discard time, for the round review. */
+  myDiscardDecision: { hand: Card[]; discarded: Card[] } | null;
   cribOwner: Seat | null;
 }
 
@@ -736,6 +742,7 @@ export function viewFor(state: GameState, seat: Seat): PlayerView {
     spied: state.current?.seats[seat].powers.find((u) => u.power === "spyglass")?.got ?? null,
     needsReady: state.phase === "preplay" && !state.ready[seat],
     myDiscards: [...(state.current?.seats[seat].discarded ?? [])],
+    myDiscardDecision: state.current?.seats[seat].atDiscard ?? null,
     cribOwner: state.current?.cribOwner ?? null,
   };
 }

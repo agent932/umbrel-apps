@@ -25,6 +25,7 @@ const seat = (o: Partial<RoundRecord["seats"][0]> = {}): RoundRecord["seats"][0]
   heelsPoints: 0,
   pirateBonus: 0,
   powers: [],
+  atDiscard: null,
   ...o,
 });
 

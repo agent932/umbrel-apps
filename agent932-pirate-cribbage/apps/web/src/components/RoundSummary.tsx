@@ -1,4 +1,11 @@
-import { type Card as CardType, type GameEvent, type Seat, handScoreParts } from "@pirate/engine";
+import {
+  type Card as CardType,
+  type GameEvent,
+  type Seat,
+  analyzeDiscard,
+  cardText,
+  handScoreParts,
+} from "@pirate/engine";
 import { Card } from "./Card.js";
 
 type ShowEvent = Extract<GameEvent, { type: "hand" | "crib" }>;
@@ -9,6 +16,46 @@ interface Props {
   names: [string, string];
   onNext?: () => void;
   nextLabel?: string;
+  /** Your six cards and throw this round, for the discard review. */
+  decision?: { hand: CardType[]; discarded: CardType[] } | null;
+  isDealer?: boolean;
+}
+
+/** How your throw compared with the best one, by expected points (hand over every cut ± crib). */
+export function DiscardReview({
+  decision,
+  isDealer,
+}: {
+  decision: { hand: CardType[]; discarded: CardType[] };
+  isDealer: boolean;
+}) {
+  const a = analyzeDiscard(decision.hand, decision.discarded, isDealer);
+  const cards = (cs: CardType[]) => cs.map(cardText).join(" ");
+  const perfect = a.chosen === a.best;
+  return (
+    <section
+      className="mb-3 rounded-lg border border-gold/30 p-3 text-sm"
+      aria-label="Discard review"
+    >
+      <div className="flex items-baseline justify-between">
+        <span className="font-semibold">Your throw: {cards(a.chosen.discard)}</span>
+        <span
+          className="font-serif text-xl font-bold text-gold"
+          title="Hand analyzer score (100 = best possible discard)"
+        >
+          {Math.round(a.score)}
+        </span>
+      </div>
+      {perfect ? (
+        <p className="mt-1 text-parchment/80">The best throw available. Well judged, captain!</p>
+      ) : (
+        <p className="mt-1 text-parchment/80">
+          Best was {cards(a.best.discard)}, keeping {cards(a.best.keep)}: worth about{" "}
+          {(a.best.ev - a.chosen.ev).toFixed(1)} more points on average.
+        </p>
+      )}
+    </section>
+  );
 }
 
 export function ShowList({ show, cut, names }: Omit<Props, "onNext">) {
@@ -44,9 +91,18 @@ export function ShowList({ show, cut, names }: Omit<Props, "onNext">) {
   );
 }
 
-export function RoundSummary({ show, cut, names, onNext, nextLabel = "Next round" }: Props) {
+export function RoundSummary({
+  show,
+  cut,
+  names,
+  onNext,
+  nextLabel = "Next round",
+  decision,
+  isDealer = false,
+}: Props) {
   return (
     <Modal title="The Show">
+      {decision && <DiscardReview decision={decision} isDealer={isDealer} />}
       <ShowList show={show} cut={cut} names={names} />
       {onNext && (
         <button type="button" className="btn-primary mt-4 w-full" onClick={onNext} autoFocus>

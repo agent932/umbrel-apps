@@ -83,6 +83,10 @@ describe("games vs the computer", () => {
     expect(medium.wins + medium.losses).toBe(1);
     expect(medium.roundsPlayed).toBeGreaterThan(3);
     expect(medium.dealtTotal).toBeGreaterThanOrEqual(medium.roundsPlayed * 6);
+    // Every recorded round has hand analyzer scores for both players.
+    expect(medium.analyzer.avg).toBeGreaterThan(50);
+    expect(medium.analyzer.avg).toBeLessThanOrEqual(100);
+    expect(medium.analyzer.avgOpp).toBeGreaterThan(50);
     const easy = stats.buckets.find((b: { key: string }) => b.key === "ai-easy").stats;
     expect(easy.matchesPlayed).toBe(0);
 
@@ -149,6 +153,13 @@ describe("games vs the computer", () => {
       cards: hand.slice(0, 2),
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  it("offers a hard computer opponent", async () => {
+    const { cookie } = await signUp(t.app);
+    const res = await post("/api/games", cookie, { level: "hard", variant: "classic" });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().level).toBe("hard");
   });
 
   it("only allows the menu's rules", async () => {

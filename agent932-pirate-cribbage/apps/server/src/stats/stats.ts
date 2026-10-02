@@ -71,6 +71,7 @@ export async function statsFor(db: Db, userId: string, variant: Variant): Promis
         heelsPoints: p.heelsPoints,
         pirateBonus: p.pirateBonus,
         powers: p.powers,
+        atDiscard: null,
       };
     }) as RoundRecord["seats"];
     const list = roundsByMatch.get(r.matchId) ?? [];

@@ -1,4 +1,5 @@
 import { type Card, cardValue, createDeck, removeCards, sameCard, shuffle } from "./cards.js";
+import { rankDiscards } from "./analyzer.js";
 import { type Action, type GameState, type PlayerView, type Seat, toAct, viewFor } from "./game.js";
 import { scoreHand } from "./handScore.js";
 import { scorePeg } from "./pegScore.js";
@@ -89,7 +90,7 @@ export function holds(hand: readonly Card[], card: Card): boolean {
   return hand.some((c) => sameCard(c, card));
 }
 
-export type BotLevel = "easy" | "medium";
+export type BotLevel = "easy" | "medium" | "hard";
 
 /**
  * The action a bot in `seat` takes now, or null when it has nothing to do.
@@ -108,14 +109,16 @@ export function botAction(
 
   switch (state.phase) {
     case "discard": {
-      if (level === "medium" && view.powersNow.includes("parley")) {
+      if (level !== "easy" && view.powersNow.includes("parley")) {
         const swap = chooseParley(view.hand, isDealer);
         if (swap) return { type: "parley", seat, card: swap };
       }
       const cards =
         level === "easy"
           ? shuffle(view.hand, random).slice(0, 2)
-          : chooseDiscard(view.hand, isDealer);
+          : level === "hard"
+            ? rankDiscards(view.hand, isDealer)[0]!.discard
+            : chooseDiscard(view.hand, isDealer);
       return { type: "discard", seat, cards };
     }
     case "cut":
@@ -131,9 +134,90 @@ export function botAction(
           card: pick(view.hand.filter((c) => count + cardValue(c) <= 31)),
         };
       }
-      return { type: "play", seat, card: choosePlay(view) };
+      return {
+        type: "play",
+        seat,
+        card: level === "hard" ? choosePlayHard(view) : choosePlay(view),
+      };
     }
     default:
       return null;
   }
+}
+
+/** Cards this player can't see: not in their hand, played, the cut, or their own crib cards. */
+function unseenCards(view: PlayerView): Card[] {
+  const seen = [
+    ...view.hand,
+    ...(view.pegging?.played.map((p) => p.card) ?? []),
+    ...(view.cut ? [view.cut] : []),
+    ...view.myDiscards,
+  ];
+  return createDeck().filter((c) => !seen.some((s) => sameCard(s, c)));
+}
+
+/** C(n, k) as a float; fine for the small numbers here. */
+function choose(n: number, k: number): number {
+  if (k < 0 || k > n) return 0;
+  let r = 1;
+  for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i;
+  return r;
+}
+
+/**
+ * Expected points of the opponent's best reply, when they hold `held` cards drawn from `unseen`.
+ * E[max] = Σ_x P(max ≥ x), with P(max ≥ x) = 1 − C(N − n_x, k) / C(N, k).
+ */
+function expectedBestReply(pile: Card[], count: number, unseen: Card[], held: number): number {
+  if (held === 0) return 0;
+  const replies = unseen
+    .filter((c) => count + cardValue(c) <= 31)
+    .map((c) => scorePeg([...pile, c]).total);
+  const top = Math.max(0, ...replies);
+  const N = unseen.length;
+  const all = choose(N, held);
+  let expected = 0;
+  for (let x = 1; x <= top; x++) {
+    const nx = replies.filter((r) => r >= x).length;
+    expected += 1 - choose(N - nx, held) / all;
+  }
+  return expected;
+}
+
+/**
+ * Hard pegging: points now, minus the opponent's expected best answer (from the cards it could hold),
+ * plus a small bonus for keeping a card that can follow up on what we lead.
+ */
+export function choosePlayHard(view: PlayerView): Card {
+  const peg = view.pegging;
+  if (!peg) throw new Error("Not pegging");
+  const legal = view.hand.filter((c) => peg.count + cardValue(c) <= 31);
+  if (legal.length === 0) throw new Error("No legal play");
+  const held = view.opponentCardCount;
+  // After a Spyglass we know exactly what's left in the opponent's hand; otherwise it's any unseen card.
+  const unseen = unseenCards(view);
+  const known = view.spied?.filter((c) => unseen.some((u) => sameCard(u, c)));
+  const pool = known && known.length === held ? known : unseen;
+
+  let best = legal[0]!;
+  let bestValue = -Infinity;
+  for (const card of legal) {
+    const pile = [...peg.pile, card];
+    const count = peg.count + cardValue(card);
+    let value = scorePeg(pile).total;
+    // At 31 the count resets, so there's nothing for the opponent to answer.
+    if (count !== 31) {
+      value -= expectedBestReply(pile, count, pool, held);
+      // Holding a card that pairs or makes 15/31 with our own lead sets up the next play.
+      const rest = view.hand.filter((c) => !sameCard(c, card));
+      if (rest.some((c) => c.rank === card.rank)) value += 0.3;
+    }
+    // Prefer shedding high cards early, keeping low ones to squeeze in under 31.
+    value += cardValue(card) / 200;
+    if (value > bestValue) {
+      bestValue = value;
+      best = card;
+    }
+  }
+  return best;
 }

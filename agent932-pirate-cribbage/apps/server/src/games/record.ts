@@ -1,8 +1,20 @@
-import { type Card, type GameState, cardLabel } from "@pirate/engine";
+import {
+  type Card,
+  type GameState,
+  type RoundSeatRecord,
+  analyzeDiscard,
+  cardLabel,
+} from "@pirate/engine";
 import type { Db } from "../db/client.js";
 import { matchPlayers, matches, roundPlayers, rounds } from "../db/schema.js";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** Hand analyzer score for one player's discard, or null if they never discarded this round. */
+export function analyzerScore(seat: RoundSeatRecord, isDealer: boolean): number | null {
+  if (!seat.atDiscard) return null;
+  return analyzeDiscard(seat.atDiscard.hand, seat.atDiscard.discarded, isDealer).score;
+}
 
 /** Write a finished game into the stats tables. */
 export async function recordMatch(
@@ -58,6 +70,7 @@ export async function recordMatch(
         heelsPoints: s.heelsPoints,
         pirateBonus: s.pirateBonus,
         powers: s.powers,
+        analyzerScore: analyzerScore(s, r.dealer === seat),
       })),
     ),
   );

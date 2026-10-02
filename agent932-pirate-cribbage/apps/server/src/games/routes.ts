@@ -14,7 +14,7 @@ import {
 } from "./aiGames.js";
 
 const NewGameBody = z.object({
-  level: z.enum(["easy", "medium"]),
+  level: z.enum(["easy", "medium", "hard"]),
   variant: z.enum(["classic", "pirate"]),
   powerCost: z.union([z.literal(0), z.literal(2)]).default(0),
 });
