@@ -72,6 +72,19 @@ export function choosePlay(view: PlayerView): Card {
   return best;
 }
 
+/**
+ * Pirate parley: with a weak hand, swap away the least useful card.
+ * Returns the card to give up, or null to keep the hand.
+ */
+export function chooseParley(hand: readonly Card[], isDealer: boolean): Card | null {
+  const [best] = discardOptions(hand);
+  if (!best || best.handEV >= 4.5) return null;
+  // Give up whichever thrown card is worth less to the crib we are building or feeding.
+  const [a, b] = best.discard;
+  const worth = (c: Card) => (c.rank === 5 ? 3 : 0) + cardValue(c) / 10;
+  return (isDealer ? worth(a) < worth(b) : worth(a) > worth(b)) ? a : b;
+}
+
 export function holds(hand: readonly Card[], card: Card): boolean {
   return hand.some((c) => sameCard(c, card));
 }

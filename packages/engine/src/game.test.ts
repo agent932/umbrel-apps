@@ -8,8 +8,13 @@ import {
   type Seat,
   applyAction,
   cardLabel,
+  PIRATE_RULES,
+  POWERS,
+  type RuleSet,
   chooseDiscard,
+  chooseParley,
   choosePlay,
+  redactEvent,
   createDeck,
   createGame,
   other,
@@ -211,11 +216,286 @@ describe("viewFor", () => {
   });
 });
 
+describe("pirate rules", () => {
+  // Board and cut twists only, so these rounds don't stop for the pre-play power step.
+  const BOARD_RULES: RuleSet = { ...PIRATE_RULES, pirate: { ...PIRATE_RULES.pirate!, powers: [] } };
+  const pirate = (scores: [number, number]) => ({ ...createGame(0, BOARD_RULES), scores });
+
+  it("digs up treasure when landing exactly on a treasure hole", () => {
+    // The pone's go point moves them from 29 to 30.
+    const { state, events } = run(pirate([0, 29]), [...SETUP, ...PEGGING.slice(0, 3)]);
+    expect(events).toContainEqual({ type: "treasure", seat: 1, points: 3, hole: 30 });
+    expect(state.scores[1]).toBe(33);
+    expect(state.current!.seats[1]).toMatchObject({ pegPoints: 1, pirateBonus: 3 });
+  });
+
+  it("drags a peg back when landing on a kraken hole", () => {
+    const { state, events } = run(pirate([0, 44]), [...SETUP, ...PEGGING.slice(0, 3)]);
+    expect(events).toContainEqual({ type: "kraken", seat: 1, points: -4, hole: 45 });
+    expect(state.scores[1]).toBe(41);
+  });
+
+  it("ignores holes that are passed over and classic games", () => {
+    expect(run(pirate([0, 28]), [...SETUP, ...PEGGING.slice(0, 3)]).state.scores[1]).toBe(29);
+    const classic = { ...createGame(0), scores: [0, 29] as [number, number] };
+    expect(run(classic, [...SETUP, ...PEGGING.slice(0, 3)]).state.scores[1]).toBe(30);
+  });
+
+  it("lets the pone steal the crib when the Black Spot (A♠) is cut", () => {
+    const deck = stackDeck("10S 10H 10D 5C 2C 3C", "KS KH KD 9C 4C AH", "AS");
+    const { state, events } = run(createGame(0, BOARD_RULES), [
+      { type: "deal", deck },
+      ...SETUP.slice(1),
+      ...PEGGING,
+    ]);
+    expect(events).toContainEqual({ type: "blackSpot", seat: 1 });
+    const crib = events.find((e) => e.type === "crib");
+    expect(crib).toMatchObject({ seat: 1 });
+    expect(state.history[0]!.seats[1].cribPoints).toBe(
+      crib!.type === "crib" ? crib!.score.total : -1,
+    );
+    expect(state.history[0]!.seats[0].cribPoints).toBeNull();
+  });
+
+  it("only applies the Black Spot under pirate rules", () => {
+    const deck = stackDeck("10S 10H 10D 5C 2C 3C", "KS KH KD 9C 4C AH", "AS");
+    const { events } = run(createGame(0), [{ type: "deal", deck }, ...SETUP.slice(1), ...PEGGING]);
+    expect(events.find((e) => e.type === "crib")).toMatchObject({ seat: 0 });
+  });
+});
+
+describe("pirate powers", () => {
+  const dealt = run(createGame(0, PIRATE_RULES), [{ type: "deal", deck: DECK }]).state;
+  const discards = SETUP.slice(1, 3);
+
+  it("Parley swaps a card for the top of the deck, once per game", () => {
+    const { state, events } = run(dealt, [{ type: "parley", seat: 1, card: parseCard("2C") }]);
+    expect(state.hands[1]).toEqual(parseCards("10S 10H 10D 5C 7D 3C"));
+    expect(state.deck.at(-1)).toEqual(parseCard("2C"));
+    expect(state.deck).toHaveLength(40);
+    expect(state.powersUsed).toEqual([[], ["parley"]]);
+    expect(state.current!.seats[1].powers).toEqual([
+      { power: "parley", cost: 0, gave: parseCards("2C"), got: parseCards("7D") },
+    ]);
+    expect(events).toEqual([
+      {
+        type: "power",
+        seat: 1,
+        power: "parley",
+        cost: 0,
+        gave: parseCards("2C"),
+        got: parseCards("7D"),
+      },
+    ]);
+    expect(viewFor(state, 1).powersLeft).not.toContain("parley");
+    expect(viewFor(state, 0).opponentPowersLeft).not.toContain("parley");
+    expect(() => applyAction(state, { type: "parley", seat: 1, card: parseCard("3C") })).toThrow(
+      /Already used/,
+    );
+  });
+
+  it("hides private power details from the opponent", () => {
+    const { events } = run(dealt, [{ type: "parley", seat: 1, card: parseCard("2C") }]);
+    expect(redactEvent(events[0]!, 0)).toEqual({
+      type: "power",
+      seat: 1,
+      power: "parley",
+      cost: 0,
+    });
+    expect(redactEvent(events[0]!, 1)).toEqual(events[0]);
+  });
+
+  it("Spyglass shows the opponent's hand, only to the user", () => {
+    const { state, events } = run(dealt, [{ type: "spyglass", seat: 1 }]);
+    expect(viewFor(state, 1).spied).toEqual(parseCards("KS KH KD 9C 4C AH"));
+    expect(viewFor(state, 0).spied).toBeNull();
+    expect(redactEvent(events[0]!, 0)).not.toHaveProperty("got");
+  });
+
+  it("Crow's Nest reveals the cut early, then play skips the cut step", () => {
+    const { state, events } = run(dealt, [{ type: "crowsNest", seat: 0 }, ...discards]);
+    expect(events[0]).toMatchObject({ type: "power", power: "crowsNest" });
+    expect(events).toContainEqual({ type: "cut", card: parseCard("7D") });
+    // Both still hold their after-the-cut powers, so they're asked if they're ready.
+    expect(state.phase).toBe("preplay");
+    expect(viewFor(state, 1).cut).toEqual(parseCard("7D"));
+    expect(state.deck.some((c) => cardLabel(c) === "7D")).toBe(false);
+    expect(() => applyAction(state, { type: "cut" })).toThrow(IllegalActionError);
+  });
+
+  it("waits for both players in pre-play, then the pone leads", () => {
+    let { state } = run(dealt, [...discards, { type: "cut" }]);
+    expect(state.phase).toBe("preplay");
+    expect(toAct(state)).toEqual([0, 1]);
+    state = applyAction(state, { type: "ready", seat: 0 }).state;
+    expect(toAct(state)).toEqual([1]);
+    state = applyAction(state, { type: "ready", seat: 1 }).state;
+    expect(state.phase).toBe("pegging");
+    expect(toAct(state)).toEqual([1]);
+  });
+
+  it("skips pre-play when nobody has an after-the-cut power", () => {
+    const noPreplay: RuleSet = {
+      ...PIRATE_RULES,
+      pirate: { ...PIRATE_RULES.pirate!, powers: ["spyglass", "parley", "belay"] },
+    };
+    const { state } = run(createGame(0, noPreplay), SETUP);
+    expect(state.phase).toBe("pegging");
+  });
+
+  it("Pickpocket swaps a card blind and lets the victim respond", () => {
+    let { state } = run(dealt, [...discards, { type: "cut" }]);
+    // Pone gives 5C and takes the dealer's card at position 0 (KS).
+    state = applyAction(state, {
+      type: "pickpocket",
+      seat: 1,
+      card: parseCard("5C"),
+      index: 0,
+    }).state;
+    expect(state.hands[1]).toEqual(parseCards("10S 10H 10D KS"));
+    expect(state.hands[0]).toEqual(parseCards("5C KH KD 9C"));
+    expect(state.current!.seats[0].kept).toEqual(parseCards("5C KH KD 9C"));
+    // Dealer can still answer with their own pickpocket or rebury.
+    expect(toAct(state)).toEqual([0, 1]);
+    state = run(state, [
+      { type: "ready", seat: 0 },
+      { type: "ready", seat: 1 },
+    ]).state;
+    // Play out the round; hands score with the traded cards.
+    const { events } = run(state, [
+      play(1, "10S"),
+      play(0, "KH"),
+      play(1, "10H"),
+      play(0, "5C"),
+      play(1, "10D"),
+      play(0, "KD"),
+      play(1, "KS"),
+      play(0, "9C"),
+    ]);
+    const hands = events.filter((e) => e.type === "hand");
+    expect(hands.map((e) => e.cards.map(cardLabel).join(" "))).toEqual([
+      "10S 10H 10D KS",
+      "5C KH KD 9C",
+    ]);
+  });
+
+  it("Rebury changes the crib discards after the cut", () => {
+    let { state } = run(dealt, [...discards, { type: "cut" }]);
+    state = applyAction(state, { type: "rebury", seat: 1, cards: parseCards("10S 3C") }).state;
+    expect(state.hands[1]).toEqual(parseCards("10H 10D 5C 2C"));
+    expect(state.crib.map(cardLabel).sort()).toEqual(["10S", "3C", "4C", "AH"].sort());
+    expect(state.current!.seats[1]).toMatchObject({
+      discarded: parseCards("10S 3C"),
+      kept: parseCards("10H 10D 5C 2C"),
+    });
+    expect(() =>
+      applyAction(state, { type: "rebury", seat: 0, cards: parseCards("10S 3C") }),
+    ).toThrow(IllegalActionError);
+  });
+
+  it("Belay That! takes back a play, including its points, until the opponent plays", () => {
+    const pegging = run(dealt, [
+      ...discards,
+      { type: "cut" },
+      { type: "ready", seat: 0 },
+      { type: "ready", seat: 1 },
+    ]).state;
+    // Dealer plays KS after 10S; pone could belay their own 10S before that, not after.
+    let s = applyAction(pegging, play(1, "10S")).state;
+    expect(viewFor(s, 1).powersNow).toContain("belay");
+    s = applyAction(s, play(0, "KS")).state;
+    expect(viewFor(s, 1).powersNow).not.toContain("belay");
+
+    // Dealer belays KS: the count goes back to 10 and it's the dealer's turn again.
+    const { state, events } = run(s, [{ type: "belay", seat: 0 }]);
+    expect(events[0]).toEqual({ type: "belayed", seat: 0, card: parseCard("KS") });
+    expect(state.pegging!.count).toBe(10);
+    expect(state.pegging!.turn).toBe(0);
+    expect(state.hands[0]).toContainEqual(parseCard("KS"));
+    expect(state.powersUsed[0]).toEqual(["belay"]);
+    expect(() => applyAction(state, { type: "belay", seat: 0 })).toThrow(IllegalActionError);
+  });
+
+  it("charges points when powers have a cost", () => {
+    const costly: RuleSet = { ...PIRATE_RULES, pirate: { ...PIRATE_RULES.pirate!, powerCost: 2 } };
+    const broke = run(createGame(0, costly), [{ type: "deal", deck: DECK }]).state;
+    expect(() => applyAction(broke, { type: "spyglass", seat: 1 })).toThrow(/Costs 2/);
+    const rich = { ...broke, scores: [0, 10] as [number, number] };
+    const { state } = run(rich, [{ type: "spyglass", seat: 1 }]);
+    expect(state.scores[1]).toBe(8);
+    expect(state.current!.seats[1].pirateBonus).toBe(-2);
+  });
+
+  it("are refused in classic games", () => {
+    const classic = run(createGame(0), [{ type: "deal", deck: DECK }]).state;
+    expect(() => applyAction(classic, { type: "spyglass", seat: 1 })).toThrow(/Not in play/);
+    expect(viewFor(classic, 1).powersNow).toEqual([]);
+  });
+});
+
+const pickOne = <T>(items: readonly T[], random: () => number): T =>
+  items[Math.floor(random() * items.length)]!;
+
+/** Now and then, use a random available power with random choices (fuzzing the power rules). */
+function randomPower(state: GameState, random: () => number): Action | null {
+  for (const seat of [0, 1] as Seat[]) {
+    const now = viewFor(state, seat).powersNow;
+    if (now.length === 0 || random() > 0.2) continue;
+    const hand = state.hands[seat];
+    switch (pickOne(now, random)) {
+      case "spyglass":
+        return { type: "spyglass", seat };
+      case "crowsNest":
+        return { type: "crowsNest", seat, index: Math.floor(random() * state.deck.length) };
+      case "parley":
+        return { type: "parley", seat, card: pickOne(hand, random) };
+      case "pickpocket":
+        return {
+          type: "pickpocket",
+          seat,
+          card: pickOne(hand, random),
+          index: Math.floor(random() * state.hands[other(seat)].length),
+        };
+      case "rebury": {
+        const pool = shuffle([...hand, ...state.current!.seats[seat].discarded], random);
+        return { type: "rebury", seat, cards: pool.slice(0, 2) };
+      }
+      case "belay":
+        return { type: "belay", seat };
+    }
+  }
+  return null;
+}
+
+/** Every card is exactly one place: a hand, the crib, the deck, the cut, or played. */
+function checkCardsConserved(state: GameState) {
+  if (state.phase === "deal" || state.phase === "gameOver") return;
+  const all = [
+    ...state.hands[0],
+    ...state.hands[1],
+    ...state.crib,
+    ...state.deck,
+    ...(state.cut ? [state.cut] : []),
+    ...(state.pegging?.played.map((p) => p.card) ?? []),
+  ].map(cardLabel);
+  if (state.phase === "roundEnd") return; // pegging cleared; hands are counted from the record
+  expect(new Set(all).size).toBe(52);
+  expect(all).toHaveLength(52);
+}
+
 /** Play a whole game between two bots; returns the final state. */
-function botGame(seed: number): GameState {
+function botGame(seed: number, rules?: RuleSet): GameState {
   const random = seededRandom(seed);
-  let state = createGame(random() < 0.5 ? 0 : 1);
+  let state = createGame(random() < 0.5 ? 0 : 1, rules);
   for (let steps = 0; steps < 10_000; steps++) {
+    if (rules?.pirate) {
+      checkCardsConserved(state);
+      const power = randomPower(state, random);
+      if (power) {
+        state = applyAction(state, power).state;
+        continue;
+      }
+    }
     let action: Action;
     switch (state.phase) {
       case "gameOver":
@@ -231,6 +511,14 @@ function botGame(seed: number): GameState {
         break;
       case "discard": {
         const seat = toAct(state)[0]!;
+        const isDealer = seat === state.dealer;
+        const swap = viewFor(state, seat).powersNow.includes("parley")
+          ? chooseParley(state.hands[seat], isDealer)
+          : null;
+        if (swap) {
+          state = applyAction(state, { type: "parley", seat, card: swap }).state;
+          continue;
+        }
         action = {
           type: "discard",
           seat,
@@ -238,6 +526,9 @@ function botGame(seed: number): GameState {
         };
         break;
       }
+      case "preplay":
+        action = { type: "ready", seat: toAct(state)[0]! };
+        break;
       case "pegging": {
         const seat = state.pegging!.turn;
         action = { type: "play", seat, card: choosePlay(viewFor(state, seat)) };
@@ -246,14 +537,20 @@ function botGame(seed: number): GameState {
     }
     const before = state.scores;
     state = applyAction(state, action).state;
-    expect(state.scores[0]).toBeGreaterThanOrEqual(before[0]);
-    expect(state.scores[1]).toBeGreaterThanOrEqual(before[1]);
+    // Scores only go up, except when the kraken drags a peg back.
+    if (!rules?.pirate) {
+      expect(state.scores[0]).toBeGreaterThanOrEqual(before[0]);
+      expect(state.scores[1]).toBeGreaterThanOrEqual(before[1]);
+    }
   }
   throw new Error("Game did not finish");
 }
 
 describe("simulated bot games", () => {
-  const games = Array.from({ length: 300 }, (_, i) => botGame(i + 1));
+  const games = [
+    ...Array.from({ length: 200 }, (_, i) => botGame(i + 1)),
+    ...Array.from({ length: 200 }, (_, i) => botGame(i + 1000, PIRATE_RULES)),
+  ];
 
   it("always finish with exactly one winner at the target score", () => {
     for (const g of games) {
@@ -268,7 +565,9 @@ describe("simulated bot games", () => {
       const loser = other(g.winner!);
       const total = g.history.reduce((sum, r) => {
         const s = r.seats[loser];
-        return sum + s.pegPoints + s.handPoints + (s.cribPoints ?? 0) + s.heelsPoints;
+        return (
+          sum + s.pegPoints + s.handPoints + (s.cribPoints ?? 0) + s.heelsPoints + s.pirateBonus
+        );
       }, 0);
       expect(total).toBe(g.scores[loser]);
     }
@@ -282,6 +581,17 @@ describe("simulated bot games", () => {
         expect(r.dealer).toBe(i % 2 === 0 ? g.firstDealer : other(g.firstDealer));
       });
     }
+  });
+
+  it("exercise every pirate twist", () => {
+    const pirateRounds = games.filter((g) => g.rules.pirate).flatMap((g) => g.history);
+    expect(pirateRounds.some((r) => r.seats.some((s) => s.pirateBonus > 0))).toBe(true);
+    expect(pirateRounds.some((r) => r.seats.some((s) => s.pirateBonus < 0))).toBe(true);
+    const used = new Set(
+      pirateRounds.flatMap((r) => r.seats.flatMap((s) => s.powers.map((u) => u.power))),
+    );
+    expect([...used].sort()).toEqual([...POWERS].sort());
+    expect(pirateRounds.some((r) => r.cribOwner !== r.dealer)).toBe(true);
   });
 
   it("produce realistic averages (sanity check on scoring)", () => {
