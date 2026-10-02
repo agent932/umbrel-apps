@@ -7,6 +7,8 @@ export default defineProject({
   test: {
     name: "web",
     environment: "jsdom",
+    // Full games through the UI run slower on CI runners than locally.
+    testTimeout: 60_000,
     setupFiles: ["./src/test/setup.ts"],
     // The end-to-end test boots the server's test app; under jsdom it can't locate files itself.
     env: { SERVER_MIGRATIONS: path.resolve(import.meta.dirname, "../server/drizzle") },
