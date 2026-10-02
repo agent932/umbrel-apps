@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.3.0"
+version: "0.4.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,10 +31,9 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Hard difficulty: Cap'n Bot now discards by full expected value (hand over
-  every cut plus crib) and pegs by weighing your likely best reply. The hand
-  analyzer scores every discard from 0 to 100, the round summary shows the
-  best throw you could have made, and the Ship's Log tracks your average.
+  Online play: Quick Match against other players, or send a friend an invite
+  link. Games run on your Umbrel, survive reconnects and restarts, and have a
+  move timer so nobody can stall. Online results go in the Ship's Log.
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage

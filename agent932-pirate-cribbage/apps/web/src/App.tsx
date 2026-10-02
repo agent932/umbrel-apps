@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Redirect, Route, Switch, useLocation } from "wouter";
+import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { ApiError, type GameResponse, api } from "./api.js";
 import { AuthProvider, useAuth } from "./auth.js";
 import { type LocalGame, loadGame, newLocalGame, saveGame } from "./game/localGame.js";
 import { type MenuChoice, rulesFor } from "./game/menu.js";
 import { useLocalGame } from "./game/useLocalGame.js";
 import { useRemoteGame } from "./game/useRemoteGame.js";
+import { JoinInvite, OnlineLobby } from "./online/OnlineLobby.js";
+import { useOnlineGame } from "./online/useOnlineGame.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
 import { GameScreen } from "./screens/GameScreen.js";
 import { HomeScreen } from "./screens/HomeScreen.js";
@@ -26,6 +28,29 @@ function LocalPlay({ game, botDelay, ...rest }: PlayProps & { game: LocalGame })
 
 function RemotePlay({ res, botDelay, ...rest }: PlayProps & { res: GameResponse }) {
   return <GameScreen game={useRemoteGame(res, botDelay)} {...rest} />;
+}
+
+function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) {
+  const game = useOnlineGame(gameId);
+  if ("loading" in game) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
+        {game.error ? (
+          <>
+            <p role="alert" className="text-red-300">
+              {game.error}
+            </p>
+            <Link href="/" className="btn-secondary">
+              Back to the harbour
+            </Link>
+          </>
+        ) : (
+          <p className="animate-pulse">Boarding…</p>
+        )}
+      </main>
+    );
+  }
+  return <GameScreen game={game} onExit={onExit} onPlayAgain={onExit} />;
 }
 
 function Routes({ botDelay }: { botDelay?: number }) {
@@ -104,7 +129,27 @@ function Routes({ botDelay }: { botDelay?: number }) {
           onStart={(c) => void start(c)}
           starting={starting}
           error={error}
-        />
+        >
+          {user && <OnlineLobby />}
+        </HomeScreen>
+      </Route>
+      <Route path="/online/:id">
+        {(params) =>
+          loading ? null : user ? (
+            <OnlinePlay key={params.id} gameId={params.id} onExit={() => navigate("/")} />
+          ) : (
+            <Redirect to="/login" />
+          )
+        }
+      </Route>
+      <Route path="/join/:code">
+        {(params) =>
+          loading ? null : user ? (
+            <JoinInvite code={params.code} />
+          ) : (
+            <AuthGate message="Sign up or log in to join your friend's game, then open the invite link again." />
+          )
+        }
       </Route>
       <Route path="/play">
         {!session ? (
@@ -136,5 +181,22 @@ export function App({ botDelay }: { botDelay?: number } = {}) {
     <AuthProvider>
       <Routes botDelay={botDelay} />
     </AuthProvider>
+  );
+}
+
+function AuthGate({ message }: { message: string }) {
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
+      <h1 className="font-pirate text-4xl text-gold">Ahoy!</h1>
+      <p>{message}</p>
+      <div className="flex gap-2">
+        <Link href="/signup" className="btn-primary">
+          Sign up
+        </Link>
+        <Link href="/login" className="btn-secondary">
+          Log in
+        </Link>
+      </div>
+    </main>
   );
 }

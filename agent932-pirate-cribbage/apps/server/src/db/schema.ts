@@ -55,14 +55,19 @@ export const games = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    mode: text("mode").$type<"ai">().notNull(),
+    mode: text("mode").$type<"ai" | "online">().notNull(),
     aiLevel: text("ai_level").$type<"easy" | "medium" | "hard">(),
+    /** Seat 1's player in online games (`userId` is seat 0). Null against the computer. */
+    user2Id: uuid("user2_id").references(() => users.id, { onDelete: "cascade" }),
     state: jsonb("state").$type<GameState>().notNull(),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
-  (t) => [index("games_user_active").on(t.userId, t.finishedAt)],
+  (t) => [
+    index("games_user_active").on(t.userId, t.finishedAt),
+    index("games_user2_active").on(t.user2Id, t.finishedAt),
+  ],
 );
 
 /** One finished match. `id` matches the game it came from. */
@@ -75,6 +80,8 @@ export const matches = pgTable("matches", {
   firstDealer: smallint("first_dealer").notNull(),
   winner: smallint("winner").notNull(),
   skunk: smallint("skunk").notNull(),
+  /** Seat that forfeited (left or timed out), if the game didn't finish normally. */
+  forfeitedBy: smallint("forfeited_by"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
 });

@@ -3,6 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { buildApp } from "../app.js";
+import type { Timing } from "../online/rooms.js";
 import type { Db } from "../db/client.js";
 import * as schema from "../db/schema.js";
 
@@ -10,13 +11,21 @@ import * as schema from "../db/schema.js";
 export async function testApp(
   migrationsFolder = process.env.SERVER_MIGRATIONS ??
     fileURLToPath(new URL("../../drizzle", import.meta.url)),
+  timing?: Timing,
 ) {
   const client = new PGlite();
   const pg = drizzle(client, { schema });
   await migrate(pg, { migrationsFolder });
   const db = pg as unknown as Db;
-  const app = await buildApp({ db, checkDb: async () => true, logger: false });
-  return { app, db, close: async () => (await app.close(), await client.close()) };
+  const build = () => buildApp({ db, checkDb: async () => true, logger: false, timing });
+  const app = await build();
+  return {
+    app,
+    db,
+    /** A second app on the same database, as after a server restart. */
+    restart: build,
+    close: async () => (await app.close(), await client.close()),
+  };
 }
 
 /** Sign up and return a cookie header for later requests. */

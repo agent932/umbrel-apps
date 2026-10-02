@@ -33,12 +33,26 @@ export interface Presentation {
   nextId: number;
 }
 
+export interface OnlineInfo {
+  /** When the server will move for whoever is holding things up (ms since epoch). */
+  deadline: number | null;
+  online: [boolean, boolean];
+  /** Seats that pressed "Next round" on the summary. */
+  nextRoundReady: Seat[];
+  forfeit: () => void;
+  /** Set when a player lost on time or by leaving. */
+  forfeitedBy: Seat | null;
+}
+
 export interface GameController {
   p: Presentation;
+  /** Display names by seat; the viewer's own seat is "You". */
   names: [string, string];
-  level: BotLevel;
+  /** Opponent difficulty, for games vs the computer. */
+  level: BotLevel | null;
   act: (action: UiAction) => void;
   error: string | null;
-  /** True while counting the stats (server games), for the UI note. */
+  /** True when the game counts toward stats (server games). */
   ranked: boolean;
+  online?: OnlineInfo;
 }

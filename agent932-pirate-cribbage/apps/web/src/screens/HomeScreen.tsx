@@ -11,6 +11,8 @@ interface Props {
   onStart: (choice: MenuChoice) => void;
   starting?: boolean;
   error?: string | null;
+  /** Extra sections (the online lobby for signed-in players). */
+  children?: React.ReactNode;
 }
 
 function Choice<T extends string>({
@@ -55,7 +57,7 @@ function Choice<T extends string>({
   );
 }
 
-export function HomeScreen({ canResume, onResume, onStart, starting, error }: Props) {
+export function HomeScreen({ canResume, onResume, onStart, starting, error, children }: Props) {
   const { user, logout } = useAuth();
   const [level, setLevel] = useState<BotLevel>("medium");
   const [mode, setMode] = useState<"classic" | "pirate">("pirate");
@@ -185,8 +187,10 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error }: Pr
         </p>
       </section>
 
+      {children}
+
       <p className="text-center text-xs text-parchment/50">
-        Online play against other pirates is on the horizon.
+        Friends lists and ranked play are on the horizon.
       </p>
     </main>
   );

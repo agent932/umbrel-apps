@@ -22,6 +22,7 @@ import type { Db } from "../db/client.js";
 import { games } from "../db/schema.js";
 import type { ClientAction } from "./actions.js";
 import { recordMatch } from "./record.js";
+import { toEngineAction } from "./toEngine.js";
 
 /** In games vs the computer, the person is always seat 0. */
 export const HUMAN: Seat = 0;
@@ -39,40 +40,6 @@ export interface GameResponse {
 }
 
 export class GameNotFoundError extends Error {}
-
-const randomIndex = (n: number) => Math.floor(cryptoRandom() * n);
-
-/** Turn what the client sent into a full engine action, filling in the seat and any randomness. */
-function toEngineAction(state: GameState, a: ClientAction): Action | "continue" {
-  const seat = HUMAN;
-  switch (a.type) {
-    case "continue":
-      return "continue";
-    case "cut":
-      return { type: "cut", index: randomIndex(state.deck.length) };
-    case "crowsNest":
-      return { type: "crowsNest", seat, index: randomIndex(state.deck.length) };
-    case "pickpocket":
-      return {
-        type: "pickpocket",
-        seat,
-        card: a.card,
-        index: randomIndex(state.hands[COMPUTER].length),
-      };
-    case "nextRound":
-      return { type: "nextRound" };
-    case "discard":
-    case "rebury":
-      return { type: a.type, seat, cards: a.cards };
-    case "play":
-    case "parley":
-      return { type: a.type, seat, card: a.card };
-    case "ready":
-    case "spyglass":
-    case "belay":
-      return { type: a.type, seat };
-  }
-}
 
 /** Apply one action and capture what the person is allowed to see of it. */
 function apply(state: GameState, action: Action, steps: Step[]): GameState {
@@ -157,7 +124,7 @@ export async function actInAiGame(
 
     const steps: Step[] = [];
     let state = row.state;
-    const action = toEngineAction(state, input);
+    const action = input.type === "continue" ? "continue" : toEngineAction(state, HUMAN, input);
     if (action === "continue") {
       state = advance(state, level, steps, false);
     } else {

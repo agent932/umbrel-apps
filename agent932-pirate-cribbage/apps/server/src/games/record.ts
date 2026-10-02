@@ -2,6 +2,7 @@ import {
   type Card,
   type GameState,
   type RoundSeatRecord,
+  type Seat,
   analyzeDiscard,
   cardLabel,
 } from "@pirate/engine";
@@ -19,9 +20,15 @@ export function analyzerScore(seat: RoundSeatRecord, isDealer: boolean): number 
 /** Write a finished game into the stats tables. */
 export async function recordMatch(
   tx: Tx | Db,
-  game: { id: string; mode: "ai"; aiLevel: "easy" | "medium" | "hard" | null; createdAt: Date },
+  game: {
+    id: string;
+    mode: "ai" | "online";
+    aiLevel: "easy" | "medium" | "hard" | null;
+    createdAt: Date;
+  },
   players: [string | null, string | null],
   state: GameState,
+  forfeitedBy: Seat | null = null,
 ) {
   const labels = (cards: Card[]) => cards.map(cardLabel);
   await tx.insert(matches).values({
@@ -33,6 +40,7 @@ export async function recordMatch(
     firstDealer: state.firstDealer,
     winner: state.winner!,
     skunk: state.skunk,
+    forfeitedBy,
     startedAt: game.createdAt,
     endedAt: new Date(),
   });

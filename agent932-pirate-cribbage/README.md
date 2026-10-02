@@ -24,6 +24,8 @@ npm run dev          # server on :3000, web on http://localhost:5173
 
 Play the engine against the bot in your terminal: `npm run play`.
 
+Try online play alone: sign up in the browser, then run `npx tsx scripts/dev-opponent.ts pirate` (or `classic`, or pass an invite code as a second argument) for a scripted opponent using the second test account in `.env.example`.
+
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run format`, `npm run build`.
 
 Changing the database schema: edit `apps/server/src/db/schema.ts`, then `npm run db:generate` to write a new migration.

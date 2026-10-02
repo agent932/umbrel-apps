@@ -16,6 +16,8 @@ interface Props {
   names: [string, string];
   onNext?: () => void;
   nextLabel?: string;
+  /** Shown instead of the button while the other player hasn't moved on. */
+  waitingNote?: string;
   /** Your six cards and throw this round, for the discard review. */
   decision?: { hand: CardType[]; discarded: CardType[] } | null;
   isDealer?: boolean;
@@ -97,6 +99,7 @@ export function RoundSummary({
   names,
   onNext,
   nextLabel = "Next round",
+  waitingNote,
   decision,
   isDealer = false,
 }: Props) {
@@ -109,6 +112,7 @@ export function RoundSummary({
           {nextLabel}
         </button>
       )}
+      {waitingNote && <p className="mt-4 text-center text-parchment/70">{waitingNote}</p>}
     </Modal>
   );
 }

@@ -1,17 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   type Card as CardType,
   type PowerId,
   cardLabel,
   cardValue,
+  other,
   sameCard,
 } from "@pirate/engine";
 import { Board } from "../components/Board.js";
 import { Card } from "../components/Card.js";
 import { POWER_ICONS, PowerBar } from "../components/PowerBar.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
-import { BOT, YOU } from "../game/localGame.js";
 import type { FeedItem, GameController } from "../game/types.js";
 
 interface Props {
@@ -21,8 +21,12 @@ interface Props {
 }
 
 export function GameScreen({ game, onExit, onPlayAgain }: Props) {
-  const { p, names: label, act, error } = game;
+  const { p, names: label, act, error, online } = game;
   const view = p.view;
+  // Seat-relative: online you may be seat 1.
+  const me = view.seat;
+  const opp = other(me);
+  const oppName = label[opp];
   const pirate = view.rules.pirate;
   // The selection belongs to one situation; when the phase or hand changes it's dropped.
   const situation = `${view.round}:${view.phase}:${view.hand.map(cardLabel).join()}`;
@@ -37,9 +41,9 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
       isSelected(c) ? sel.filter((s) => !sameCard(s, c)) : sel.length < max ? [...sel, c] : sel,
     );
 
-  const myTurnToPeg = view.phase === "pegging" && view.toAct.includes(YOU);
+  const myTurnToPeg = view.phase === "pegging" && view.toAct.includes(me);
   const mustDiscard = view.phase === "discard" && view.hand.length === 6;
-  const mustCut = view.phase === "cut" && view.toAct.includes(YOU);
+  const mustCut = view.phase === "cut" && view.toAct.includes(me);
   const inPreplay = view.phase === "preplay" && view.needsReady;
   const count = view.pegging?.count ?? 0;
 
@@ -73,22 +77,25 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
     if (myTurnToPeg) return act({ type: "play", card: c });
   }
 
+  const waitingForMe = view.phase === "roundEnd" && !!online && !online.nextRoundReady.includes(me);
+  const myMove = mustDiscard || mustCut || inPreplay || myTurnToPeg || waitingForMe;
+
   const prompt = mustDiscard
-    ? `Throw two cards to ${view.dealer === YOU ? "your" : "Cap'n Bot's"} crib`
+    ? `Throw two cards to ${view.dealer === me ? "your" : `${oppName}'s`} crib`
     : view.phase === "discard"
-      ? "Waiting for Cap'n Bot to discard…"
+      ? `Waiting for ${oppName} to discard…`
       : mustCut
         ? "Cut the deck"
         : view.phase === "cut"
-          ? "Cap'n Bot is cutting…"
+          ? `${oppName} is cutting…`
           : inPreplay
             ? "Use Pickpocket or Rebury, or set sail"
             : view.phase === "preplay"
-              ? "Waiting for Cap'n Bot…"
+              ? `Waiting for ${oppName}…`
               : myTurnToPeg
                 ? `Your play — the count is ${count}`
                 : view.phase === "pegging"
-                  ? "Cap'n Bot is thinking…"
+                  ? `${oppName} is thinking…`
                   : view.phase === "deal"
                     ? "Shuffling…"
                     : "";
@@ -97,9 +104,9 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
     ? view.pegging.played.slice(view.pegging.played.length - view.pegging.pile.length)
     : [];
   const cribLabel =
-    view.cribOwner === YOU || (view.cribOwner === null && view.dealer === YOU)
+    view.cribOwner === me || (view.cribOwner === null && view.dealer === me)
       ? "Your crib"
-      : "Bot's crib";
+      : `${oppName}'s crib`;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-3 px-4 py-3">
@@ -110,13 +117,25 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
         <span className="text-parchment/70">
           Round {Math.max(view.round, 1)} · {pirate ? "Pirate rules" : "Classic"}
         </span>
+        {online && view.phase !== "gameOver" && (
+          <button
+            type="button"
+            className="text-parchment/60 hover:text-red-300"
+            onClick={() => {
+              if (window.confirm(`Abandon ship? ${oppName} wins this game.`)) online.forfeit();
+            }}
+          >
+            Forfeit
+          </button>
+        )}
       </header>
 
       <PlayerStrip
-        name={label[BOT]}
-        score={view.scores[BOT]}
-        dealer={view.dealer === BOT}
+        name={label[opp]}
+        score={view.scores[opp]}
+        dealer={view.dealer === opp}
         powersLeft={view.opponentPowersLeft}
+        offline={online ? !online.online[opp] : false}
       >
         {view.spied && view.phase === "discard" ? (
           <div className="flex gap-1" aria-label="Opponent's hand seen through the spyglass">
@@ -136,7 +155,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
         )}
       </PlayerStrip>
 
-      <Board scores={view.scores} backPegs={p.backPegs} rules={view.rules} names={label} />
+      <Board scores={view.scores} backPegs={p.backPegs} rules={view.rules} names={label} me={me} />
 
       <section className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
         <div className="flex flex-col items-center gap-1 text-[11px] text-parchment/70">
@@ -163,7 +182,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
                   {pile.map((p) => (
                     <motion.div
                       key={cardLabel(p.card)}
-                      initial={{ y: p.seat === YOU ? 40 : -40, opacity: 0 }}
+                      initial={{ y: p.seat === me ? 40 : -40, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                     >
                       <Card card={p.card} small />
@@ -200,9 +219,10 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
 
       <Feed items={p.feed.slice(0, 4)} />
 
-      <PlayerStrip name={label[YOU]} score={view.scores[YOU]} dealer={view.dealer === YOU} you>
+      <PlayerStrip name={label[me]} score={view.scores[me]} dealer={view.dealer === me} you>
         <p className="text-sm text-parchment/85" aria-live="polite">
           {view.pegging ? prompt : ""}
+          {online && myMove && <Countdown deadline={online.deadline} />}
         </p>
       </PlayerStrip>
 
@@ -279,23 +299,31 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
           show={p.show}
           cut={view.cut}
           names={label}
-          onNext={() => act({ type: "nextRound" })}
+          onNext={online && !waitingForMe ? undefined : () => act({ type: "nextRound" })}
+          waitingNote={online && !waitingForMe ? `Waiting for ${oppName}…` : undefined}
           decision={view.myDiscardDecision}
-          isDealer={view.dealer === YOU}
+          isDealer={view.dealer === me}
         />
       )}
 
       {view.phase === "gameOver" && (
-        <Modal title={view.winner === YOU ? "Victory! 🏴‍☠️" : "Defeat…"}>
+        <Modal title={view.winner === me ? "Victory! 🏴‍☠️" : "Defeat…"}>
+          {online?.forfeitedBy != null && (
+            <p className="mb-2 text-center text-parchment/80">
+              {online.forfeitedBy === me ? "You abandoned ship." : `${oppName} abandoned ship.`}
+            </p>
+          )}
           <p className="mb-3 text-center">
-            {view.winner === YOU ? "Ye won" : "Cap'n Bot won"} {view.scores[YOU]}–{view.scores[BOT]}
+            {view.winner === me ? "Ye won" : `${oppName} won`} {view.scores[me]}–{view.scores[opp]}
             {view.skunk === 2 ? " — a double skunk!" : view.skunk === 1 ? " — a skunk!" : "."}
           </p>
           {p.show.length > 0 && <ShowList show={p.show} cut={view.cut} names={label} />}
           <div className="mt-4 flex gap-2">
-            <button type="button" className="btn-primary flex-1" onClick={onPlayAgain} autoFocus>
-              Play again
-            </button>
+            {!online && (
+              <button type="button" className="btn-primary flex-1" onClick={onPlayAgain} autoFocus>
+                Play again
+              </button>
+            )}
             <button type="button" className="btn-secondary flex-1" onClick={onExit}>
               Harbour
             </button>
@@ -312,9 +340,11 @@ function PlayerStrip({
   dealer,
   you,
   powersLeft,
+  offline,
   children,
 }: {
   name: string;
+  offline?: boolean;
   score: number;
   dealer: boolean;
   you?: boolean;
@@ -328,6 +358,9 @@ function PlayerStrip({
           <span className={`h-2.5 w-2.5 rounded-full ${you ? "bg-gold" : "bg-[#e05252]"}`} />
           <span className="truncate font-semibold">{name}</span>
           {dealer && <span className="rounded bg-rum px-1.5 text-[10px] uppercase">dealer</span>}
+          {offline && (
+            <span className="rounded bg-red-900/60 px-1.5 text-[10px] uppercase">offline</span>
+          )}
         </div>
         {powersLeft && powersLeft.length > 0 && (
           <div className="mt-0.5 text-xs" title="Powers left">
@@ -376,5 +409,25 @@ function Feed({ items }: { items: FeedItem[] }) {
         ))}
       </AnimatePresence>
     </ol>
+  );
+}
+
+/** Seconds left before the server moves for you. */
+function Countdown({ deadline }: { deadline: number | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [deadline]);
+  if (!deadline) return null;
+  const secs = Math.max(0, Math.ceil((deadline - now) / 1000));
+  return (
+    <span
+      className={`ml-2 tabular-nums ${secs <= 10 ? "text-red-300" : "text-parchment/60"}`}
+      title="Time to move"
+    >
+      ⏳ {secs}s
+    </span>
   );
 }

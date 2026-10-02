@@ -5,6 +5,8 @@ interface BoardProps {
   backPegs: [number, number];
   rules: RuleSet;
   names: [string, string];
+  /** Your seat: your lane is drawn at the bottom, in gold. */
+  me?: 0 | 1;
 }
 
 const HOLES_PER_ROW = 60;
@@ -26,9 +28,10 @@ function pegXY(score: number, lane: number) {
   return holeXY(score, lane);
 }
 
-export function Board({ scores, backPegs, rules, names }: BoardProps) {
+export function Board({ scores, backPegs, rules, names, me = 0 }: BoardProps) {
   const pirate = rules.pirate;
-  const lanes = [1, 0]; // opponent on top, you below
+  const lanes = [1 - me, me]; // opponent on top, you below
+  const color = (seat: number) => (seat === me ? COLORS[0] : COLORS[1]);
   return (
     <figure className="w-full">
       <svg
@@ -68,14 +71,14 @@ export function Board({ scores, backPegs, rules, names }: BoardProps) {
               cx={pegXY(backPegs[seat as 0 | 1], lane).x}
               cy={pegXY(backPegs[seat as 0 | 1], lane).y}
               r={2.8}
-              fill={COLORS[seat]}
+              fill={color(seat)}
               opacity={0.5}
             />
             <circle
               cx={pegXY(scores[seat as 0 | 1], lane).x}
               cy={pegXY(scores[seat as 0 | 1], lane).y}
               r={3.4}
-              fill={COLORS[seat]}
+              fill={color(seat)}
               stroke="#000"
               strokeWidth={0.6}
               style={{ transition: "cx 600ms ease, cy 600ms ease" }}
