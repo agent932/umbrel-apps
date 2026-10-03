@@ -16,7 +16,10 @@ describe("security headers", () => {
     const res = await t.app.inject({ url: "/api/health" });
     const csp = String(res.headers["content-security-policy"]);
     expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain("script-src 'self'");
+    expect(csp).toContain("script-src 'self' https://static.cloudflareinsights.com");
+    expect(csp).toContain("https://cloudflareinsights.com");
+    // Inline scripts stay blocked.
+    expect(csp.split(";").find((d) => d.startsWith("script-src"))).not.toContain("unsafe-inline");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).not.toContain("upgrade-insecure-requests");

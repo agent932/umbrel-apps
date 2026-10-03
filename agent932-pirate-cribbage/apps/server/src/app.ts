@@ -40,7 +40,8 @@ export async function buildApp({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+        // Cloudflare Web Analytics (added to pages by Cloudflare when the site is behind it).
+        scriptSrc: ["'self'", "https://static.cloudflareinsights.com"],
         // React and the animation library set inline style attributes; fonts come from Google.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -48,7 +49,13 @@ export async function buildApp({
         imgSrc: ["'self'", "data:"],
         // The game socket is same-origin. The service worker also fetches Google Fonts to cache
         // them for offline play, and runs under this same policy.
-        connectSrc: ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+        connectSrc: [
+          "'self'",
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+          // Where Cloudflare Web Analytics reports page views.
+          "https://cloudflareinsights.com",
+        ],
         workerSrc: ["'self'"],
         manifestSrc: ["'self'"],
         objectSrc: ["'none'"],
