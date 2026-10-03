@@ -30,6 +30,8 @@ export interface User {
   email: string;
   rating: number;
   rankedGames: number;
+  /** Painted crew portrait 1-8, or null for their initial. */
+  avatar: number | null;
   isAdmin: boolean;
 }
 

@@ -1,6 +1,11 @@
 import type { Card as CardType } from "@pirate/engine";
 import { cardLabel } from "@pirate/engine";
 import cardBackUrl from "../assets/table/card-back.webp";
+import jackUrl from "../assets/table/court-jack.webp";
+import queenUrl from "../assets/table/court-queen.webp";
+import kingUrl from "../assets/table/court-king.webp";
+
+const COURT = { 11: jackUrl, 12: queenUrl, 13: kingUrl } as const;
 
 const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" } as const;
 const SUIT_NAME = { S: "spades", H: "hearts", D: "diamonds", C: "clubs" } as const;
@@ -83,21 +88,22 @@ export function Card({
       <span className="pointer-events-none absolute inset-[3px] rounded-[5px] border border-[#c9b58a]/60" />
       <span className="absolute top-1 left-1">{index}</span>
       <span className="absolute right-1 bottom-1 rotate-180">{index}</span>
-      <span className="absolute inset-0 grid place-items-center">
-        {face ? (
-          <span
-            className={`font-pirate leading-none ${fluid ? "text-[2.6em]" : small ? "text-2xl" : "text-4xl sm:text-5xl"}`}
-          >
-            {RANK[card.rank]}
-          </span>
-        ) : (
+      {face ? (
+        // Painted pirate portraits for the jack, queen and king, framed between the corners.
+        <span
+          className="absolute inset-x-[17%] inset-y-[13%] rounded-[3px] border border-[#b7a374] bg-cover bg-top shadow-inner"
+          style={{ backgroundImage: `url("${COURT[card.rank as 11 | 12 | 13]}")` }}
+          aria-hidden
+        />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center">
           <span
             className={`leading-none ${fluid ? "text-[2.3em]" : small ? "text-xl" : "text-3xl sm:text-4xl"}`}
           >
             {SUIT[card.suit]}
           </span>
-        )}
-      </span>
+        </span>
+      )}
     </>
   );
   const colors = `${red ? "text-[#b8322b]" : "text-[#1c2430]"} bg-[linear-gradient(160deg,#fdf7e4,#efe2bd)] border border-[#b7a374]`;

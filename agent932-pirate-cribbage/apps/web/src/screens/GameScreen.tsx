@@ -11,9 +11,10 @@ import {
 } from "@pirate/engine";
 import { Cinematics } from "../brand/Cinematics.js";
 import { PeggyChatter } from "../brand/PeggyChatter.js";
-import { PEG_COLORS } from "../components/Board.js";
+import { PEG_COLORS, POWER_ART } from "../brand/powerArt.js";
 import { SettingsButton, SettingsFields } from "../components/SettingsButton.js";
 import { PaintedBoard } from "../components/table/PaintedBoard.js";
+import { avatarUrl } from "../brand/avatars.js";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
 import { CountThenShow } from "../components/Counting.js";
@@ -21,13 +22,9 @@ import { CutForDealPanel, CutReveal } from "../components/CutForDeal.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
 import type { FeedItem, GameController } from "../game/types.js";
 import menuUrl from "../assets/table/btn-menu.webp";
+import hourglassUrl from "../assets/ui/icon-hourglass.webp";
+import flagUrl from "../assets/ui/icon-flag.webp";
 import captainUrl from "../assets/table/captain.webp";
-import spyglassUrl from "../assets/table/p-spyglass.webp";
-import crowsNestUrl from "../assets/table/p-crowsNest.webp";
-import parleyUrl from "../assets/table/p-parley.webp";
-import pickpocketUrl from "../assets/table/p-pickpocket.webp";
-import reburyUrl from "../assets/table/p-rebury.webp";
-import belayUrl from "../assets/table/p-belay.webp";
 
 interface Props {
   game: GameController;
@@ -35,9 +32,11 @@ interface Props {
   onPlayAgain: () => void;
   /** Skip animations (tests that play at full bot speed). */
   instant?: boolean;
+  /** The signed-in player's crew portrait, for games against the computer. */
+  myAvatar?: number | null;
 }
 
-export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
+export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Props) {
   const { p, names: label, act, error, online } = game;
   const view = p.view;
   // Seat-relative: online you may be seat 1.
@@ -219,7 +218,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
           name={oppName}
           score={view.scores[opp]}
           dealer={view.dealer === opp}
-          portrait={!online}
+          image={online ? avatarUrl(online.avatars[opp]) : captainUrl}
           powersLeft={pirate ? view.opponentPowersLeft : undefined}
           offline={online ? !online.online[opp] : false}
           returnBy={online?.returnBy[opp] ?? null}
@@ -337,6 +336,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
           name={label[me]}
           score={view.scores[me]}
           dealer={view.dealer === me}
+          image={avatarUrl(online ? online.avatars[me] : myAvatar)}
           you
         >
           {online && myMove && <Countdown deadline={online.deadline} />}
@@ -434,7 +434,10 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
       )}
 
       {view.phase === "gameOver" && (
-        <Modal title={view.winner === me ? "Victory! 🏴‍☠️" : "Defeat…"}>
+        <Modal title={view.winner === me ? "Victory!" : "Defeat…"}>
+          {view.winner === me && (
+            <img src={flagUrl} alt="" className="mx-auto -mt-2 mb-2 h-16 w-auto" />
+          )}
           <CountThenShow show={p.show} cut={view.cut} names={label} instant={instant}>
             {online?.forfeitedBy != null && (
               <p className="mb-2 text-center text-parchment/80">
@@ -472,15 +475,6 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
 /** Where card i of n sits in a fan (the fan's shape is in `.t-slot` CSS). */
 const fan = (i: number, n: number) => ({ "--i": i, "--n": n }) as React.CSSProperties;
 
-const POWER_ART: Record<PowerId, string> = {
-  spyglass: spyglassUrl,
-  crowsNest: crowsNestUrl,
-  parley: parleyUrl,
-  pickpocket: pickpocketUrl,
-  rebury: reburyUrl,
-  belay: belayUrl,
-};
-
 const POWER_HINTS: Partial<Record<PowerId, string>> = {
   parley: "Select one card first.",
   pickpocket: "Select one card from your hand first.",
@@ -510,7 +504,7 @@ function PlayerChip({
   score,
   dealer,
   you,
-  portrait,
+  image,
   powersLeft,
   offline,
   returnBy,
@@ -521,8 +515,8 @@ function PlayerChip({
   score: number;
   dealer: boolean;
   you?: boolean;
-  /** Cap'n Bot's painted portrait instead of an initial. */
-  portrait?: boolean;
+  /** A painted portrait instead of an initial. */
+  image?: string | null;
   powersLeft?: PowerId[];
   offline?: boolean;
   /** When an offline opponent forfeits unless they're back. */
@@ -533,12 +527,10 @@ function PlayerChip({
     <section className={`t-chip ${className}`} aria-label={name}>
       <span
         className="t-avatar"
-        style={
-          portrait ? { background: `url("${captainUrl}") center / 118% no-repeat` } : undefined
-        }
+        style={image ? { background: `url("${image}") center / 118% no-repeat` } : undefined}
         aria-hidden
       >
-        {portrait ? "" : name.slice(0, 1).toUpperCase()}
+        {image ? "" : name.slice(0, 1).toUpperCase()}
       </span>
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-sm leading-tight font-bold">
@@ -620,7 +612,8 @@ function Countdown({ deadline }: { deadline: number | null }) {
       className={`ml-2 tabular-nums ${secs <= 10 ? "text-red-300" : "text-parchment/60"}`}
       title="Time to move"
     >
-      ⏳ {secs}s
+      <img src={hourglassUrl} alt="" className="mr-0.5 inline h-4 w-4 align-[-3px]" />
+      {secs}s
     </span>
   );
 }

@@ -2,6 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
+import { TierBadge } from "../components/TierBadge.js";
+import goldMedalUrl from "../assets/ui/medal-gold.webp";
+import silverMedalUrl from "../assets/ui/medal-silver.webp";
+import bronzeMedalUrl from "../assets/ui/medal-bronze.webp";
+
+const MEDALS = [goldMedalUrl, silverMedalUrl, bronzeMedalUrl];
 
 interface Row {
   id: string;
@@ -105,10 +111,20 @@ export function LeaderboardScreen() {
                 className={`border-t border-parchment/10 ${r.id === user?.id ? "bg-gold/10" : ""}`}
               >
                 <td className="py-1.5 tabular-nums">
-                  {r.rank <= 3 ? ["🥇", "🥈", "🥉"][r.rank - 1] : r.rank}
+                  {r.rank <= 3 ? (
+                    <img
+                      src={MEDALS[r.rank - 1]}
+                      alt={`${r.rank}`}
+                      className="h-7 w-auto drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]"
+                    />
+                  ) : (
+                    r.rank
+                  )}
                 </td>
                 <td className="py-1.5 font-semibold">{r.username}</td>
-                <td className="py-1.5">{r.tier}</td>
+                <td className="py-1.5">
+                  <TierBadge tier={r.tier} />
+                </td>
                 <td className="py-1.5 text-right tabular-nums">{r.rating}</td>
                 <td className="py-1.5 text-right tabular-nums">{r.rankedGames}</td>
               </tr>

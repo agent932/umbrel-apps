@@ -4,6 +4,9 @@ import { tierFor } from "@pirate/engine";
 import { useAuth } from "../auth.js";
 import type { Menu } from "./protocol.js";
 import { socket } from "./socket.js";
+import { TierBadge } from "../components/TierBadge.js";
+import trophyUrl from "../assets/ui/icon-trophy.webp";
+import { SPYGLASS_URL } from "../brand/powerArt.js";
 
 type Status = { kind: "idle" } | { kind: "searching" } | { kind: "invite"; code: string };
 
@@ -53,7 +56,7 @@ export function OnlineLobby() {
             className="text-sm text-parchment/80 hover:text-gold"
             title="Ranked rating"
           >
-            {tierFor(user.rating).name} · {user.rating}
+            <TierBadge tier={tierFor(user.rating).name} /> · {user.rating}
           </Link>
         )}
       </div>
@@ -113,14 +116,18 @@ export function OnlineLobby() {
               socket.send({ t: "queue", menu: { variant: "classic", powerCost: 0, ranked: true } })
             )}
           >
-            🏆 Ranked match (classic rules)
+            <img src={trophyUrl} alt="" className="mr-1 inline h-5 w-auto align-[-4px]" />
+            Ranked match (classic rules)
           </button>
         </div>
       )}
 
       {status.kind === "searching" && (
         <div className="flex items-center justify-between gap-2" role="status">
-          <span className="animate-pulse">🔭 Scanning the horizon for an opponent…</span>
+          <span className="animate-pulse">
+            <img src={SPYGLASS_URL} alt="" className="mr-1 inline h-5 w-5 align-[-4px]" />
+            Scanning the horizon for an opponent…
+          </span>
           <button
             type="button"
             className="text-sm text-parchment/70 hover:text-gold"

@@ -36,6 +36,13 @@
       "when": 1790986547099,
       "tag": "0004_admin_and_seasons",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791047421501,
+      "tag": "0005_avatars",
+      "breakpoints": true
     }
   ]
 }

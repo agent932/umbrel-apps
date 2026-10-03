@@ -37,6 +37,8 @@ export type ServerMessage =
       gameId: string;
       seat: Seat;
       names: [string, string];
+      /** Each player's crew portrait (1-8), or null for their initial. */
+      avatars: [number | null, number | null];
       step: { events: GameEvent[]; view: PlayerView };
       /** When the server will move for whoever is holding things up (ms since epoch). */
       deadline: number | null;

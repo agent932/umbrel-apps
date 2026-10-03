@@ -7,6 +7,7 @@ import { type Client, RoomError, type RoomManager } from "./rooms.js";
 export interface Seeker {
   userId: string;
   username: string;
+  avatar: number | null;
   client: Client;
 }
 
@@ -23,6 +24,9 @@ const INVITE_TTL_MS = 60 * 60 * 1000;
 export class Matchmaker {
   private queues = new Map<string, Seeker>();
   private invites = new Map<string, { host: Seeker; menu: Menu; expires: number }>();
+
+  /** Games that started while their host was offline; told as soon as they reconnect. */
+  private pendingMatches = new Map<string, string>();
 
   private challenges = new Map<
     string,
@@ -55,6 +59,7 @@ export class Matchmaker {
 
   createInvite(host: Seeker, menu: Menu): string {
     this.cancel(host.client);
+    this.cancelInvites(host.userId);
     // Short, unambiguous code (no 0/O, 1/I).
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const code = Array.from(randomBytes(6), (b) => alphabet[b % alphabet.length]).join("");
@@ -76,9 +81,30 @@ export class Matchmaker {
       rulesFor(invite.menu),
       invite.menu.ranked,
     );
-    invite.host.client.send({ t: "matched", gameId });
+    // The host may have reconnected since inviting (a phone drops its connection while the
+    // link is being shared), so reach them wherever they are now.
+    if (this.presence.isOnline(invite.host.userId)) {
+      this.presence.notify(invite.host.userId, { t: "matched", gameId });
+    } else {
+      this.pendingMatches.set(invite.host.userId, gameId);
+      this.rooms.startAwayClock(gameId, invite.host.userId);
+    }
     guest.client.send({ t: "matched", gameId });
     return gameId;
+  }
+
+  /** A player just connected: tell them about a game a friend started while they were away. */
+  deliverPending(userId: string, client: Client) {
+    const gameId = this.pendingMatches.get(userId);
+    if (!gameId) return;
+    this.pendingMatches.delete(userId);
+    client.send({ t: "matched", gameId });
+  }
+
+  /** Withdraw a player's invite links. */
+  cancelInvites(userId: string) {
+    for (const [code, inv] of this.invites)
+      if (inv.host.userId === userId) this.invites.delete(code);
   }
 
   /** Challenge a friend directly. They get a prompt wherever they're signed in. */
@@ -117,11 +143,13 @@ export class Matchmaker {
     c.from.client.send({ t: "challengeDeclined", challengeId, by: guest.username });
   }
 
-  /** Forget anything this connection was waiting for (it cancelled, or disconnected). */
+  /**
+   * Forget the Quick Match place and challenges this connection was waiting on (it cancelled, or
+   * disconnected). Invite links outlive the connection: they're shared through other apps, which
+   * often sends the host's browser to the background and drops its connection.
+   */
   cancel(client: Client) {
     for (const [key, s] of this.queues) if (s.client === client) this.queues.delete(key);
-    for (const [code, inv] of this.invites)
-      if (inv.host.client === client) this.invites.delete(code);
     for (const [id, c] of this.challenges) if (c.from.client === client) this.challenges.delete(id);
   }
 }

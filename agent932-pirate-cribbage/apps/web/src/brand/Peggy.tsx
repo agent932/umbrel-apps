@@ -1,5 +1,5 @@
-import peggyUrl from "./peggy.svg";
-import squawkUrl from "./peggy-squawk.svg";
+import peggyUrl from "../assets/table/peggy.webp";
+import squawkUrl from "../assets/table/peggy-squawk.webp";
 
 interface PeggyProps {
   /** Beak open, mid-squawk. */

@@ -61,6 +61,29 @@ describe("auth routes", () => {
     expect(res.json().error).toMatch(message);
   });
 
+  it("lets a player pick a crew portrait, or go back to their initial", async () => {
+    const { cookie } = await signUp(t.app);
+    const me = async () =>
+      (await t.app.inject({ url: "/api/auth/me", headers: { cookie } })).json().user;
+    expect((await me()).avatar).toBeNull();
+    const pick = (avatar: unknown) =>
+      t.app.inject({
+        method: "POST",
+        url: "/api/auth/avatar",
+        headers: { cookie },
+        payload: { avatar },
+      });
+    expect((await pick(3)).json().user.avatar).toBe(3);
+    expect((await me()).avatar).toBe(3);
+    expect((await pick(9)).statusCode).toBe(400);
+    expect((await pick(null)).statusCode).toBe(200);
+    expect((await me()).avatar).toBeNull();
+    expect(
+      (await t.app.inject({ method: "POST", url: "/api/auth/avatar", payload: { avatar: 1 } }))
+        .statusCode,
+    ).toBe(401);
+  });
+
   it("logs in by username or email, case-insensitively", async () => {
     await signUp(t.app);
     for (const login of ["CaroS", "caros", "CAROS@example.test"]) {

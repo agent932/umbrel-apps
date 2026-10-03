@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { KRAKEN_HOLES, TREASURE_HOLES, type RuleSet } from "@pirate/engine";
 import boardUrl from "../../assets/table/board.webp";
-import { PEG_COLORS } from "../Board.js";
+import { PEG_COLORS } from "../../brand/powerArt.js";
 
 interface PaintedBoardProps {
   scores: [number, number];

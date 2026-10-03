@@ -1,6 +1,6 @@
 // Pirate Cribbage service worker: makes the app installable and lets guest games vs Cap'n Bot
 // work offline. The API and the game socket always go to the network.
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const FONTS = `fonts-${VERSION}`;
@@ -9,7 +9,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
-      .then((c) => c.addAll(["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png"]))
+      .then((c) => c.addAll(["/", "/manifest.webmanifest", "/favicon.png", "/icon-192.png"]))
       .then(() => self.skipWaiting()),
   );
 });

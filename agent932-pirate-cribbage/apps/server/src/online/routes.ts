@@ -8,6 +8,8 @@ import { ClientMessage, type ServerMessage } from "./protocol.js";
 import { type Client, RoomError, type RoomManager } from "./rooms.js";
 
 /** A real player sends a few messages a second at most. */
+const KEEP_ALIVE_MS = 30_000;
+
 export const MAX_MESSAGES_PER_10S = 60;
 
 /**
@@ -68,7 +70,7 @@ export async function onlineRoutes(
     let windowStart = Date.now();
     let inWindow = 0;
     const watching = new Set<string>();
-    const seeker = { userId: user.id, username: user.username, client };
+    const seeker = { userId: user.id, username: user.username, avatar: user.avatar, client };
 
     socket.on("message", async (raw) => {
       if (Date.now() - windowStart > 10_000) {
@@ -94,8 +96,11 @@ export async function onlineRoutes(
             matchmaker.createInvite(seeker, msg.menu);
             break;
           case "cancelQueue":
+            matchmaker.cancel(client);
+            break;
           case "cancelInvite":
             matchmaker.cancel(client);
+            matchmaker.cancelInvites(user.id);
             break;
           case "joinInvite":
             await matchmaker.joinInvite(seeker, msg.code);
@@ -129,7 +134,13 @@ export async function onlineRoutes(
     });
 
     presence.add(user.id, client);
+    // Proxies such as Cloudflare drop connections that are quiet for ~100s (a host waiting on
+    // their invite screen, a slow thinker); a ping every 30s keeps them open.
+    const keepAlive = setInterval(() => {
+      if (socket.readyState === socket.OPEN) socket.ping();
+    }, KEEP_ALIVE_MS);
     socket.on("close", () => {
+      clearInterval(keepAlive);
       presence.remove(user.id, client);
       matchmaker.cancel(client);
       for (const id of watching) rooms.leave(id, client);
@@ -141,6 +152,7 @@ export async function onlineRoutes(
         username: user.username,
         activeGames: await rooms.activeFor(user.id),
       });
+      matchmaker.deliverPending(user.id, client);
     } catch (e) {
       req.log.error(e);
       client.send({ t: "error", message: "Something went wrong" });

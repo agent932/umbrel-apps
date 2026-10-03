@@ -8,6 +8,7 @@ import { socket } from "./socket.js";
 interface OnlineState {
   p: Presentation | null;
   names: [string, string];
+  avatars: [number | null, number | null];
   deadline: number | null;
   online: [boolean, boolean];
   returnBy: [number | null, number | null];
@@ -27,6 +28,7 @@ export function useOnlineGame(
   const [s, setS] = useState<OnlineState>({
     p: null,
     names: ["You", "Opponent"],
+    avatars: [null, null],
     deadline: null,
     online: [true, true],
     returnBy: [null, null],
@@ -48,6 +50,7 @@ export function useOnlineGame(
               ...prev,
               p: present(base, m.step.events, m.step.view, names),
               names,
+              avatars: m.avatars ?? [null, null],
               deadline: m.deadline,
               online: m.online,
               returnBy: m.returnBy ?? [null, null],
@@ -88,6 +91,7 @@ export function useOnlineGame(
     error: s.error,
     ranked: true,
     online: {
+      avatars: s.avatars,
       deadline: s.deadline,
       online: s.online,
       returnBy: s.returnBy,

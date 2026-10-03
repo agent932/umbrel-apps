@@ -52,6 +52,7 @@ export interface Client {
 interface Player {
   userId: string;
   username: string;
+  avatar?: number | null;
 }
 
 export class RoomError extends Error {}
@@ -138,15 +139,16 @@ export class RoomManager {
       .where(and(eq(games.id, gameId), eq(games.mode, "online"), isNull(games.finishedAt)));
     if (!row || !row.user2Id) return null;
     const people = await this.db
-      .select({ id: users.id, username: users.username })
+      .select({ id: users.id, username: users.username, avatar: users.avatar })
       .from(users)
       .where(or(eq(users.id, row.userId), eq(users.id, row.user2Id)));
     const name = (id: string) => people.find((p) => p.id === id)?.username ?? "Pirate";
+    const avatar = (id: string) => people.find((p) => p.id === id)?.avatar ?? null;
     const room = new Room(
       row.id,
       [
-        { userId: row.userId, username: name(row.userId) },
-        { userId: row.user2Id, username: name(row.user2Id) },
+        { userId: row.userId, username: name(row.userId), avatar: avatar(row.userId) },
+        { userId: row.user2Id, username: name(row.user2Id), avatar: avatar(row.user2Id) },
       ],
       row.state,
       row.createdAt,
@@ -198,13 +200,27 @@ export class RoomManager {
     void room.run(async () => {
       for (const seat of [0, 1] as Seat[]) {
         if (!room.clients[seat].delete(client) || room.online(seat)) continue;
-        room.returnBy[seat] = Date.now() + this.timing.disconnectMs;
-        this.broadcastPresence(room);
-        room.disconnectTimers[seat] = setTimeout(() => {
-          void room.run(() => this.forfeit(room, seat));
-        }, this.timing.disconnectMs);
+        this.awayClock(room, seat);
       }
     });
+  }
+
+  /** A player who isn't connected yet (a friend joined their invite while they were away). */
+  startAwayClock(gameId: string, userId: string) {
+    const room = this.rooms.get(gameId);
+    const seat = room?.seatOf(userId);
+    if (!room || seat == null) return;
+    void room.run(async () => {
+      if (!room.online(seat) && !room.disconnectTimers[seat]) this.awayClock(room, seat);
+    });
+  }
+
+  private awayClock(room: Room, seat: Seat) {
+    room.returnBy[seat] = Date.now() + this.timing.disconnectMs;
+    this.broadcastPresence(room);
+    room.disconnectTimers[seat] = setTimeout(() => {
+      void room.run(() => this.forfeit(room, seat));
+    }, this.timing.disconnectMs);
   }
 
   async act(gameId: string, userId: string, action: ClientAction): Promise<void> {
@@ -387,6 +403,7 @@ export class RoomManager {
       gameId: room.id,
       seat,
       names: [room.players[0].username, room.players[1].username],
+      avatars: [room.players[0].avatar ?? null, room.players[1].avatar ?? null],
       step: { events: events.map((e) => redactEvent(e, seat)), view: viewFor(room.state, seat) },
       deadline: room.state.phase === "gameOver" ? null : room.deadline,
       online: [room.online(0), room.online(1)],

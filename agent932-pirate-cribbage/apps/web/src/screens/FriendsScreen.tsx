@@ -4,14 +4,13 @@ import type { PlayerStats } from "@pirate/engine";
 import { ApiError, type Friend, type FriendsResponse, api } from "../api.js";
 import type { Menu } from "../online/protocol.js";
 import { socket } from "../online/socket.js";
+import { TierBadge } from "../components/TierBadge.js";
+import { CUTLASS_URL } from "../brand/powerArt.js";
 
-function TierBadge({ friend }: { friend: Friend }) {
+function FriendTier({ friend }: { friend: Friend }) {
   return (
-    <span
-      className="rounded bg-sea-deep px-1.5 text-[11px] text-parchment/80"
-      title={`Rating ${friend.rating}`}
-    >
-      {friend.tier}
+    <span className="text-[11px] text-parchment/80" title={`Rating ${friend.rating}`}>
+      <TierBadge tier={friend.tier} />
     </span>
   );
 }
@@ -139,7 +138,7 @@ export function FriendsScreen() {
               className="flex items-center justify-between gap-2 border-t border-parchment/10 py-2"
             >
               <span>
-                {f.username} <TierBadge friend={f} />
+                {f.username} <FriendTier friend={f} />
               </span>
               <span className="flex gap-2">
                 <button
@@ -181,7 +180,7 @@ export function FriendsScreen() {
                   aria-label={f.online ? "online" : "offline"}
                 />
                 <span className="font-semibold">{f.username}</span>
-                <TierBadge friend={f} />
+                <FriendTier friend={f} />
               </button>
               {f.online && (
                 <span className="flex gap-1">
@@ -195,7 +194,12 @@ export function FriendsScreen() {
                         className="btn-secondary px-2 py-1 text-xs capitalize"
                         onClick={() => challenge(f, { variant: v, powerCost: 0 })}
                       >
-                        ⚔️ {v}
+                        <img
+                          src={CUTLASS_URL}
+                          alt=""
+                          className="mr-1 inline h-4 w-4 align-[-3px]"
+                        />
+                        {v}
                       </button>
                     ))
                   )}

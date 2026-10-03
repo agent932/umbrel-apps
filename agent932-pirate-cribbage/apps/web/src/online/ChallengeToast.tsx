@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "../auth.js";
 import type { ServerMessage } from "./protocol.js";
 import { socket } from "./socket.js";
+import { CUTLASS_URL } from "../brand/powerArt.js";
 
 type Incoming = Extract<ServerMessage, { t: "challenge" }>;
 
@@ -58,7 +59,8 @@ export function ChallengeToast() {
           className="rounded-xl border border-gold bg-sea p-3 shadow-2xl"
         >
           <p>
-            ⚔️ <b className="text-gold">{c.from.username}</b> challenges you to a{" "}
+            <img src={CUTLASS_URL} alt="" className="mr-1 inline h-5 w-5 align-[-4px]" />
+            <b className="text-gold">{c.from.username}</b> challenges you to a{" "}
             {c.menu.ranked ? "ranked" : c.menu.variant} game!
           </p>
           <div className="mt-2 flex gap-2">

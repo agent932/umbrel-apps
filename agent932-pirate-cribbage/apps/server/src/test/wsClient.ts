@@ -88,9 +88,21 @@ export async function matchedPair(
   t: TestApp,
   menu: object = { variant: "classic" },
   names = ["Anne", "Bonny"],
+  /** Crew portraits to pick before connecting. */
+  avatars?: [number | null, number | null],
 ) {
   const anne = await signUp(t.app, names[0]);
   const bonny = await signUp(t.app, names[1]);
+  if (avatars) {
+    for (const [i, who] of [anne, bonny].entries()) {
+      await t.app.inject({
+        method: "POST",
+        url: "/api/auth/avatar",
+        headers: { cookie: who.cookie },
+        payload: { avatar: avatars[i] },
+      });
+    }
+  }
   const a = await connect(t.app, anne.cookie);
   const b = await connect(t.app, bonny.cookie);
   await a.next((m) => m.t === "hello");

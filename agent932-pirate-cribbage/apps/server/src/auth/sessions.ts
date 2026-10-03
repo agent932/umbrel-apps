@@ -14,6 +14,8 @@ export interface SessionUser {
   email: string;
   rating: number;
   rankedGames: number;
+  /** Painted crew portrait 1-8, or null for their initial. */
+  avatar: number | null;
   isAdmin: boolean;
 }
 
@@ -24,6 +26,7 @@ export const userColumns = {
   email: users.email,
   rating: users.rating,
   rankedGames: users.rankedGames,
+  avatar: users.avatar,
   isAdmin: users.isAdmin,
 };
 

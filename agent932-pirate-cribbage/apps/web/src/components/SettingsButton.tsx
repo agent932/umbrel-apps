@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { type Settings, updateSettings, useSettings } from "../settings.js";
+import wheelUrl from "../assets/ui/icon-wheel.webp";
 
-/** ⚙️ in the corner: sound on/off and how fast Cap'n Bot plays. Saved in this browser. */
+/** The ship's wheel in the corner: sound on/off and how fast Cap'n Bot plays. Saved in this browser. */
 export function SettingsButton() {
   const [open, setOpen] = useState(false);
   return (
@@ -10,10 +11,10 @@ export function SettingsButton() {
         type="button"
         aria-label="Settings"
         aria-expanded={open}
-        className="text-parchment/70 hover:text-gold"
+        className="opacity-85 transition hover:scale-110 hover:opacity-100"
         onClick={() => setOpen((o) => !o)}
       >
-        ⚙️
+        <img src={wheelUrl} alt="" className="h-7 w-7" />
       </button>
       {open && (
         <div

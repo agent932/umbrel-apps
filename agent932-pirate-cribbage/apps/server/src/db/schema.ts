@@ -27,6 +27,8 @@ export const users = pgTable(
     /** Elo rating for ranked play. */
     rating: integer("rating").notNull().default(1000),
     rankedGames: integer("ranked_games").notNull().default(0),
+    /** Which painted crew portrait the player picked (1-8), or null for their initial. */
+    avatar: smallint("avatar"),
     /** Can use the admin pages. The first account created is an admin. */
     isAdmin: boolean("is_admin").notNull().default(false),
     /** Disabled accounts can't sign in. */

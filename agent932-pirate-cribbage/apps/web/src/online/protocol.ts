@@ -26,6 +26,8 @@ export type StateMessage = {
   gameId: string;
   seat: Seat;
   names: [string, string];
+  /** Each player's crew portrait (1-8), or null for their initial. */
+  avatars?: [number | null, number | null];
   step: { events: GameEvent[]; view: PlayerView };
   deadline: number | null;
   online: [boolean, boolean];

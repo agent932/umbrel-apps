@@ -37,20 +37,24 @@ function useBotDelay(override?: number) {
 }
 
 function LocalPlay({ game, botDelay, ...rest }: PlayProps & { game: LocalGame }) {
+  const { user } = useAuth();
   return (
     <GameScreen
       game={useLocalGame(game, useBotDelay(botDelay))}
       instant={botDelay === 0}
+      myAvatar={user?.avatar ?? null}
       {...rest}
     />
   );
 }
 
 function RemotePlay({ res, botDelay, ...rest }: PlayProps & { res: GameResponse }) {
+  const { user } = useAuth();
   return (
     <GameScreen
       game={useRemoteGame(res, useBotDelay(botDelay))}
       instant={botDelay === 0}
+      myAvatar={user?.avatar ?? null}
       {...rest}
     />
   );

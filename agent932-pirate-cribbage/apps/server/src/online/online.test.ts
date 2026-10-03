@@ -29,6 +29,15 @@ describe("online play", () => {
     expect(await c.closed).toBe(4401);
   });
 
+  it("shows both players' crew portraits", async () => {
+    t = await testApp(undefined, LONG);
+    const { sa, sb } = await matchedPair(t, { variant: "classic" }, ["Anne", "Bonny"], [5, null]);
+    const anneSeat = sa.names.indexOf("Anne");
+    expect(sa.avatars[anneSeat]).toBe(5);
+    expect(sa.avatars[1 - anneSeat]).toBeNull();
+    expect(sb.avatars).toEqual(sa.avatars);
+  });
+
   it("pairs two players through Quick Match and shows each only their own hand", async () => {
     const { gameId, a, b, sa, sb } = await pair();
     expect(new Set([sa.seat, sb.seat])).toEqual(new Set([0, 1]));
@@ -248,14 +257,64 @@ describe("online play", () => {
       });
     });
 
-    it("cancels an invite when the host disconnects", async () => {
+    it("keeps the invite when the host's phone drops its connection while sharing the link", async () => {
+      t = await testApp(undefined, LONG);
+      const anne = await signUp(t.app, "Anne");
+      const host = await connect(t.app, anne.cookie);
+      host.send({ t: "createInvite", menu: { variant: "classic" } });
+      const { code } = await host.next<Extract<ServerMessage, { t: "invite" }>>(
+        (m) => m.t === "invite",
+      );
+      // The browser goes to the background and the connection drops, then comes back.
+      host.ws.terminate();
+      await new Promise((r) => setTimeout(r, 50));
+      const back = await connect(t.app, anne.cookie);
+      await back.next((m) => m.t === "hello");
+
+      const guest = await connect(t.app, (await signUp(t.app, "Bonny")).cookie);
+      guest.send({ t: "joinInvite", code });
+      const { gameId } = await guest.next<Extract<ServerMessage, { t: "matched" }>>(
+        (m) => m.t === "matched",
+      );
+      // The host hears about it on the new connection.
+      expect(await back.next((m) => m.t === "matched")).toMatchObject({ gameId });
+    });
+
+    it("starts the game when the host is away, and tells them when they're back", async () => {
+      t = await testApp(undefined, LONG);
+      const anne = await signUp(t.app, "Anne");
+      const host = await connect(t.app, anne.cookie);
+      host.send({ t: "createInvite", menu: { variant: "classic" } });
+      const { code } = await host.next<Extract<ServerMessage, { t: "invite" }>>(
+        (m) => m.t === "invite",
+      );
+      host.ws.terminate();
+      await new Promise((r) => setTimeout(r, 50));
+
+      const guest = await connect(t.app, (await signUp(t.app, "Bonny")).cookie);
+      guest.send({ t: "joinInvite", code });
+      const { gameId } = await guest.next<Extract<ServerMessage, { t: "matched" }>>(
+        (m) => m.t === "matched",
+      );
+      guest.send({ t: "watch", gameId });
+      const s = await guest.next<StateMsg>((m) => m.t === "state");
+      // Anne has the usual few minutes to come back before forfeiting.
+      const anneSeat = s.names.indexOf("Anne");
+      expect(s.online[anneSeat]).toBe(false);
+      expect(s.returnBy[anneSeat]).toBeGreaterThan(Date.now());
+
+      const back = await connect(t.app, anne.cookie);
+      expect(await back.next((m) => m.t === "matched")).toMatchObject({ gameId });
+    });
+
+    it("stops working once the host cancels it", async () => {
       t = await testApp(undefined, LONG);
       const host = await connect(t.app, (await signUp(t.app, "Anne")).cookie);
       host.send({ t: "createInvite", menu: { variant: "classic" } });
       const { code } = await host.next<Extract<ServerMessage, { t: "invite" }>>(
         (m) => m.t === "invite",
       );
-      host.ws.terminate();
+      host.send({ t: "cancelInvite" });
       await new Promise((r) => setTimeout(r, 50));
       const guest = await connect(t.app, (await signUp(t.app, "Bonny")).cookie);
       guest.send({ t: "joinInvite", code });

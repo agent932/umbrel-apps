@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
+import { AvatarPicker } from "../components/AvatarPicker.js";
 
-/** Change your password (e.g. after an admin gave you a temporary one). */
+/** Pick your portrait, and change your password (e.g. after an admin gave you a temporary one). */
 export function AccountScreen() {
   const { user } = useAuth();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -48,6 +49,7 @@ export function AccountScreen() {
       <p className="text-center text-sm text-parchment/80">
         Signed in as <b className="text-gold">{user?.username}</b> ({user?.email})
       </p>
+      <AvatarPicker />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <h2 className="font-pirate text-2xl text-gold">Change password</h2>
         <label className="flex flex-col gap-1 text-sm">

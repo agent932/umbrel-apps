@@ -3,7 +3,8 @@ import { Link } from "wouter";
 import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
 import { useAuth } from "../auth.js";
 import { Peggy } from "../brand/Peggy.js";
-import { POWER_ICONS } from "../components/PowerBar.js";
+import logoUrl from "../assets/ui/logo-a.webp";
+import { POWER_ART } from "../brand/powerArt.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import type { MenuChoice } from "../game/menu.js";
 
@@ -127,7 +128,13 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
       </nav>
       <header className="flex flex-col items-center text-center">
         <Peggy bob className="mb-1 h-28 w-auto drop-shadow-[0_8px_14px_rgba(0,0,0,0.5)]" />
-        <h1 className="font-pirate text-5xl text-gold lantern-glow sm:text-6xl">Pirate Cribbage</h1>
+        <h1>
+          <img
+            src={logoUrl}
+            alt="Pirate Cribbage"
+            className="mx-auto h-auto max-h-[30dvh] w-[min(88vw,460px)] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.6)]"
+          />
+        </h1>
         <p className="mt-2 text-parchment/80">
           Fifteen-two, fifteen-four, and a pair be six, matey.
         </p>
@@ -187,7 +194,8 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
                 </li>
                 {POWERS.map((p) => (
                   <li key={p}>
-                    {POWER_ICONS[p]} <b>{POWER_INFO[p].name}:</b> {POWER_INFO[p].description}
+                    <img src={POWER_ART[p]} alt="" className="mr-1 inline h-5 w-5 align-[-5px]" />{" "}
+                    <b>{POWER_INFO[p].name}:</b> {POWER_INFO[p].description}
                   </li>
                 ))}
               </ul>
@@ -200,7 +208,7 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
           </p>
         )}
         <button type="button" className="btn-primary" onClick={start} disabled={starting}>
-          Set sail ⛵
+          Set sail
         </button>
         <p className="text-center text-xs text-parchment/60">
           {user

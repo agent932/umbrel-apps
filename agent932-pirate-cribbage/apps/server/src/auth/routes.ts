@@ -20,6 +20,9 @@ declare module "fastify" {
   }
 }
 
+/** How many crew portraits there are to pick from. */
+export const AVATAR_COUNT = 8;
+
 const SignupBody = z.object({
   username: z
     .string()
@@ -136,6 +139,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
         email: row.email,
         rating: row.rating,
         rankedGames: row.rankedGames,
+        avatar: row.avatar,
         isAdmin: row.isAdmin,
       },
     };
@@ -177,4 +181,18 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
   });
 
   app.get("/api/auth/me", async (req) => ({ user: req.user }));
+
+  /** Pick a crew portrait (1-8), or null to go back to your initial. */
+  app.post("/api/auth/avatar", async (req, reply) => {
+    const user = requireUser(req, reply);
+    if (!user) return;
+    const body = parseBody(
+      z.object({ avatar: z.number().int().min(1).max(AVATAR_COUNT).nullable() }),
+      req.body,
+      reply,
+    );
+    if (!body) return;
+    await db.update(users).set({ avatar: body.avatar }).where(eq(users.id, user.id));
+    return { user: { ...user, avatar: body.avatar } };
+  });
 }

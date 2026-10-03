@@ -40,6 +40,8 @@ export interface OnlineInfo {
   /** When the server will move for whoever is holding things up (ms since epoch). */
   deadline: number | null;
   online: [boolean, boolean];
+  /** Each player's crew portrait (1-8), or null for their initial. */
+  avatars: [number | null, number | null];
   /** When a disconnected player forfeits unless they're back (ms since epoch). */
   returnBy: [number | null, number | null];
   /** Seats that pressed "Next round" on the summary. */
