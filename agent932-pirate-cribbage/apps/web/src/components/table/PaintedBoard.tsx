@@ -1,7 +1,8 @@
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { KRAKEN_HOLES, TREASURE_HOLES, type RuleSet } from "@pirate/engine";
 import boardUrl from "../../assets/table/board.webp";
 import { PEG_COLORS } from "../../brand/powerArt.js";
+import { pegTick } from "../../sound.js";
 
 interface PaintedBoardProps {
   scores: [number, number];
@@ -12,6 +13,25 @@ interface PaintedBoardProps {
   me: 0 | 1;
   /** Upright down the side of a landscape table, or lying across a portrait one. */
   upright: boolean;
+  /** Jump straight to new scores instead of hopping hole by hole (tests). */
+  instant?: boolean;
+}
+
+/** How long a peg takes to hop one hole. */
+const STEP_MS = 80;
+
+/** The score a peg shows: it walks hole by hole to the real score, tapping each hole. */
+function useHopping(target: number, instant: boolean) {
+  const [shown, setShown] = useState(target);
+  useEffect(() => {
+    if (instant || shown === target) return;
+    const t = setTimeout(() => {
+      setShown((s) => s + Math.sign(target - s));
+      pegTick();
+    }, STEP_MS);
+    return () => clearTimeout(t);
+  }, [shown, target, instant]);
+  return instant ? target : shown;
 }
 
 // Measured on board.webp (700 x 1400): the two carved channels and the run of holes along them.
@@ -39,7 +59,19 @@ function pegUV(score: number, lane: number): [number, number] {
 }
 
 /** The painted cribbage board, with 121 holes per player drilled into its carved channels. */
-export function PaintedBoard({ scores, backPegs, rules, names, me, upright }: PaintedBoardProps) {
+export function PaintedBoard({
+  scores,
+  backPegs,
+  rules,
+  names,
+  me,
+  upright,
+  instant = false,
+}: PaintedBoardProps) {
+  const hopping: [number, number] = [
+    useHopping(scores[0], instant),
+    useHopping(scores[1], instant),
+  ];
   const id = useId().replace(/:/g, "");
   const ref = (name: string) => `url(#${id}-${name})`;
   // Portrait lays the board on its side, start on the right.
@@ -53,7 +85,10 @@ export function PaintedBoard({ scores, backPegs, rules, names, me, upright }: Pa
     return (
       <g
         key={`${seat}-${back ? "back" : "front"}`}
-        style={{ transform: `translate(${x}px, ${y}px)`, transition: "transform 600ms ease" }}
+        style={{
+          transform: `translate(${x}px, ${y}px)`,
+          transition: `transform ${back ? 400 : STEP_MS}ms ease-out`,
+        }}
         opacity={back ? 0.6 : 1}
       >
         <circle cx={3.5} cy={5} r={r} fill="#000" opacity={0.45} />
@@ -132,7 +167,7 @@ export function PaintedBoard({ scores, backPegs, rules, names, me, upright }: Pa
       ))}
       {/* Pegs last, so they sit above every hole. */}
       {lanes.map((seat, lane) => peg(seat, backPegs[seat as 0 | 1], lane, true))}
-      {lanes.map((seat, lane) => peg(seat, scores[seat as 0 | 1], lane, false))}
+      {lanes.map((seat, lane) => peg(seat, hopping[seat as 0 | 1], lane, false))}
     </svg>
   );
 }

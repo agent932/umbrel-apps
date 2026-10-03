@@ -296,6 +296,8 @@ body {
 }
 .t-hand .t-slot {
   --h: var(--ch);
+  /* Vertical swipes on a card are flicks, not page scrolls. */
+  touch-action: none;
   bottom: calc(var(--ch) * -0.1);
   transform-origin: 50% 140%;
   transform: translateX(calc(-50% + (var(--i) - (var(--n) - 1) / 2) * var(--h) * var(--spread)))
@@ -445,6 +447,141 @@ body {
   }
 }
 
+/* Cards deal in from the deck, one after another (the direction is set per area below). */
+.t-hand {
+  --deal-x: -26cqw;
+  --deal-y: -32cqh;
+}
+.t-opp-fan {
+  --deal-x: -24cqw;
+  --deal-y: 26cqh;
+}
+.t-deal-in {
+  animation: t-deal-in 0.45s cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+@keyframes t-deal-in {
+  from {
+    translate: var(--deal-x) var(--deal-y);
+    scale: 0.55;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.t-shake {
+  animation: t-shake 0.35s ease-in-out;
+}
+@keyframes t-shake {
+  25% {
+    translate: -7px 0;
+  }
+  75% {
+    translate: 7px 0;
+  }
+}
+.t-hand .t-slot.dragging {
+  transition: none;
+  animation: none;
+}
+/* A card that would go past 31: touches go to its slot, which shakes it. */
+.t-slot.too-high button {
+  pointer-events: none;
+}
+
+/* "+2 fifteen" rises from the play, then drifts toward the board. */
+.t-pops {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+}
+.t-pop {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: t-pop-land 1.4s ease-out both;
+}
+.t-pop-num {
+  font-family: var(--font-pirate);
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--color-gold);
+  text-shadow:
+    0 2px 0 #5a3a08,
+    0 0 18px rgb(242 184 75 / 0.7);
+}
+.t-pop.theirs .t-pop-num {
+  color: #ffb4a8;
+  text-shadow:
+    0 2px 0 #5a1208,
+    0 0 14px rgb(229 56 59 / 0.6);
+}
+.t-pop.bad .t-pop-num {
+  color: #7fe0ee;
+}
+.t-pop-why {
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--color-parchment);
+  text-shadow: 0 1px 3px #000;
+}
+@keyframes t-pop-land {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  15% {
+    opacity: 1;
+    scale: 1.15;
+  }
+  30% {
+    scale: 1;
+    translate: 0 -2cqh;
+  }
+  70% {
+    opacity: 1;
+    translate: 0 -4cqh;
+  }
+  100% {
+    opacity: 0;
+    translate: -32cqw -4cqh;
+    scale: 0.5;
+  }
+}
+@keyframes t-pop-port {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  15% {
+    opacity: 1;
+    scale: 1.15;
+  }
+  30% {
+    scale: 1;
+  }
+  70% {
+    opacity: 1;
+    translate: 0 -3cqh;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 -24cqh;
+    scale: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-deal-in,
+  .t-shake {
+    animation: none;
+  }
+}
+
 /* Big screens: scale the table's controls up with the cards. */
 .t-chip,
 .t-round,
@@ -473,6 +610,9 @@ body {
   }
   .t-opp-chip {
     margin-left: 3cqw;
+  }
+  .t-opp-chip,
+  .t-you-chip {
     max-width: 50cqw;
   }
   .t-opp-fan .t-slot {
@@ -514,5 +654,16 @@ body {
   .t-peggy {
     top: 31cqh;
     right: 3cqw;
+  }
+  .t-hand {
+    --deal-x: -30cqw;
+    --deal-y: -24cqh;
+  }
+  .t-opp-fan {
+    --deal-x: -30cqw;
+    --deal-y: 34cqh;
+  }
+  .t-pop {
+    animation-name: t-pop-port;
   }
 }

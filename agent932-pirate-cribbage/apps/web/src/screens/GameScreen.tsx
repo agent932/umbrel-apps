@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   type Card as CardType,
@@ -14,6 +14,9 @@ import { PeggyChatter } from "../brand/PeggyChatter.js";
 import { PEG_COLORS, POWER_ART } from "../brand/powerArt.js";
 import { SettingsButton, SettingsFields } from "../components/SettingsButton.js";
 import { PaintedBoard } from "../components/table/PaintedBoard.js";
+import { HandSlot } from "../components/table/HandSlot.js";
+import { ScorePops } from "../components/table/ScorePops.js";
+import { buzz } from "../haptics.js";
 import { avatarUrl } from "../brand/avatars.js";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
@@ -43,8 +46,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
   const me = view.seat;
   const opp = other(me);
   const oppName = label[opp];
-  const stageRef = useRef<HTMLElement>(null);
-  const upright = useUpright(stageRef);
+  const upright = useUpright();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Sound effects for each new step.
@@ -98,7 +100,10 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
   function onCardClick(c: CardType) {
     if (mustDiscard) return toggle(c, 2);
     if (inPreplay) return toggle(c, 2);
-    if (myTurnToPeg) return act({ type: "play", card: c });
+    if (myTurnToPeg) {
+      buzz();
+      act({ type: "play", card: c });
+    }
   }
 
   const waitingForMe = view.phase === "roundEnd" && !!online && !online.nextRoundReady.includes(me);
@@ -182,7 +187,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
   ) : null;
 
   return (
-    <main className="table-stage" ref={stageRef}>
+    <main className="table-stage">
       <div className="table-grid">
         <div className="t-board">
           <PaintedBoard
@@ -192,6 +197,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
             names={label}
             me={me}
             upright={upright}
+            instant={instant}
           />
         </div>
 
@@ -207,8 +213,14 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
         ) : (
           <div className="t-opp-fan" aria-label={`Opponent holds ${view.opponentCardCount} cards`}>
             {Array.from({ length: view.opponentCardCount }, (_, i) => (
-              <div key={i} className="t-slot" style={fan(i, view.opponentCardCount)}>
-                <Card fluid hidden />
+              <div
+                key={`${view.round}-${i}`}
+                className="t-slot"
+                style={fan(i, view.opponentCardCount)}
+              >
+                <div className="t-deal-in">
+                  <Card fluid hidden />
+                </div>
               </div>
             ))}
           </div>
@@ -276,8 +288,14 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
                     {pile.map((p) => (
                       <motion.div
                         key={cardLabel(p.card)}
-                        initial={{ y: p.seat === me ? 60 : -60, opacity: 0, scale: 1.1 }}
-                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        // From your hand below, or flipping over from the opponent's fan above.
+                        initial={
+                          p.seat === me
+                            ? { y: "32vh", opacity: 0, scale: 1.15 }
+                            : { y: "-28vh", opacity: 0, rotateY: 90 }
+                        }
+                        animate={{ y: 0, opacity: 1, scale: 1, rotateY: 0 }}
+                        transition={{ type: "spring", stiffness: 260, damping: 24 }}
                       >
                         <Card card={p.card} fluid />
                       </motion.div>
@@ -310,10 +328,14 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
             const playable = myTurnToPeg && count + cardValue(c) <= 31;
             const clickable = mustDiscard || inPreplay || playable;
             return (
-              <div
-                key={cardLabel(c)}
-                className={`t-slot ${isSelected(c) ? "sel" : ""} ${playable ? "playable" : ""}`}
-                style={fan(i, preplayPool.length)}
+              <HandSlot
+                key={`${view.round}-${cardLabel(c)}`}
+                i={i}
+                n={preplayPool.length}
+                selected={isSelected(c)}
+                playable={playable}
+                tooHigh={myTurnToPeg && !playable}
+                onFlick={clickable ? () => onCardClick(c) : undefined}
               >
                 <Card
                   card={c}
@@ -327,7 +349,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
                     in crib
                   </span>
                 )}
-              </div>
+              </HandSlot>
             );
           })}
         </div>
@@ -418,6 +440,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
 
       <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
       <CutReveal events={p.lastEvents} names={label} me={me} />
+      {!instant && <ScorePops events={p.lastEvents} me={me} />}
       {!instant && <Cinematics events={p.lastEvents} names={label} me={me} />}
 
       {view.phase === "roundEnd" && (
@@ -481,20 +504,19 @@ const POWER_HINTS: Partial<Record<PowerId, string>> = {
   rebury: "Select the two cards you want in the crib.",
 };
 
-/** True when the table is wider than tall: the board then stands upright down the side. */
-function useUpright(ref: React.RefObject<HTMLElement | null>) {
-  const [upright, setUpright] = useState(
-    () => typeof window === "undefined" || window.innerWidth >= window.innerHeight,
-  );
+/** True when the screen (and so the table, which fills it) is wider than tall: the board then
+ * stands upright down the side. Matches the table's own landscape/portrait CSS. */
+function useUpright() {
+  const query = () =>
+    typeof window === "undefined" || !window.matchMedia?.("(orientation: portrait)").matches;
+  const [upright, setUpright] = useState(query);
   useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(([entry]) => {
-      if (entry) setUpright(entry.contentRect.width >= entry.contentRect.height);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
+    const mq = window.matchMedia?.("(orientation: portrait)");
+    if (!mq) return;
+    const update = () => setUpright(!mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
   return upright;
 }
 

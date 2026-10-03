@@ -37,11 +37,11 @@ function tone(
   osc.stop(t + length + 0.02);
 }
 
-/** A card slapping the table: a short burst of filtered noise. */
-function cardFlick() {
+/** A short burst of filtered noise: the basis of card and wood sounds. */
+function noise(start: number, length: number, freq: number, gain: number) {
   const a = audio();
   if (!a) return;
-  const buffer = a.createBuffer(1, a.sampleRate * 0.05, a.sampleRate);
+  const buffer = a.createBuffer(1, Math.ceil(a.sampleRate * length), a.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
   const src = a.createBufferSource();
@@ -49,10 +49,24 @@ function cardFlick() {
   const g = a.createGain();
   src.buffer = buffer;
   filter.type = "bandpass";
-  filter.frequency.value = 2400;
-  g.gain.value = 0.25;
+  filter.frequency.value = freq;
+  g.gain.value = gain;
   src.connect(filter).connect(g).connect(a.destination);
-  src.start();
+  src.start(a.currentTime + start);
+}
+
+/** A card slapping the table. */
+const cardFlick = () => noise(0, 0.05, 2400, 0.25);
+
+/** A riffle shuffle: a quick run of card flicks. */
+const shuffle = () => {
+  for (let i = 0; i < 10; i++) noise(i * 0.045, 0.03, 2600 + (i % 3) * 300, 0.12);
+};
+
+/** A wooden peg tapped into the next hole. */
+export function pegTick() {
+  noise(0, 0.03, 1100, 0.18);
+  tone(820, 0, 0.05, "triangle", 0.04);
 }
 
 /** Rising chime, one note per couple of points (up to five). */
@@ -96,8 +110,10 @@ export function playEvents(events: GameEvent[], me: Seat) {
         else lament();
         break;
       case "cut":
-      case "dealt":
         cardFlick();
+        break;
+      case "dealt":
+        shuffle();
         break;
     }
   }

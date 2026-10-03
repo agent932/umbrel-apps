@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.11.1"
+version: "0.12.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,8 +31,12 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Fixed: the pirate portraits on jacks, queens and kings no longer cover the
-  card's rank and suit in the corners.
+  The table comes alive: cards deal out from the deck, played cards fly to
+  the pile (your opponent's flip over), and you can flick a card up to play
+  it. Points float up ("+2 fifteen") and the pegs hop hole by hole with a
+  tap. A card that would go past 31 shakes when you touch it, and phones
+  that support it give a little buzz. Fixed: the board now turns when you
+  rotate your phone during a new game.
 
 
 developer: agent932
