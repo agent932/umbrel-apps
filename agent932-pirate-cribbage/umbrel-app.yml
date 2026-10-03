@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.8.2"
+version: "0.8.3"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,11 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Ready for a Cloudflare Tunnel: the login rate limit now uses the visitor
-  address Cloudflare reports, so it can't be dodged with a faked header.
-
+  Security and maintenance: browser security headers, safer error messages,
+  the game connection only accepts the game's own pages, flood protection,
+  stronger password hashing (upgraded automatically at your next sign-in), and
+  disabled accounts are disconnected immediately. Now runs on Node.js 24, with
+  every dependency up to date and no known vulnerabilities.
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage

@@ -3,7 +3,7 @@ import { eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
 import { users } from "../db/schema.js";
-import { hashPassword, verifyPassword } from "./password.js";
+import { hashPassword, needsRehash, verifyPassword } from "./password.js";
 import {
   SESSION_COOKIE,
   type SessionUser,
@@ -121,6 +121,13 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
       return reply.code(401).send({ error: "Wrong username or password" });
     }
     if (row.disabledAt) return reply.code(403).send({ error: "This account has been disabled" });
+    // Upgrade older, weaker password hashes now that we have the password in hand.
+    if (needsRehash(row.passwordHash)) {
+      await db
+        .update(users)
+        .set({ passwordHash: await hashPassword(body.password) })
+        .where(eq(users.id, row.id));
+    }
     await startSession(reply, row.id);
     return {
       user: {

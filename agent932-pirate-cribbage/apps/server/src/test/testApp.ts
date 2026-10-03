@@ -12,12 +12,22 @@ export async function testApp(
   migrationsFolder = process.env.SERVER_MIGRATIONS ??
     fileURLToPath(new URL("../../drizzle", import.meta.url)),
   timing?: Timing,
+  messageLimit = 100_000,
 ) {
   const client = new PGlite();
   const pg = drizzle(client, { schema });
   await migrate(pg, { migrationsFolder });
   const db = pg as unknown as Db;
-  const build = () => buildApp({ db, checkDb: async () => true, logger: false, timing });
+  // Test clients play whole games at machine speed, far past any human, so the flood limit is
+  // raised unless a test asks for the real one.
+  const build = () =>
+    buildApp({
+      db,
+      checkDb: async () => true,
+      logger: false,
+      timing,
+      socketMessageLimit: messageLimit,
+    });
   const app = await build();
   return {
     app,

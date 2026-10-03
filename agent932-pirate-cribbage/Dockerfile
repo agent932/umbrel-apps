@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/engine/package.json packages/engine/
@@ -9,15 +9,18 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/engine/package.json packages/engine/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
-RUN npm ci --omit=dev -w @pirate/server --include-workspace-root=false
+RUN npm ci --omit=dev -w @pirate/server --include-workspace-root=false \
+ # npm sometimes keeps a package in the workspace's own node_modules; make sure the folder exists
+ # so the copy below always works.
+ && mkdir -p apps/server/node_modules
 
-FROM node:22-alpine
+FROM node:24-alpine
 # Shown by /api/health so you can tell which build is running.
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION \
@@ -27,6 +30,7 @@ ENV APP_VERSION=$APP_VERSION \
     MIGRATE_ON_START=true
 WORKDIR /app/server
 COPY --from=deps /app/node_modules /app/node_modules
+COPY --from=deps /app/apps/server/node_modules ./node_modules
 COPY --from=build /app/apps/server/dist ./dist
 COPY --from=build /app/apps/server/drizzle ./drizzle
 COPY --from=build /app/apps/web/dist /app/web

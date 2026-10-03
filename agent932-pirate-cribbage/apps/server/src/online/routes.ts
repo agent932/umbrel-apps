@@ -7,9 +7,36 @@ import type { Presence } from "./presence.js";
 import { ClientMessage, type ServerMessage } from "./protocol.js";
 import { type Client, RoomError, type RoomManager } from "./rooms.js";
 
+/** A real player sends a few messages a second at most. */
+export const MAX_MESSAGES_PER_10S = 60;
+
+/**
+ * Whether a socket's Origin header matches the host it connected to. No Origin means it isn't a
+ * browser (scripts, future native apps), which can't borrow a player's cookie from another site.
+ */
+export function sameOrigin(
+  origin: string | undefined,
+  headers: Record<string, string | string[] | undefined>,
+) {
+  if (!origin) return true;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return false;
+  }
+  const hosts = [headers.host, headers["x-forwarded-host"]].flat().filter(Boolean) as string[];
+  return hosts.some((h) => h.split(",")[0]!.trim() === originHost);
+}
+
 export async function onlineRoutes(
   app: FastifyInstance,
-  { db, rooms, presence }: { db: Db; rooms: RoomManager; presence: Presence },
+  {
+    db,
+    rooms,
+    presence,
+    messageLimit = MAX_MESSAGES_PER_10S,
+  }: { db: Db; rooms: RoomManager; presence: Presence; messageLimit?: number },
 ) {
   const matchmaker = new Matchmaker(rooms, presence, (a, b) => areFriends(db, a, b));
 
@@ -25,15 +52,34 @@ export async function onlineRoutes(
       socket.close(4401, "unauthorized");
       return;
     }
+    // Only the game's own pages may open a socket with the player's cookie. Another site on the
+    // same domain (e.g. a different app at *.atomicit.ca) could otherwise act as them.
+    if (!sameOrigin(req.headers.origin, req.headers)) {
+      socket.close(4403, "forbidden origin");
+      return;
+    }
     const client: Client = {
       send: (m) => {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
       },
+      close: (code, reason) => socket.close(code, reason),
     };
+    // A real player sends a few messages a second at most; hang up on floods.
+    let windowStart = Date.now();
+    let inWindow = 0;
     const watching = new Set<string>();
     const seeker = { userId: user.id, username: user.username, client };
 
     socket.on("message", async (raw) => {
+      if (Date.now() - windowStart > 10_000) {
+        windowStart = Date.now();
+        inWindow = 0;
+      }
+      if (++inWindow > messageLimit) {
+        client.send({ t: "error", message: "Slow down, matey" });
+        socket.close(4429, "too many messages");
+        return;
+      }
       let gameId: string | undefined;
       try {
         const parsed = ClientMessage.safeParse(JSON.parse(String(raw)));

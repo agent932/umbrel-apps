@@ -8,7 +8,8 @@ const scrypt = promisify(scryptCb) as (
   options: { N: number; r: number; p: number; maxmem: number },
 ) => Promise<Buffer>;
 
-const PARAMS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+/** OWASP's recommended scrypt strength: about 170 ms and 128 MB per hash. */
+const PARAMS = { N: 2 ** 17, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
 const KEYLEN = 64;
 
 /** Hash a password as `scrypt$N$r$p$salt$hash` (base64). */
@@ -36,4 +37,12 @@ export async function verifyPassword(password: string, stored: string): Promise<
     maxmem: PARAMS.maxmem,
   });
   return timingSafeEqual(actual, expected);
+}
+
+/** True for hashes made with weaker settings than today's; they're re-hashed at the next sign-in. */
+export function needsRehash(stored: string): boolean {
+  const [kind, n, r, p] = stored.split("$");
+  return (
+    kind !== "scrypt" || Number(n) < PARAMS.N || Number(r) !== PARAMS.r || Number(p) !== PARAMS.p
+  );
 }

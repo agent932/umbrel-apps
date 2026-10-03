@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import fastifyCookie from "@fastify/cookie";
+import fastifyHelmet from "@fastify/helmet";
 import fastifyRateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
@@ -20,12 +21,56 @@ export interface AppOptions {
   logger?: boolean;
   /** Online game clocks; tests shorten them. */
   timing?: Timing;
+  /** Socket messages allowed per connection per 10 seconds; tests that play at bot speed raise it. */
+  socketMessageLimit?: number;
 }
 
-export async function buildApp({ db, checkDb, webDist, logger = true, timing }: AppOptions) {
+export async function buildApp({
+  db,
+  checkDb,
+  webDist,
+  logger = true,
+  timing,
+  socketMessageLimit,
+}: AppOptions) {
   // trustProxy: behind Umbrel's app proxy / Cloudflare, so req.protocol reflects HTTPS.
   const app = Fastify({ logger, trustProxy: true });
   await app.register(fastifyCookie);
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        // React and the animation library set inline style attributes; fonts come from Google.
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        // Vite inlines small images (the card back) as data: URIs.
+        imgSrc: ["'self'", "data:"],
+        // The game socket is same-origin. The service worker also fetches Google Fonts to cache
+        // them for offline play, and runs under this same policy.
+        connectSrc: ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+        workerSrc: ["'self'"],
+        manifestSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        // Served over plain HTTP on the home network too, so don't force upgrades.
+        upgradeInsecureRequests: null,
+      },
+    },
+    // Google Fonts are loaded cross-origin without CORP headers.
+    crossOriginEmbedderPolicy: false,
+  });
+  // Unexpected errors are logged in full but never shown to the browser.
+  app.setErrorHandler((err: { statusCode?: number; message: string }, req, reply) => {
+    const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    if (status >= 500) {
+      req.log.error(err);
+      return reply.code(status).send({ error: "Something went wrong" });
+    }
+    return reply.code(status).send({ error: err.message });
+  });
   await app.register(fastifyRateLimit, {
     global: false,
     // Behind a Cloudflare tunnel, CF-Connecting-IP is the real visitor (Cloudflare sets it and
@@ -55,7 +100,7 @@ export async function buildApp({ db, checkDb, webDist, logger = true, timing }: 
   // Online games live here; the admin page lists and can end them.
   const rooms = new RoomManager(db, timing);
   app.addHook("onClose", async () => rooms.close());
-  await app.register(onlineRoutes, { db, rooms, presence });
+  await app.register(onlineRoutes, { db, rooms, presence, messageLimit: socketMessageLimit });
   await app.register(friendRoutes, { db, presence });
   await app.register(adminRoutes, { db, rooms, presence });
 

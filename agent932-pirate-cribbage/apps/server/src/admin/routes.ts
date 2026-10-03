@@ -137,6 +137,8 @@ export async function adminRoutes(
       .returning({ username: users.username });
     if (!res[0]) return reply.code(404).send({ error: "No such player" });
     await deleteUserSessions(db, id);
+    // Also hang up any game or lobby they're connected to right now.
+    presence.disconnect(id, "This account has been disabled");
     audit(req, "disable", { player: res[0].username });
     return { ok: true };
   });

@@ -38,20 +38,24 @@ export async function friendRoutes(
     };
   });
 
-  app.post("/api/friends/requests", async (req, reply) => {
-    const user = requireUser(req, reply);
-    if (!user) return;
-    const body = parseBody(z.object({ username: z.string().min(1).max(40) }), req.body, reply);
-    if (!body) return;
-    try {
-      const { friend, accepted } = await requestFriend(db, user.id, body.username);
-      presence.notify(friend.id, { t: "friends" });
-      return reply.code(201).send({ friend: withPresence(friend), accepted });
-    } catch (e) {
-      if (e instanceof FriendError) return reply.code(400).send({ error: e.message });
-      throw e;
-    }
-  });
+  app.post(
+    "/api/friends/requests",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (req, reply) => {
+      const user = requireUser(req, reply);
+      if (!user) return;
+      const body = parseBody(z.object({ username: z.string().min(1).max(40) }), req.body, reply);
+      if (!body) return;
+      try {
+        const { friend, accepted } = await requestFriend(db, user.id, body.username);
+        presence.notify(friend.id, { t: "friends" });
+        return reply.code(201).send({ friend: withPresence(friend), accepted });
+      } catch (e) {
+        if (e instanceof FriendError) return reply.code(400).send({ error: e.message });
+        throw e;
+      }
+    },
+  );
 
   app.post<{ Params: { id: string } }>("/api/friends/requests/:id/accept", async (req, reply) => {
     const user = requireUser(req, reply);

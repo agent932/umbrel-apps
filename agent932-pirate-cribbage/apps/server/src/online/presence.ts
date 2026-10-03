@@ -24,4 +24,12 @@ export class Presence {
   notify(userId: string, message: ServerMessage) {
     for (const c of this.byUser.get(userId) ?? []) c.send(message);
   }
+
+  /** Hang up every connection a player has (their account was just disabled). */
+  disconnect(userId: string, reason: string) {
+    for (const c of this.byUser.get(userId) ?? []) {
+      c.send({ t: "error", message: reason });
+      c.close?.(4403, "disabled");
+    }
+  }
 }

@@ -44,6 +44,8 @@ export const DEFAULT_TIMING: Timing = {
 /** Anything that can receive messages: a WebSocket in production, a fake in tests. */
 export interface Client {
   send(message: ServerMessage): void;
+  /** Hang up (e.g. the account was disabled). Test clients may leave this out. */
+  close?(code: number, reason: string): void;
 }
 
 interface Player {
