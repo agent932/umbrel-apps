@@ -21,6 +21,8 @@ export const BOT: Seat = 1;
 export interface LocalGameOptions {
   level: BotLevel;
   rules: RuleSet;
+  /** "Learn to play": Peggy explains each step, and the game isn't saved for resuming. */
+  practice?: boolean;
 }
 
 /** A guest game run entirely in the browser; saved to localStorage. */
@@ -98,6 +100,7 @@ export function dealAction(): Action {
 const STORAGE_KEY = "pirate-cribbage:local-game:v2";
 
 export function saveGame(game: LocalGame | null) {
+  if (game?.options.practice) return;
   try {
     if (game && game.state.phase !== "gameOver")
       localStorage.setItem(STORAGE_KEY, JSON.stringify(game));

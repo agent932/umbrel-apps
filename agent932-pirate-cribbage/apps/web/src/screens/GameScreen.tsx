@@ -20,6 +20,7 @@ import { ScorePops } from "../components/table/ScorePops.js";
 import { buzz } from "../haptics.js";
 import { avatarUrl } from "../brand/avatars.js";
 import { NewAchievements } from "../components/Achievements.js";
+import { TutorialTips } from "../components/TutorialTips.js";
 import { EMOTES, type Emote } from "../online/protocol.js";
 import blankButtonUrl from "../assets/table/btn-blank.webp";
 import { playEvents } from "../sound.js";
@@ -41,9 +42,11 @@ interface Props {
   instant?: boolean;
   /** The signed-in player's crew portrait, for games against the computer. */
   myAvatar?: number | null;
+  /** "Learn to play": Peggy explains each step. */
+  tutorial?: boolean;
 }
 
-export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Props) {
+export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutorial }: Props) {
   const { p, names: label, act, error, online } = game;
   const view = p.view;
   // Seat-relative: online you may be seat 1.
@@ -163,6 +166,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
             onPick={(index) => act({ type: "pickCut", index })}
           />
           <Feed items={p.feed.slice(0, 3)} />
+          {tutorial && <TutorialTips phase={view.phase} />}
           {error && (
             <p role="alert" className="text-center text-sm text-red-300">
               {error}
@@ -492,6 +496,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
       )}
 
       <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
+      {tutorial && <TutorialTips phase={view.phase} />}
       <CutReveal events={p.lastEvents} names={label} me={me} />
       {!instant && <ScorePops events={p.lastEvents} me={me} />}
       {!instant && <Cinematics events={p.lastEvents} names={label} me={me} />}

@@ -9,6 +9,8 @@ import { SettingsButton } from "../components/SettingsButton.js";
 import type { MenuChoice } from "../game/menu.js";
 
 interface Props {
+  /** Start a practice game where Peggy explains each step. */
+  onLearn: () => void;
   canResume: boolean;
   onResume: () => void;
   onStart: (choice: MenuChoice) => void;
@@ -60,7 +62,15 @@ function Choice<T extends string>({
   );
 }
 
-export function HomeScreen({ canResume, onResume, onStart, starting, error, children }: Props) {
+export function HomeScreen({
+  canResume,
+  onResume,
+  onLearn,
+  onStart,
+  starting,
+  error,
+  children,
+}: Props) {
   const { user, logout } = useAuth();
   const [level, setLevel] = useState<BotLevel>("medium");
   const [mode, setMode] = useState<"classic" | "pirate">("pirate");
@@ -145,8 +155,11 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
           Resume yer game
         </button>
       )}
+      <button type="button" className="btn-secondary" onClick={onLearn}>
+        New to cribbage? Learn to play with Peggy
+      </button>
 
-      <section className="flex flex-col gap-5 rounded-2xl border border-gold/30 bg-sea-deep/80 backdrop-blur-md p-5">
+      <section className="panel flex flex-col gap-5 p-5">
         <h2 className="font-pirate text-2xl text-gold">Play vs Cap'n Bot</h2>
         <Choice
           label="Opponent"

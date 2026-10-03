@@ -207,7 +207,7 @@ export function FriendsScreen() {
               )}
             </div>
             {open === f.id && (
-              <div className="mt-2 flex flex-col gap-2 rounded-lg bg-sea-deep/80 backdrop-blur-md p-3">
+              <div className="mt-2 flex flex-col gap-2 rounded-lg border border-gold/30 bg-night/60 p-3">
                 <HeadToHead friend={f} />
                 <button
                   type="button"

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
+import { CLASSIC_RULES } from "@pirate/engine";
 import { ApiError, type GameResponse, api } from "./api.js";
 import { AuthProvider, useAuth } from "./auth.js";
 import { MoonlitScene } from "./brand/MoonlitScene.js";
@@ -43,6 +44,7 @@ function LocalPlay({ game, botDelay, ...rest }: PlayProps & { game: LocalGame })
       game={useLocalGame(game, useBotDelay(botDelay))}
       instant={botDelay === 0}
       myAvatar={user?.avatar ?? null}
+      tutorial={!!game.options.practice}
       {...rest}
     />
   );
@@ -162,6 +164,12 @@ function Routes({ botDelay }: { botDelay?: number }) {
         <HomeScreen
           canResume={!!resumable}
           onResume={() => resumable && play(resumable)}
+          onLearn={() =>
+            play({
+              kind: "local",
+              game: newLocalGame({ level: "easy", rules: CLASSIC_RULES, practice: true }),
+            })
+          }
           onStart={(c) => void start(c)}
           starting={starting}
           error={error}

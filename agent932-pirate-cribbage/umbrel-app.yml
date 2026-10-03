@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.14.0"
+version: "0.15.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,10 +31,11 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Achievements! Earn 14 of them, from First Plunder and The Perfect Hand (a
-  29) to skunks, win streaks, Gold rank and mastering each pirate power.
-  See them in the Ship's Log; new ones pop up when a game ends. They count
-  from this version on, for signed-in players.
+  New to cribbage? Tap "Learn to play with Peggy" on the home screen for a
+  practice game against an easy Cap'n Bot, with Peggy explaining each step:
+  the deal, the crib, the cut, pegging, the show and winning. Practice
+  games aren't recorded or saved. The home screen and lobby panels now
+  match the painted look.
 
 
 developer: agent932
