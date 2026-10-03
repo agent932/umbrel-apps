@@ -8,3 +8,4 @@ export * from "./stats.js";
 export * from "./analyzer.js";
 export * from "./cribTable.js";
 export * from "./rating.js";
+export * from "./achievements.js";

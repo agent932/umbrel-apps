@@ -19,6 +19,7 @@ import { HandSlot } from "../components/table/HandSlot.js";
 import { ScorePops } from "../components/table/ScorePops.js";
 import { buzz } from "../haptics.js";
 import { avatarUrl } from "../brand/avatars.js";
+import { NewAchievements } from "../components/Achievements.js";
 import { EMOTES, type Emote } from "../online/protocol.js";
 import blankButtonUrl from "../assets/table/btn-blank.webp";
 import { playEvents } from "../sound.js";
@@ -525,6 +526,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
               {view.skunk === 2 ? " — a double skunk!" : view.skunk === 1 ? " — a skunk!" : "."}
             </p>
             {p.show.length > 0 && <ShowList show={p.show} cut={view.cut} names={label} />}
+            {game.ranked && <NewAchievements />}
             <div className="mt-4 flex gap-2">
               {!online && (
                 <button

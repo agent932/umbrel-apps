@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import type { PlayerStats } from "@pirate/engine";
 import { type StatsResponse, api } from "../api.js";
 import { BarChart } from "../components/BarChart.js";
+import { AchievementGrid } from "../components/Achievements.js";
 
 type Fmt = "int" | "rate" | "avg" | "share";
 interface Row {
@@ -163,6 +164,8 @@ export function StatsScreen() {
         </p>
       )}
       {!data && !error && <p className="text-center text-parchment/60">Reading the log…</p>}
+
+      <AchievementGrid />
 
       {data && (
         <>

@@ -208,3 +208,18 @@ export const roundPlayers = pgTable(
   },
   (t) => [primaryKey({ columns: [t.matchId, t.roundNo, t.seat] })],
 );
+
+/** Achievements a player has earned (definitions live in @pirate/engine). */
+export const achievements = pgTable(
+  "achievements",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    /** The match that earned it. */
+    matchId: uuid("match_id").references(() => matches.id, { onDelete: "set null" }),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.key] })],
+);

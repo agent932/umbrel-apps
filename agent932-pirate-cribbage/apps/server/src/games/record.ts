@@ -8,6 +8,7 @@ import {
 } from "@pirate/engine";
 import type { Db } from "../db/client.js";
 import { matchPlayers, matches, roundPlayers, rounds } from "../db/schema.js";
+import { awardAchievements } from "../achievements/award.js";
 
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -66,6 +67,7 @@ export async function recordMatch(
       tier: ratings?.[seat]?.tier ?? null,
     })),
   );
+  await awardAchievements(tx, game.id, players, state, ratings);
   if (state.history.length === 0) return;
   await tx.insert(rounds).values(
     state.history.map((r) => ({

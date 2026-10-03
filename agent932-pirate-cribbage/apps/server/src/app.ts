@@ -10,6 +10,7 @@ import type { Db } from "./db/client.js";
 import { gameRoutes } from "./games/routes.js";
 import { adminRoutes } from "./admin/routes.js";
 import { friendRoutes } from "./friends/routes.js";
+import { achievementRoutes } from "./achievements/routes.js";
 import { Presence } from "./online/presence.js";
 import { onlineRoutes } from "./online/routes.js";
 import { RoomManager, type Timing } from "./online/rooms.js";
@@ -110,6 +111,7 @@ export async function buildApp({
   app.addHook("onClose", async () => rooms.close());
   await app.register(onlineRoutes, { db, rooms, presence, messageLimit: socketMessageLimit });
   await app.register(friendRoutes, { db, presence });
+  await app.register(achievementRoutes, { db });
   await app.register(adminRoutes, { db, rooms, presence });
 
   if (webDist) {
