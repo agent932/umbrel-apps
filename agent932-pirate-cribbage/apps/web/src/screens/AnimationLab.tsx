@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { parseCard, parseCards, scoreHand } from "@pirate/engine";
 import { ALL_SCENES, SceneOnce } from "../brand/Cinematics.js";
+import { Card } from "../components/Card.js";
 import { CountingShow } from "../components/Counting.js";
 
 const CAPTIONS: Record<string, string> = {
@@ -75,6 +76,25 @@ export function AnimationLab() {
           />
         )}
       </div>
+      {/* Every court card at every size the game uses, to check the corners stay readable. */}
+      <section className="panel flex flex-col gap-4 p-4" aria-label="Court cards">
+        {(["small", "normal", "fluid"] as const).map((size) => (
+          <div
+            key={size}
+            className="flex flex-wrap gap-2"
+            style={size === "fluid" ? ({ "--h": "150px" } as React.CSSProperties) : undefined}
+          >
+            {parseCards("JH QS KD JC 10H").map((c) => (
+              <Card
+                key={size + c.rank + c.suit}
+                card={c}
+                small={size === "small"}
+                fluid={size === "fluid"}
+              />
+            ))}
+          </div>
+        ))}
+      </section>
     </main>
   );
 }

@@ -86,12 +86,21 @@ export function Card({
     <>
       {/* Thin inner frame, like a printed card. */}
       <span className="pointer-events-none absolute inset-[3px] rounded-[5px] border border-[#c9b58a]/60" />
-      <span className="absolute top-1 left-1">{index}</span>
-      <span className="absolute right-1 bottom-1 rotate-180">{index}</span>
+      {/* Corner indices sit above a court portrait, on a patch of card, so they're never hidden. */}
+      <span
+        className={`absolute top-1 left-1 z-10 ${face ? "rounded-br-[3px] bg-[#fcf5df] pr-px pb-px" : ""}`}
+      >
+        {index}
+      </span>
+      <span
+        className={`absolute right-1 bottom-1 z-10 rotate-180 ${face ? "rounded-br-[3px] bg-[#f1e4c2] pr-px pb-px" : ""}`}
+      >
+        {index}
+      </span>
       {face ? (
         // Painted pirate portraits for the jack, queen and king, framed between the corners.
         <span
-          className="absolute inset-x-[17%] inset-y-[13%] rounded-[3px] border border-[#b7a374] bg-cover bg-top shadow-inner"
+          className="absolute inset-x-[21%] inset-y-[11%] rounded-[3px] border border-[#b7a374] bg-cover bg-top shadow-inner"
           style={{ backgroundImage: `url("${COURT[card.rank as 11 | 12 | 13]}")` }}
           aria-hidden
         />

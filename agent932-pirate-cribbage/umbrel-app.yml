@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.11.0"
+version: "0.11.1"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,12 +31,8 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Painted everything! A new title screen in a moonlit harbour, a painted logo
-  and app icon, painted backgrounds on every page, pirate portraits on the
-  jacks, queens and kings, a painted Peggy, rank badges and medals. Pick your
-  own crew portrait under Account; your opponent sees it in online games.
-  The game table now has moonlight instead of a porthole. Fixed: invite links
-  no longer expire when your phone drops its connection while you share them.
+  Fixed: the pirate portraits on jacks, queens and kings no longer cover the
+  card's rank and suit in the corners.
 
 
 developer: agent932
