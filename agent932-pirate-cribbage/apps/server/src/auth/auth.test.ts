@@ -96,6 +96,28 @@ describe("auth routes", () => {
     expect(me.json().user).toBeNull();
   });
 
+  it("rate-limits by the Cloudflare visitor address, which a faked X-Forwarded-For can't dodge", async () => {
+    let last = 0;
+    for (let i = 0; i < 12; i++) {
+      const res = await t.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        headers: { "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": `198.51.100.${i}` },
+        payload: { login: "x", password: "y" },
+      });
+      last = res.statusCode;
+    }
+    expect(last).toBe(429);
+    // A different visitor isn't affected.
+    const other = await t.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "cf-connecting-ip": "203.0.113.8" },
+      payload: { login: "x", password: "y" },
+    });
+    expect(other.statusCode).toBe(401);
+  });
+
   it("rate-limits repeated login attempts", async () => {
     let last = 0;
     for (let i = 0; i < 12; i++) {

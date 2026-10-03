@@ -26,7 +26,15 @@ export async function buildApp({ db, checkDb, webDist, logger = true, timing }: 
   // trustProxy: behind Umbrel's app proxy / Cloudflare, so req.protocol reflects HTTPS.
   const app = Fastify({ logger, trustProxy: true });
   await app.register(fastifyCookie);
-  await app.register(fastifyRateLimit, { global: false });
+  await app.register(fastifyRateLimit, {
+    global: false,
+    // Behind a Cloudflare tunnel, CF-Connecting-IP is the real visitor (Cloudflare sets it and
+    // overwrites any copy a visitor sends). X-Forwarded-For can be faked to dodge the limit.
+    keyGenerator: (req) => {
+      const cf = req.headers["cf-connecting-ip"];
+      return (Array.isArray(cf) ? cf[0] : cf) ?? req.ip;
+    },
+  });
   await app.register(fastifyWebsocket, { options: { maxPayload: 64 * 1024 } });
 
   app.get("/api/health", async (_req, reply) => {

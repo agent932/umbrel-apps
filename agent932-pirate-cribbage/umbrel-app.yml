@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.8.1"
+version: "0.8.2"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,9 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  A deeper, carved cribbage board: bevelled edges, lanes cut into the wood,
-  drilled holes and shadowed pegs. Your pegs are now blue and your opponent's
-  red, matching the dots beside each name, so they're easy to tell apart.
+  Ready for a Cloudflare Tunnel: the login rate limit now uses the visitor
+  address Cloudflare reports, so it can't be dodged with a faked header.
+
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage
