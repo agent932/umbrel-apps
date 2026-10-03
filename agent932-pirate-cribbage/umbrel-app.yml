@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.7.0"
+version: "0.8.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,11 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Admin tools and ranked seasons. The first account is the admin (on an
-  existing install, whoever signed up first): see an overview, manage players
-  (reset passwords, disable accounts, add admins), end stuck games, and end a
-  ranked season. Final standings are kept and ratings move halfway back to
-  1000 for the new season. Players can change their password under Account.
+  A new look: meet Peggy the parrot, who squawks out the big moments (you can
+  quiet her in Settings). Every page sails under a moonlit night sky with
+  drifting waves, plus new card designs, a lantern-lit board with brass pegs,
+  a refreshed app icon, and new fonts.
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage

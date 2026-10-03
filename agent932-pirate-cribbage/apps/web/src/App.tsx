@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { ApiError, type GameResponse, api } from "./api.js";
 import { AuthProvider, useAuth } from "./auth.js";
+import { MoonlitScene } from "./brand/MoonlitScene.js";
 import { SPEED_FACTOR, useSettings } from "./settings.js";
 import { type LocalGame, loadGame, newLocalGame, saveGame } from "./game/localGame.js";
 import { type MenuChoice, rulesFor } from "./game/menu.js";
@@ -211,6 +212,7 @@ function Routes({ botDelay }: { botDelay?: number }) {
 export function App({ botDelay }: { botDelay?: number } = {}) {
   return (
     <AuthProvider>
+      <MoonlitScene />
       <Routes botDelay={botDelay} />
       <ChallengeToast />
     </AuthProvider>

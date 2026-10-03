@@ -42,7 +42,7 @@ export function DiscardReview({
       <div className="flex items-baseline justify-between">
         <span className="font-semibold">Your throw: {cards(a.chosen.discard)}</span>
         <span
-          className="font-serif text-xl font-bold text-gold"
+          className="num text-xl text-gold"
           title="Hand analyzer score (100 = best possible discard)"
         >
           {Math.round(a.score)}
@@ -69,7 +69,7 @@ export function ShowList({ show, cut, names }: Omit<Props, "onNext">) {
             <span className="font-semibold">
               {names[e.seat as Seat]} — {e.type === "crib" ? "crib" : "hand"}
             </span>
-            <span className="font-serif text-2xl font-bold text-gold">{e.score.total}</span>
+            <span className="num text-2xl text-gold">{e.score.total}</span>
           </div>
           <div className="flex items-center gap-1">
             {e.cards.map((c, j) => (

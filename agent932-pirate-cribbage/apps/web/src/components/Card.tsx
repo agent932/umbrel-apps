@@ -1,5 +1,6 @@
 import type { Card as CardType } from "@pirate/engine";
 import { cardLabel } from "@pirate/engine";
+import cardBackUrl from "../brand/card-back.svg";
 
 const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" } as const;
 const SUIT_NAME = { S: "spades", H: "hearts", D: "diamonds", C: "clubs" } as const;
@@ -37,41 +38,55 @@ interface CardProps {
 }
 
 export function Card({ card, hidden, selected, disabled, small, onClick, label }: CardProps) {
-  const size = small ? "w-10 h-14 text-xs" : "w-14 h-20 text-sm sm:w-16 sm:h-24 sm:text-base";
+  const size = small ? "w-10 h-14 text-[11px]" : "w-14 h-20 text-sm sm:w-16 sm:h-24 sm:text-base";
   const faceDown = hidden || !card;
-  const base = `${size} relative shrink-0 select-none rounded-lg border shadow-md transition-transform duration-150`;
+  const base = `${size} relative shrink-0 select-none rounded-lg shadow-[0_4px_10px_-2px_rgba(0,0,0,0.55)] transition-transform duration-150`;
 
   if (faceDown) {
     return (
       <div
-        className={`${base} border-gold/60 bg-rum bg-[repeating-linear-gradient(45deg,transparent_0_6px,rgba(0,0,0,.18)_6px_12px)]`}
+        className={`${base} bg-cover bg-center`}
+        // Quoted: Vite may inline the SVG as a data URI containing quotes and spaces.
+        style={{ backgroundImage: `url("${cardBackUrl}")` }}
         aria-label={label ?? "Face-down card"}
         role="img"
-      >
-        <span className="absolute inset-0 grid place-items-center text-lg text-parchment/80">
-          ☠
-        </span>
-      </div>
+      />
     );
   }
 
   const red = card.suit === "H" || card.suit === "D";
+  const face = card.rank >= 11;
+  const index = (
+    <span className="flex flex-col items-center leading-none font-extrabold">
+      <span>{RANK[card.rank]}</span>
+      <span className="-mt-px">{SUIT[card.suit]}</span>
+    </span>
+  );
   const content = (
     <>
-      <span className="absolute top-1 left-1.5 leading-none font-bold">
-        {RANK[card.rank]}
-        <br />
-        {SUIT[card.suit]}
-      </span>
-      <span
-        className={`absolute inset-0 grid place-items-center ${small ? "text-xl" : "text-3xl"}`}
-      >
-        {SUIT[card.suit]}
+      {/* Thin inner frame, like a printed card. */}
+      <span className="pointer-events-none absolute inset-[3px] rounded-[5px] border border-[#c9b58a]/60" />
+      <span className="absolute top-1 left-1">{index}</span>
+      <span className="absolute right-1 bottom-1 rotate-180">{index}</span>
+      <span className="absolute inset-0 grid place-items-center">
+        {face ? (
+          <span
+            className={`font-pirate leading-none ${small ? "text-2xl" : "text-4xl sm:text-5xl"}`}
+          >
+            {RANK[card.rank]}
+          </span>
+        ) : (
+          <span className={`leading-none ${small ? "text-xl" : "text-3xl sm:text-4xl"}`}>
+            {SUIT[card.suit]}
+          </span>
+        )}
       </span>
     </>
   );
-  const colors = `${red ? "text-red-700" : "text-slate-900"} bg-parchment border-stone-400`;
-  const state = selected ? "-translate-y-3 ring-2 ring-gold" : "";
+  const colors = `${red ? "text-[#b8322b]" : "text-[#1c2430]"} bg-[linear-gradient(160deg,#fdf7e4,#efe2bd)] border border-[#b7a374]`;
+  const lift = selected
+    ? "-translate-y-3 ring-2 ring-gold shadow-[0_0_18px_rgba(242,184,75,0.55)]"
+    : "";
 
   if (!onClick) {
     return (
@@ -83,7 +98,7 @@ export function Card({ card, hidden, selected, disabled, small, onClick, label }
   return (
     <button
       type="button"
-      className={`${base} ${colors} ${state} ${disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer hover:-translate-y-1"}`}
+      className={`${base} ${colors} ${lift} ${disabled ? "cursor-not-allowed brightness-[.8] saturate-[.7]" : "cursor-pointer hover:-translate-y-1"}`}
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}

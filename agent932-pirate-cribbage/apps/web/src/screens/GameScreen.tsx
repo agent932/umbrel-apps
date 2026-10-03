@@ -8,6 +8,7 @@ import {
   other,
   sameCard,
 } from "@pirate/engine";
+import { PeggyChatter } from "../brand/PeggyChatter.js";
 import { Board } from "../components/Board.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import { playEvents } from "../sound.js";
@@ -198,10 +199,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
                   ))}
                 </AnimatePresence>
               </div>
-              <span
-                className="font-serif text-2xl font-bold tabular-nums text-gold"
-                aria-label={`Count ${count}`}
-              >
+              <span className="num text-2xl text-gold lantern-glow" aria-label={`Count ${count}`}>
                 {count}
               </span>
             </>
@@ -302,6 +300,8 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
         )}
       </section>
 
+      <PeggyChatter events={p.lastEvents} me={me} />
+
       {view.phase === "roundEnd" && (
         <RoundSummary
           show={p.show}
@@ -381,10 +381,7 @@ function PlayerStrip({
         )}
         <div className="mt-1">{children}</div>
       </div>
-      <span
-        className="font-serif text-4xl font-bold tabular-nums text-gold"
-        aria-label={`${name} score`}
-      >
+      <span className="num text-4xl text-gold lantern-glow" aria-label={`${name} score`}>
         {score}
       </span>
     </section>

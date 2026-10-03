@@ -42,7 +42,7 @@ export function OnlineLobby() {
 
   return (
     <section
-      className="flex flex-col gap-4 rounded-2xl border border-gold/30 bg-sea-deep/60 p-5"
+      className="flex flex-col gap-4 rounded-2xl border border-gold/30 bg-sea-deep/80 backdrop-blur-md p-5"
       aria-label="Play online"
     >
       <div className="flex items-baseline justify-between gap-2">

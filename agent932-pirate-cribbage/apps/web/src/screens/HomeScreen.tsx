@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
 import { useAuth } from "../auth.js";
+import { Peggy } from "../brand/Peggy.js";
 import { POWER_ICONS } from "../components/PowerBar.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import type { MenuChoice } from "../game/menu.js";
@@ -74,11 +75,15 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-6">
-      <nav className="flex items-center justify-end gap-3 text-sm" aria-label="Account">
-        <SettingsButton />
+      {/* On phones the greeting gets its own row and the links sit underneath. */}
+      <nav
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm whitespace-nowrap"
+        aria-label="Account"
+      >
         {user ? (
           <>
-            <span className="mr-auto text-parchment/80">
+            <span className="flex w-full items-center gap-2 text-parchment/80 sm:mr-auto sm:w-auto">
+              <SettingsButton />
               Ahoy, <b className="text-gold">{user.username}</b>
             </span>
             {user.isAdmin && (
@@ -105,6 +110,9 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
           </>
         ) : (
           <>
+            <span className="mr-auto">
+              <SettingsButton />
+            </span>
             <Link href="/login" className="text-parchment hover:text-gold">
               Log in
             </Link>
@@ -117,8 +125,9 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
           </>
         )}
       </nav>
-      <header className="text-center">
-        <h1 className="font-pirate text-5xl text-gold sm:text-6xl">Pirate Cribbage</h1>
+      <header className="flex flex-col items-center text-center">
+        <Peggy bob className="mb-1 h-28 w-auto drop-shadow-[0_8px_14px_rgba(0,0,0,0.5)]" />
+        <h1 className="font-pirate text-5xl text-gold lantern-glow sm:text-6xl">Pirate Cribbage</h1>
         <p className="mt-2 text-parchment/80">
           Fifteen-two, fifteen-four, and a pair be six, matey.
         </p>
@@ -130,7 +139,7 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
         </button>
       )}
 
-      <section className="flex flex-col gap-5 rounded-2xl border border-gold/30 bg-sea-deep/60 p-5">
+      <section className="flex flex-col gap-5 rounded-2xl border border-gold/30 bg-sea-deep/80 backdrop-blur-md p-5">
         <h2 className="font-pirate text-2xl text-gold">Play vs Cap'n Bot</h2>
         <Choice
           label="Opponent"

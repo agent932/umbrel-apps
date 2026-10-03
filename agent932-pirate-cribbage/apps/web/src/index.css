@@ -1,30 +1,117 @@
 @import "tailwindcss";
 
+/*
+ * Moonlit sea: deep night blues, moonlight, and warm lantern gold.
+ * Display type is Pirata One; everything else is Alegreya Sans.
+ */
 @theme {
+  --color-night: #04121c;
   --color-sea: #0b2a3a;
   --color-sea-deep: #061a25;
+  --color-moon: #f4ecd2;
   --color-parchment: #f3e5c0;
-  --color-gold: #d4a017;
+  --color-gold: #f2b84b;
+  --color-brass: #c9962c;
+  --color-tide: #3fb6c9;
+  --color-coral: #e05252;
   --color-rum: #7a3b12;
+  --font-sans: "Alegreya Sans", ui-sans-serif, system-ui, sans-serif;
   --font-pirate: "Pirata One", "Georgia", serif;
 }
 
-/* Matches the bottom of the body gradient, so over-scrolling on phones never flashes white. */
+/*
+ * The page colour lives on <html> only. If <body> had a background too, it would paint over the
+ * <MoonlitScene/> backdrop (which sits behind the content at a negative z-index).
+ */
 html {
-  background: var(--color-sea-deep);
+  background: var(--color-night);
 }
 
 body {
-  background: radial-gradient(circle at 50% 0%, var(--color-sea), var(--color-sea-deep));
   color: var(--color-parchment);
   min-height: 100dvh;
+  font-size: 1.0625rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+@utility num {
+  /* Scores and counts: bold, lining, evenly spaced figures. */
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+@utility lantern-glow {
+  text-shadow:
+    0 0 18px rgb(242 184 75 / 0.45),
+    0 2px 0 rgb(0 0 0 / 0.35);
 }
 
 @layer components {
   .btn-primary {
-    @apply rounded-xl bg-gold px-5 py-2.5 font-semibold text-sea-deep shadow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply rounded-xl px-5 py-2.5 font-bold text-night transition disabled:cursor-not-allowed disabled:opacity-40;
+    background: linear-gradient(180deg, #ffd27a, var(--color-gold) 55%, #d9962b);
+    box-shadow:
+      0 0 0 1px rgb(255 220 150 / 0.4) inset,
+      0 6px 18px -6px rgb(242 184 75 / 0.6);
+  }
+  .btn-primary:not(:disabled):hover {
+    filter: brightness(1.08);
+    box-shadow:
+      0 0 0 1px rgb(255 220 150 / 0.5) inset,
+      0 8px 26px -6px rgb(242 184 75 / 0.85);
   }
   .btn-secondary {
-    @apply rounded-xl border border-gold/60 px-5 py-2.5 font-semibold text-parchment transition hover:bg-gold/10;
+    @apply rounded-xl border border-gold/50 bg-night/30 px-5 py-2.5 font-bold text-moon backdrop-blur-sm transition hover:border-gold hover:bg-gold/10;
+  }
+  /* A frosted panel floating over the sea. */
+  .panel {
+    @apply rounded-2xl border border-moon/15 bg-sea-deep/70 shadow-2xl backdrop-blur-md;
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes pop-in {
+  from {
+    transform: translateY(12px) scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

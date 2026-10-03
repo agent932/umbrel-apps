@@ -4,10 +4,12 @@ export interface Settings {
   sound: boolean;
   /** How quickly Cap'n Bot plays. */
   speed: "slow" | "normal" | "fast";
+  /** Peggy the parrot's commentary during games. */
+  peggy: boolean;
 }
 
 const KEY = "pirate-cribbage:settings";
-const DEFAULTS: Settings = { sound: true, speed: "normal" };
+const DEFAULTS: Settings = { sound: true, speed: "normal", peggy: true };
 const listeners = new Set<() => void>();
 
 function read(): Settings {

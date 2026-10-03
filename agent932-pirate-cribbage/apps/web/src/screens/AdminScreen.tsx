@@ -56,9 +56,9 @@ const date = (iso: string) => new Date(iso).toLocaleDateString();
 
 function Tile({ label, value, note }: { label: string; value: string | number; note?: string }) {
   return (
-    <div className="rounded-xl border border-parchment/15 bg-sea-deep/60 p-3">
+    <div className="rounded-xl border border-parchment/15 bg-sea-deep/80 backdrop-blur-md p-3">
       <div className="text-xs text-parchment/70">{label}</div>
-      <div className="font-serif text-2xl font-bold tabular-nums text-gold">{value}</div>
+      <div className="num text-2xl text-gold lantern-glow">{value}</div>
       {note && <div className="text-xs text-parchment/60">{note}</div>}
     </div>
   );
