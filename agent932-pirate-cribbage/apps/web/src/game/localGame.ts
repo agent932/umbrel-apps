@@ -14,6 +14,7 @@ import {
 } from "@pirate/engine";
 import { initialPresentation, present } from "./present.js";
 import type { Presentation, UiAction } from "./types.js";
+import { BOT_CREW } from "../brand/botCrew.js";
 
 export const YOU: Seat = 0;
 export const BOT: Seat = 1;
@@ -33,7 +34,7 @@ export interface LocalGame {
 }
 
 export function names(level: BotLevel): [string, string] {
-  return ["You", `Cap'n Bot (${level[0]!.toUpperCase()}${level.slice(1)})`];
+  return ["You", BOT_CREW[level].name];
 }
 
 export function newLocalGame(options: LocalGameOptions): LocalGame {

@@ -19,6 +19,7 @@ import { HandSlot } from "../components/table/HandSlot.js";
 import { ScorePops } from "../components/table/ScorePops.js";
 import { buzz } from "../haptics.js";
 import { avatarUrl } from "../brand/avatars.js";
+import { BOT_CREW } from "../brand/botCrew.js";
 import { NewAchievements } from "../components/Achievements.js";
 import { TutorialTips } from "../components/TutorialTips.js";
 import { EMOTES, type Emote } from "../online/protocol.js";
@@ -32,7 +33,6 @@ import type { FeedItem, GameController } from "../game/types.js";
 import menuUrl from "../assets/table/btn-menu.webp";
 import hourglassUrl from "../assets/ui/icon-hourglass.webp";
 import flagUrl from "../assets/ui/icon-flag.webp";
-import captainUrl from "../assets/table/captain.webp";
 
 interface Props {
   game: GameController;
@@ -240,7 +240,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           name={oppName}
           score={view.scores[opp]}
           dealer={view.dealer === opp}
-          image={online ? avatarUrl(online.avatars[opp]) : captainUrl}
+          image={online ? avatarUrl(online.avatars[opp]) : BOT_CREW[game.level ?? "hard"].portrait}
           powersLeft={pirate ? view.opponentPowersLeft : undefined}
           offline={online ? !online.online[opp] : false}
           returnBy={online?.returnBy[opp] ?? null}

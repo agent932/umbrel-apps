@@ -4,6 +4,7 @@ import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
 import { useAuth } from "../auth.js";
 import { Peggy } from "../brand/Peggy.js";
 import logoUrl from "../assets/ui/logo-a.webp";
+import { BOT_CREW } from "../brand/botCrew.js";
 import { POWER_ART } from "../brand/powerArt.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import type { MenuChoice } from "../game/menu.js";
@@ -28,7 +29,7 @@ function Choice<T extends string>({
 }: {
   label: string;
   value: T;
-  options: { value: T; label: string; note?: string; disabled?: boolean }[];
+  options: { value: T; label: string; note?: string; image?: string; disabled?: boolean }[];
   onChange: (v: T) => void;
 }) {
   return (
@@ -53,6 +54,13 @@ function Choice<T extends string>({
               disabled={o.disabled}
               onChange={() => onChange(o.value)}
             />
+            {o.image && (
+              <img
+                src={o.image}
+                alt=""
+                className="mx-auto mb-1 h-12 w-12 rounded-full object-cover ring-2 ring-brass/70"
+              />
+            )}
             <span className="block font-semibold">{o.label}</span>
             {o.note && <span className="block text-xs text-parchment/60">{o.note}</span>}
           </label>
@@ -160,15 +168,18 @@ export function HomeScreen({
       </button>
 
       <section className="panel flex flex-col gap-5 p-5">
-        <h2 className="font-pirate text-2xl text-gold">Play vs Cap'n Bot</h2>
+        <h2 className="font-pirate text-2xl text-gold">Play the crew</h2>
         <Choice
           label="Opponent"
           value={level}
           onChange={setLevel}
           options={[
-            { value: "easy", label: "Easy", note: "Deckhand" },
-            { value: "medium", label: "Medium", note: "Bosun" },
-            { value: "hard", label: "Hard", note: "Captain" },
+            ...(["easy", "medium", "hard"] as const).map((l) => ({
+              value: l,
+              label: l[0]!.toUpperCase() + l.slice(1),
+              note: BOT_CREW[l].name,
+              image: BOT_CREW[l].portrait,
+            })),
           ]}
         />
         <Choice
