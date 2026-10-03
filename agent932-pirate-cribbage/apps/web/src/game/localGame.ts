@@ -6,7 +6,8 @@ import {
   type Seat,
   applyAction,
   createDeck,
-  createGame,
+  hostAction,
+  newGame,
   cryptoRandom,
   shuffle,
   viewFor,
@@ -34,8 +35,9 @@ export function names(level: BotLevel): [string, string] {
 }
 
 export function newLocalGame(options: LocalGameOptions): LocalGame {
-  const firstDealer: Seat = cryptoRandom() < 0.5 ? YOU : BOT;
-  const state = createGame(firstDealer, options.rules);
+  // Both cut the deck to see who deals first; the house spreads a shuffled deck straight away.
+  let state = newGame(options.rules);
+  state = applyAction(state, hostAction(state, shuffledDeck)!).state;
   return { options, state, p: initialPresentation(viewFor(state, YOU)) };
 }
 
@@ -46,6 +48,8 @@ export function toEngineAction(state: GameState, a: UiAction): Action {
   switch (a.type) {
     case "cut":
       return { type: "cut", index: randomIndex(state.deck.length) };
+    case "pickCut":
+      return { type: "pickCut", seat: YOU, index: a.index };
     case "crowsNest":
       return { type: "crowsNest", seat: YOU, index: randomIndex(state.deck.length) };
     case "pickpocket":
@@ -80,8 +84,15 @@ export function step(game: LocalGame, action: Action): LocalGame {
   };
 }
 
+const shuffledDeck = () => shuffle(createDeck(), cryptoRandom);
+
+/** What the house does next (shuffle for the cut, or deal), if anything. */
+export function houseAction(state: GameState): Action | null {
+  return hostAction(state, shuffledDeck);
+}
+
 export function dealAction(): Action {
-  return { type: "deal", deck: shuffle(createDeck(), cryptoRandom) };
+  return { type: "deal", deck: shuffledDeck() };
 }
 
 const STORAGE_KEY = "pirate-cribbage:local-game:v2";

@@ -12,7 +12,25 @@ async function startGame(
   await user.click(screen.getByLabelText(new RegExp(`^${level}`)));
   await user.click(screen.getByLabelText(new RegExp(`^${rules}`)));
   await user.click(screen.getByRole("button", { name: /set sail/i }));
+  await cutForDeal(user);
   return user;
+}
+
+/** Cut any card until the deal is decided (a tie means cutting again). */
+async function cutForDeal(user: ReturnType<typeof userEvent.setup>) {
+  for (let i = 0; i < 20; i++) {
+    const free = screen
+      .queryAllByRole("button", { name: /^Cut card/ })
+      .filter((b) => !b.hasAttribute("disabled"));
+    if (free.length) await user.click(free[0]!);
+    if (screen.queryByLabelText("Your hand")) return;
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText("Your hand") ??
+          screen.queryAllByRole("button", { name: /^Cut card/ })[0],
+      ).toBeTruthy(),
+    );
+  }
 }
 
 const hand = () => within(screen.getByLabelText("Your hand"));
@@ -81,6 +99,16 @@ describe("playing vs the bot", () => {
     const end = screen.getByRole("dialog", { name: /Victory|Defeat/ });
     expect(within(end).getByText(/121/)).toBeInTheDocument();
   }, 60_000);
+
+  it("cuts for the deal before the first hand", async () => {
+    const user = userEvent.setup();
+    render(<App botDelay={0} />);
+    await user.click(screen.getByRole("button", { name: /set sail/i }));
+    expect(screen.getByRole("heading", { name: "Cut for the deal" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Cut card/ }).length).toBeGreaterThanOrEqual(51);
+    await cutForDeal(user);
+    expect(screen.getAllByText(/cut low and deals? first/).length).toBeGreaterThan(0);
+  });
 
   it("offers to resume a saved game", async () => {
     const user = await startGame("Classic");

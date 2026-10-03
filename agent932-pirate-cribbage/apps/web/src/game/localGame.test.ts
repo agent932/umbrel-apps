@@ -1,19 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { CLASSIC_RULES, botAction } from "@pirate/engine";
-import { BOT, YOU, dealAction, loadGame, newLocalGame, saveGame, step } from "./localGame.js";
+import {
+  BOT,
+  YOU,
+  dealAction,
+  houseAction,
+  loadGame,
+  newLocalGame,
+  saveGame,
+  step,
+} from "./localGame.js";
 
 describe("local game", () => {
+  it("starts with both players cutting for the deal", () => {
+    const game = newLocalGame({ level: "medium", rules: CLASSIC_RULES });
+    expect(game.state.phase).toBe("cutForDeal");
+    expect(game.p.view.cutForDeal?.deckSize).toBe(52);
+  });
+
   it("plays a whole game, tracking back pegs and the feed", () => {
     let game = newLocalGame({ level: "medium", rules: CLASSIC_RULES });
     for (let i = 0; i < 5000 && game.state.phase !== "gameOver"; i++) {
       const { state } = game;
       const before = state.scores;
       const action =
-        state.phase === "deal"
-          ? dealAction()
-          : state.phase === "roundEnd"
-            ? ({ type: "nextRound" } as const)
-            : (botAction(state, YOU, "medium") ?? botAction(state, BOT, "medium"))!;
+        houseAction(state) ??
+        (state.phase === "roundEnd"
+          ? ({ type: "nextRound" } as const)
+          : (botAction(state, YOU, "medium") ?? botAction(state, BOT, "medium"))!);
       game = step(game, action);
       for (const seat of [YOU, BOT]) {
         if (game.state.scores[seat] !== before[seat])
@@ -31,9 +45,7 @@ describe("local game", () => {
       const s = game.state;
       game = step(
         game,
-        s.phase === "deal"
-          ? dealAction()
-          : (botAction(s, YOU, "easy") ?? botAction(s, BOT, "easy"))!,
+        houseAction(s) ?? (botAction(s, YOU, "easy") ?? botAction(s, BOT, "easy"))!,
       );
     }
     if (game.state.phase === "roundEnd") {

@@ -30,19 +30,32 @@ describe("online play", () => {
   });
 
   it("pairs two players through Quick Match and shows each only their own hand", async () => {
-    const { sa, sb } = await pair();
+    const { gameId, a, b, sa, sb } = await pair();
     expect(new Set([sa.seat, sb.seat])).toEqual(new Set([0, 1]));
     expect(sa.names).toEqual(sb.names);
     expect([...sa.names].sort()).toEqual(["Anne", "Bonny"]);
-    for (const s of [sa, sb]) {
+    // Bonny joined second, so her first state shows both players connected.
+    expect(sb.online).toEqual([true, true]);
+    // The game opens with both players cutting for deal.
+    expect(sa.step.view.phase).toBe("cutForDeal");
+    for (const c of [a, b]) await move(c, gameId, nextMove(c.latestState()!.step.view, false)!);
+    let la = a.latestState()!;
+    for (let i = 0; la.step.view.phase === "cutForDeal" && i < 20; i++) {
+      // A tied cut: both cut again.
+      for (const c of [a, b]) {
+        const m = nextMove(c.latestState()!.step.view, false);
+        if (m) await move(c, gameId, m);
+      }
+      la = a.latestState()!;
+    }
+    const lb = b.latestState()!;
+    for (const s of [la, lb]) {
       expect(s.step.view.phase).toBe("discard");
       expect(s.step.view.hand).toHaveLength(6);
       expect(s.step.view).not.toHaveProperty("hands");
     }
-    // Bonny joined second, so her first state shows both players connected.
-    expect(sb.online).toEqual([true, true]);
     // Neither player's cards appear anywhere in what the other was sent.
-    expect(JSON.stringify(sb)).not.toContain(JSON.stringify(sa.step.view.hand));
+    expect(JSON.stringify(b.messages)).not.toContain(JSON.stringify(la.step.view.hand));
   });
 
   it("only pairs players who asked for the same rules", async () => {
@@ -82,8 +95,8 @@ describe("online play", () => {
   }, 60_000);
 
   it("rejects illegal moves and moves from people not in the game", async () => {
-    const { gameId, a, sa } = await pair();
-    a.send({ t: "act", gameId, action: { type: "play", card: sa.step.view.hand[0] } });
+    const { gameId, a } = await pair();
+    a.send({ t: "act", gameId, action: { type: "play", card: { rank: 5, suit: "H" } } });
     expect(await a.next((m) => m.t === "error")).toMatchObject({ message: "Not time to play" });
 
     const c = await connect(t.app, (await signUp(t.app, "Calico")).cookie);

@@ -13,6 +13,7 @@ import { Board, PEG_COLORS } from "../components/Board.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
+import { CutForDealPanel, CutReveal } from "../components/CutForDeal.js";
 import { POWER_ICONS, PowerBar } from "../components/PowerBar.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
 import type { FeedItem, GameController } from "../game/types.js";
@@ -115,6 +116,34 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
     view.cribOwner === me || (view.cribOwner === null && view.dealer === me)
       ? "Your crib"
       : `${oppName}'s crib`;
+
+  // Before the first hand: both players cut the deck to see who deals.
+  if (view.phase === "cutForDeal") {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 px-4 py-3">
+        <header className="flex items-center justify-between text-sm">
+          <button type="button" className="text-parchment/70 hover:text-gold" onClick={onExit}>
+            ← Harbour
+          </button>
+          <span className="flex items-center gap-2 text-parchment/70">
+            {pirate ? "Pirate rules" : "Classic"}
+            <SettingsButton />
+          </span>
+        </header>
+        <CutForDealPanel
+          view={view}
+          names={label}
+          onPick={(index) => act({ type: "pickCut", index })}
+        />
+        <Feed items={p.feed.slice(0, 3)} />
+        {error && (
+          <p role="alert" className="text-center text-sm text-red-300">
+            {error}
+          </p>
+        )}
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-3 px-4 py-3">
@@ -302,6 +331,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
       </section>
 
       <PeggyChatter events={p.lastEvents} me={me} />
+      <CutReveal events={p.lastEvents} names={label} me={me} />
 
       {view.phase === "roundEnd" && (
         <RoundSummary

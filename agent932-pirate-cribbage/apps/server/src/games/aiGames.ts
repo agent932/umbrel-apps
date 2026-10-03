@@ -10,7 +10,8 @@ import {
   applyAction,
   botAction,
   createDeck,
-  createGame,
+  hostAction,
+  newGame,
   cryptoRandom,
   powerBlocker,
   redactEvent,
@@ -63,8 +64,10 @@ function advance(
 ): GameState {
   for (let guard = 0; guard < 500; guard++) {
     if (state.phase === "gameOver") return state;
-    if (state.phase === "deal") {
-      state = apply(state, { type: "deal", deck: shuffle(createDeck(), cryptoRandom) }, steps);
+    // The house shuffles for the cut and deals.
+    const house = hostAction(state, () => shuffle(createDeck(), cryptoRandom));
+    if (house) {
+      state = apply(state, house, steps);
       continue;
     }
     if (
@@ -88,8 +91,8 @@ export async function createAiGame(
   rules: RuleSet,
 ): Promise<GameResponse> {
   const steps: Step[] = [];
-  const firstDealer: Seat = cryptoRandom() < 0.5 ? HUMAN : COMPUTER;
-  let state = createGame(firstDealer, rules);
+  // Both cut the deck to see who deals first.
+  let state = newGame(rules);
   steps.push({ events: [], view: viewFor(state, HUMAN) });
   state = advance(state, level, steps, false);
 

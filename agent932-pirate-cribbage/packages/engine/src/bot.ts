@@ -108,6 +108,13 @@ export function botAction(
   const pick = <T>(items: readonly T[]) => items[Math.floor(random() * items.length)]!;
 
   switch (state.phase) {
+    case "cutForDeal": {
+      // Any face-down card the opponent hasn't taken.
+      const free = Array.from({ length: view.cutForDeal!.deckSize! }, (_, i) => i).filter(
+        (i) => !view.cutForDeal!.taken.includes(i),
+      );
+      return { type: "pickCut", seat, index: pick(free) };
+    }
     case "discard": {
       if (level !== "easy" && view.powersNow.includes("parley")) {
         const swap = chooseParley(view.hand, isDealer);

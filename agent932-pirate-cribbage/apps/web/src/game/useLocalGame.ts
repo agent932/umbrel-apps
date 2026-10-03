@@ -10,7 +10,7 @@ import {
   BOT,
   type LocalGame,
   YOU,
-  dealAction,
+  houseAction,
   names,
   saveGame,
   step,
@@ -23,6 +23,8 @@ export const BOT_DELAY_MS = 750;
 /** Extra time to reach for Belay That! before the bot plays over your card. */
 export const BELAY_WINDOW_MS = 2500;
 const DEAL_DELAY_MS = 350;
+/** How long the two cut cards stay up before the first deal. */
+export const CUT_REVEAL_MS = 2200;
 
 export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameController {
   const [game, setGame] = useState(initial);
@@ -50,8 +52,11 @@ export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameC
   // The host deals automatically, and the bot takes its turns after a short pause.
   useEffect(() => {
     const { state, options } = game;
-    if (state.phase === "deal") {
-      const t = setTimeout(() => apply(dealAction()), DEAL_DELAY_MS);
+    const house = houseAction(state);
+    if (house) {
+      // After the cut for deal, pause so both cards can be seen before the deal.
+      const delay = house.type === "deal" && state.round === 0 ? CUT_REVEAL_MS : DEAL_DELAY_MS;
+      const t = setTimeout(() => apply(house), botDelay > 0 ? delay : 0);
       return () => clearTimeout(t);
     }
     const move = botAction(state, BOT, options.level, cryptoRandom);

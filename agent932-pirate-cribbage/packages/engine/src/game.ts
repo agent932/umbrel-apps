@@ -81,7 +81,21 @@ export const KRAKEN_POINTS = -4;
  * "preplay" only happens under pirate rules, between the cut and the first play, while a player
  * still has an after-the-cut power (Pickpocket, Rebury) to use.
  */
-export type Phase = "deal" | "discard" | "cut" | "preplay" | "pegging" | "roundEnd" | "gameOver";
+export type Phase =
+  "cutForDeal" | "deal" | "discard" | "cut" | "preplay" | "pegging" | "roundEnd" | "gameOver";
+
+/**
+ * Before the first hand each player cuts the deck; the lower card deals (aces low). A tie means
+ * a fresh shuffle and both cut again.
+ */
+export interface CutForDeal {
+  /** The spread deck to pick from; null while waiting for the host to shuffle. */
+  deck: Card[] | null;
+  /** Index into `deck` each player picked. */
+  picks: [number | null, number | null];
+  /** The cards cut, once picked (kept after the dealer is decided, for display). */
+  cards: [Card | null, Card | null];
+}
 
 export interface PlayedCard {
   seat: Seat;
@@ -166,9 +180,14 @@ export interface GameState {
   ready: [boolean, boolean];
   /** State before the most recent play, for Belay That! Never sent to clients. */
   undo: { seat: Seat; state: GameState } | null;
+  /** The cut for first deal (null for games started with a fixed dealer). */
+  cutForDeal: CutForDeal | null;
 }
 
 export type Action =
+  /** Host: spread a freshly shuffled deck for the cut for deal. */
+  | { type: "shuffleForCut"; deck: Card[] }
+  | { type: "pickCut"; seat: Seat; index: number }
   | { type: "deal"; deck: Card[] }
   | { type: "discard"; seat: Seat; cards: Card[] }
   | { type: "spyglass"; seat: Seat }
@@ -184,6 +203,9 @@ export type Action =
   | { type: "nextRound" };
 
 export type GameEvent =
+  | { type: "cutPick"; seat: Seat; card: Card }
+  | { type: "cutTie"; cards: [Card, Card] }
+  | { type: "cutForDealt"; cards: [Card, Card]; dealer: Seat }
   | { type: "dealt"; dealer: Seat }
   | { type: "discarded"; seat: Seat }
   | { type: "cut"; card: Card }
@@ -229,7 +251,29 @@ export function createGame(firstDealer: Seat, rules: RuleSet = CLASSIC_RULES): G
     powersUsed: [[], []],
     ready: [true, true],
     undo: null,
+    cutForDeal: null,
   };
+}
+
+/** A new game that starts with both players cutting the deck to see who deals. */
+export function newGame(rules: RuleSet = CLASSIC_RULES): GameState {
+  return {
+    ...createGame(0, rules),
+    phase: "cutForDeal",
+    cutForDeal: { deck: null, picks: [null, null], cards: [null, null] },
+  };
+}
+
+/**
+ * What the house (not a player) has to do next: shuffle for the cut, or deal. Hosts call this in
+ * a loop with a fresh shuffled deck.
+ */
+export function hostAction(state: GameState, shuffledDeck: () => Card[]): Action | null {
+  if (state.phase === "deal") return { type: "deal", deck: shuffledDeck() };
+  if (state.phase === "cutForDeal" && !state.cutForDeal?.deck) {
+    return { type: "shuffleForCut", deck: shuffledDeck() };
+  }
+  return null;
 }
 
 function fail(message: string): never {
@@ -257,6 +301,10 @@ export function canPlay(state: GameState, seat: Seat): boolean {
 /** Who must act next, or null when the game is waiting on a non-seat action (deal, nextRound). */
 export function toAct(state: GameState): Seat[] {
   switch (state.phase) {
+    case "cutForDeal":
+      return state.cutForDeal?.deck
+        ? ([0, 1] as Seat[]).filter((s) => state.cutForDeal!.picks[s] === null)
+        : [];
     case "discard":
       return ([0, 1] as Seat[]).filter((s) => state.hands[s].length === 6);
     case "cut":
@@ -280,6 +328,12 @@ export function applyAction(input: GameState, action: Action): ActionResult {
   const ctx = { state, events };
 
   switch (action.type) {
+    case "shuffleForCut":
+      shuffleForCut(ctx, action.deck);
+      break;
+    case "pickCut":
+      pickCut(ctx, action.seat, action.index);
+      break;
     case "deal":
       deal(ctx, action.deck);
       break;
@@ -317,6 +371,48 @@ export function applyAction(input: GameState, action: Action): ActionResult {
 interface Ctx {
   state: GameState;
   events: GameEvent[];
+}
+
+function checkFullDeck(deck: Card[]) {
+  const labels = new Set(deck.map(cardLabel));
+  if (deck.length !== 52 || labels.size !== 52) fail("Deck must be 52 distinct cards");
+  if (createDeck().some((c) => !labels.has(cardLabel(c)))) fail("Deck has unknown cards");
+}
+
+function shuffleForCut(ctx: Ctx, deck: Card[]) {
+  const cfd = ctx.state.cutForDeal;
+  if (ctx.state.phase !== "cutForDeal" || !cfd || cfd.deck) fail("Not time to shuffle for the cut");
+  checkFullDeck(deck);
+  ctx.state.cutForDeal = { deck: [...deck], picks: [null, null], cards: [null, null] };
+}
+
+function pickCut(ctx: Ctx, seat: Seat, index: number) {
+  const { state } = ctx;
+  const cfd = state.cutForDeal;
+  if (state.phase !== "cutForDeal" || !cfd?.deck) fail("Not time to cut for deal");
+  if (cfd.picks[seat] !== null) fail("You've already cut");
+  if (!Number.isInteger(index) || index < 0 || index >= cfd.deck.length)
+    fail("Pick a card from the deck");
+  if (cfd.picks[other(seat)] === index) fail("That card's already taken");
+  const card = cfd.deck[index]!;
+  cfd.picks[seat] = index;
+  cfd.cards[seat] = card;
+  ctx.events.push({ type: "cutPick", seat, card });
+
+  const [a, b] = cfd.cards;
+  if (!a || !b) return;
+  if (a.rank === b.rank) {
+    // Tie: reshuffle and cut again.
+    ctx.events.push({ type: "cutTie", cards: [a, b] });
+    state.cutForDeal = { deck: null, picks: [null, null], cards: [null, null] };
+    return;
+  }
+  const dealer: Seat = a.rank < b.rank ? 0 : 1;
+  state.dealer = dealer;
+  state.firstDealer = dealer;
+  state.phase = "deal";
+  state.cutForDeal = { deck: null, picks: [null, null], cards: [a, b] };
+  ctx.events.push({ type: "cutForDealt", cards: [a, b], dealer });
 }
 
 /** Add points; ends the game the moment someone reaches the target. Returns true if the game ended. */
@@ -360,9 +456,7 @@ function boardTwists(ctx: Ctx, seat: Seat) {
 function deal(ctx: Ctx, deck: Card[]) {
   const { state } = ctx;
   if (state.phase !== "deal") fail("Not time to deal");
-  const labels = new Set(deck.map(cardLabel));
-  if (deck.length !== 52 || labels.size !== 52) fail("Deck must be 52 distinct cards");
-  if (createDeck().some((c) => !labels.has(cardLabel(c)))) fail("Deck has unknown cards");
+  checkFullDeck(deck);
 
   const pone = other(state.dealer);
   const hands: [Card[], Card[]] = [[], []];
@@ -718,6 +812,14 @@ export interface PlayerView {
   /** This player's six cards and throw at discard time, for the round review. */
   myDiscardDecision: { hand: Card[]; discarded: Card[] } | null;
   cribOwner: Seat | null;
+  /** The cut for first deal, while it's happening (and the two cards cut, once decided). */
+  cutForDeal: {
+    /** Number of face-down cards to pick from, or null while the house shuffles. */
+    deckSize: number | null;
+    /** Positions already picked (yours or your opponent's), so they can't be picked again. */
+    taken: number[];
+    cards: [Card | null, Card | null];
+  } | null;
 }
 
 export function viewFor(state: GameState, seat: Seat): PlayerView {
@@ -744,6 +846,11 @@ export function viewFor(state: GameState, seat: Seat): PlayerView {
     myDiscards: [...(state.current?.seats[seat].discarded ?? [])],
     myDiscardDecision: state.current?.seats[seat].atDiscard ?? null,
     cribOwner: state.current?.cribOwner ?? null,
+    cutForDeal: state.cutForDeal && {
+      deckSize: state.cutForDeal.deck?.length ?? null,
+      taken: state.cutForDeal.picks.filter((p): p is number => p !== null),
+      cards: [...state.cutForDeal.cards],
+    },
   };
 }
 

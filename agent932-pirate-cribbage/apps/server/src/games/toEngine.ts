@@ -15,6 +15,8 @@ export function toEngineAction(
   switch (a.type) {
     case "cut":
       return { type: "cut", index: randomIndex(state.deck.length) };
+    case "pickCut":
+      return { type: "pickCut", seat, index: a.index };
     case "crowsNest":
       return { type: "crowsNest", seat, index: randomIndex(state.deck.length) };
     case "pickpocket":

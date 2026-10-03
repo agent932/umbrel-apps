@@ -10,6 +10,9 @@ import {
   cardLabel,
   PIRATE_RULES,
   POWERS,
+  botAction,
+  hostAction,
+  newGame,
   type RuleSet,
   chooseDiscard,
   chooseParley,
@@ -469,7 +472,7 @@ function randomPower(state: GameState, random: () => number): Action | null {
 
 /** Every card is exactly one place: a hand, the crib, the deck, the cut, or played. */
 function checkCardsConserved(state: GameState) {
-  if (state.phase === "deal" || state.phase === "gameOver") return;
+  if (state.phase === "cutForDeal" || state.phase === "deal" || state.phase === "gameOver") return;
   const all = [
     ...state.hands[0],
     ...state.hands[1],
@@ -486,7 +489,7 @@ function checkCardsConserved(state: GameState) {
 /** Play a whole game between two bots; returns the final state. */
 function botGame(seed: number, rules?: RuleSet): GameState {
   const random = seededRandom(seed);
-  let state = createGame(random() < 0.5 ? 0 : 1, rules);
+  let state = seed % 2 === 0 ? newGame(rules) : createGame(random() < 0.5 ? 0 : 1, rules);
   for (let steps = 0; steps < 10_000; steps++) {
     if (rules?.pirate) {
       checkCardsConserved(state);
@@ -500,6 +503,11 @@ function botGame(seed: number, rules?: RuleSet): GameState {
     switch (state.phase) {
       case "gameOver":
         return state;
+      case "cutForDeal":
+        action =
+          hostAction(state, () => shuffle(createDeck(), random)) ??
+          botAction(state, toAct(state)[0]!, "easy", random)!;
+        break;
       case "deal":
         action = { type: "deal", deck: shuffle(createDeck(), random) };
         break;

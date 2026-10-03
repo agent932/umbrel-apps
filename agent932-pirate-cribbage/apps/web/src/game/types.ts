@@ -5,6 +5,7 @@ export type UiAction =
   | { type: "discard"; cards: Card[] }
   | { type: "play"; card: Card }
   | { type: "cut" }
+  | { type: "pickCut"; index: number }
   | { type: "nextRound" }
   | { type: "ready" }
   | { type: "spyglass" }

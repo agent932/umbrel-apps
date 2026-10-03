@@ -61,6 +61,19 @@ describe("signed-in play, end to end", () => {
     await user.click(screen.getByLabelText(/^Easy/));
     await user.click(screen.getByLabelText(/^Classic/));
     await user.click(screen.getByRole("button", { name: /set sail/i }));
+    // Cut for the deal (again on a tie) until the cards are dealt.
+    for (let i = 0; i < 20 && !screen.queryByLabelText("Your hand"); i++) {
+      const free = (await screen.findAllByRole("button", { name: /^Cut card/ })).filter(
+        (b) => !b.hasAttribute("disabled"),
+      );
+      await user.click(free[0]!);
+      await waitFor(() =>
+        expect(
+          screen.queryByLabelText("Your hand") ??
+            screen.queryAllByRole("button", { name: /^Cut card/ })[0],
+        ).toBeTruthy(),
+      );
+    }
     const hand = () => within(screen.getByLabelText("Your hand"));
     await waitFor(() => expect(hand().getAllByRole("button")).toHaveLength(6));
 

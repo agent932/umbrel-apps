@@ -17,6 +17,7 @@ export const ClientAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("discard"), cards: z.array(CardSchema).length(2) }),
   z.object({ type: z.literal("play"), card: CardSchema }),
   z.object({ type: z.literal("cut") }),
+  z.object({ type: z.literal("pickCut"), index: z.number().int().min(0).max(51) }),
   z.object({ type: z.literal("nextRound") }),
   z.object({ type: z.literal("ready") }),
   z.object({ type: z.literal("continue") }),

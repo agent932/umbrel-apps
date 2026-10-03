@@ -50,7 +50,29 @@ export function handScoreParts(score: HandScore): string[] {
 export function describeEvent(event: GameEvent, names: readonly [string, string]): string | null {
   const who = (seat: Seat) => names[seat];
   const whose = (seat: Seat) => (names[seat] === "You" ? "Your" : `${names[seat]}'s`);
+  const RANK_WORD = [
+    "",
+    "aces",
+    "twos",
+    "threes",
+    "fours",
+    "fives",
+    "sixes",
+    "sevens",
+    "eights",
+    "nines",
+    "tens",
+    "jacks",
+    "queens",
+    "kings",
+  ];
   switch (event.type) {
+    case "cutPick":
+      return `${who(event.seat)} cut ${cardText(event.card)}`;
+    case "cutTie":
+      return `Both cut ${RANK_WORD[event.cards[0].rank]}! Cut again`;
+    case "cutForDealt":
+      return `${who(event.dealer)} cut low and ${names[event.dealer] === "You" ? "deal" : "deals"} first`;
     case "cut":
       return `The cut is ${cardText(event.card)}`;
     case "heels":

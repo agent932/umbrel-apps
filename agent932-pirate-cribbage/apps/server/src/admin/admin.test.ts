@@ -124,7 +124,8 @@ describe("live games", () => {
     const captain = await signUp(t.app, "Captain");
     const { gameId, a } = await matchedPair(t);
     const list = (await api("GET", "/api/admin/games", captain.cookie)).json().games;
-    expect(list).toMatchObject([{ id: gameId, round: 1, ranked: false }]);
+    // Still cutting for deal, so no round has started yet.
+    expect(list).toMatchObject([{ id: gameId, round: 0, phase: "cutForDeal", ranked: false }]);
     expect([...list[0].players].sort()).toEqual(["Anne", "Bonny"]);
 
     expect((await api("POST", `/api/admin/games/${gameId}/end`, captain.cookie)).statusCode).toBe(

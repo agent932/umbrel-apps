@@ -8,7 +8,8 @@ import {
   applyAction,
   botAction,
   createDeck,
-  createGame,
+  hostAction,
+  newGame,
   cryptoRandom,
   other,
   rateGame,
@@ -105,8 +106,12 @@ export class RoomManager {
   /** Start a game between two players. Seats are assigned at random, as is the first dealer. */
   async create(a: Player, b: Player, rules: RuleSet, ranked = false): Promise<string> {
     const players: [Player, Player] = cryptoRandom() < 0.5 ? [a, b] : [b, a];
-    let state = createGame(cryptoRandom() < 0.5 ? 0 : 1, rules);
-    state = applyAction(state, { type: "deal", deck: shuffle(createDeck(), cryptoRandom) }).state;
+    // Both players cut the deck to see who deals first; the house shuffles for them.
+    let state = newGame(rules);
+    state = applyAction(
+      state,
+      hostAction(state, () => shuffle(createDeck(), cryptoRandom))!,
+    ).state;
     const [row] = await this.db
       .insert(games)
       .values({
@@ -248,9 +253,11 @@ export class RoomManager {
       events.push(...result.events);
     };
     step(action);
-    if (state.phase === "deal") {
-      room.nextRoundVotes.clear();
-      step({ type: "deal", deck: shuffle(createDeck(), cryptoRandom) });
+    if (state.phase === "deal") room.nextRoundVotes.clear();
+    // The house deals, or reshuffles after a tied cut for deal.
+    for (let house = hostAction(state, () => shuffle(createDeck(), cryptoRandom)); house;) {
+      step(house);
+      house = hostAction(state, () => shuffle(createDeck(), cryptoRandom));
     }
     room.state = state;
 

@@ -113,6 +113,15 @@ export async function matchedPair(
 export function nextMove(view: PlayerView, readyForNext: boolean): ClientAction | null {
   const mine = view.toAct.includes(view.seat);
   switch (view.phase) {
+    case "cutForDeal": {
+      // Cut any face-down card the other player hasn't taken.
+      const cfd = view.cutForDeal;
+      if (!mine || !cfd?.deckSize) return null;
+      const index = Array.from({ length: cfd.deckSize }, (_, i) => i).find(
+        (i) => !cfd.taken.includes(i),
+      )!;
+      return { type: "pickCut", index };
+    }
     case "discard":
       return view.hand.length === 6
         ? { type: "discard", cards: chooseDiscard(view.hand, view.dealer === view.seat) }

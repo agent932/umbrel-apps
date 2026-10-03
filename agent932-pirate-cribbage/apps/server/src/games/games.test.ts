@@ -12,6 +12,15 @@ afterEach(async () => t.close());
 function nextMove(view: PlayerView): ClientAction | null {
   const mine = view.toAct.includes(view.seat);
   switch (view.phase) {
+    case "cutForDeal": {
+      // Cut any face-down card the other player hasn't taken.
+      const cfd = view.cutForDeal;
+      if (!mine || !cfd?.deckSize) return null;
+      const index = Array.from({ length: cfd.deckSize }, (_, i) => i).find(
+        (i) => !cfd.taken.includes(i),
+      )!;
+      return { type: "pickCut", index };
+    }
     case "discard":
       return view.hand.length === 6
         ? { type: "discard", cards: chooseDiscard(view.hand, view.dealer === view.seat) }
@@ -32,6 +41,17 @@ function nextMove(view: PlayerView): ClientAction | null {
 
 async function post(url: string, cookie: string, payload?: object) {
   return t.app.inject({ method: "POST", url, headers: { cookie }, payload: payload ?? {} });
+}
+
+/** Cut for deal (any free card) until the hands are dealt; returns the latest response. */
+async function cutIn(cookie: string, res: GameResponse): Promise<GameResponse> {
+  for (let i = 0; i < 10; i++) {
+    const view = res.steps.at(-1)!.view;
+    if (view.phase !== "cutForDeal") return res;
+    const move = nextMove(view)!;
+    res = (await post(`/api/games/${res.gameId}/actions`, cookie, move)).json();
+  }
+  throw new Error("Cut for deal never finished");
 }
 
 async function playWholeGame(cookie: string, variant: "classic" | "pirate", level = "medium") {
@@ -66,8 +86,10 @@ describe("games vs the computer", () => {
     const res = await post("/api/games", cookie, { level: "medium", variant: "classic" });
     expect(res.statusCode).toBe(201);
     const view = (res.json() as GameResponse).steps.at(-1)!.view;
-    expect(view.phase).toBe("discard");
-    expect(view.hand).toHaveLength(6);
+    // Games open with the cut for deal; the computer has already cut.
+    expect(view.phase).toBe("cutForDeal");
+    expect(view.toAct).toEqual([0]);
+    expect(view.cutForDeal?.taken).toHaveLength(1);
     expect(view).not.toHaveProperty("deck");
     expect(view).not.toHaveProperty("hands");
   });
@@ -108,9 +130,12 @@ describe("games vs the computer", () => {
 
   it("never reveals the computer's hand", async () => {
     const { cookie } = await signUp(t.app);
-    const res = (
-      await post("/api/games", cookie, { level: "medium", variant: "pirate" })
-    ).json() as GameResponse;
+    const res = await cutIn(
+      cookie,
+      (
+        await post("/api/games", cookie, { level: "medium", variant: "pirate" })
+      ).json() as GameResponse,
+    );
     const view = res.steps.at(-1)!.view;
     expect(view.opponentCardCount).toBeGreaterThanOrEqual(4);
     // Spyglass is the only way to see it.
@@ -144,10 +169,14 @@ describe("games vs the computer", () => {
   it("keeps players out of each other's games", async () => {
     const a = await signUp(t.app, "Anne");
     const b = await signUp(t.app, "Bonny");
-    const game = (
-      await post("/api/games", a.cookie, { level: "easy", variant: "classic" })
-    ).json() as GameResponse;
+    const game = await cutIn(
+      a.cookie,
+      (
+        await post("/api/games", a.cookie, { level: "easy", variant: "classic" })
+      ).json() as GameResponse,
+    );
     const hand = game.steps.at(-1)!.view.hand;
+    expect(hand).toHaveLength(6);
     const res = await post(`/api/games/${game.gameId}/actions`, b.cookie, {
       type: "discard",
       cards: hand.slice(0, 2),
