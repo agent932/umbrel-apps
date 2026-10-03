@@ -5,7 +5,16 @@ import { Peggy } from "./Peggy.js";
 import { quipFor } from "./quips.js";
 
 /** Peggy pops up in the corner to squawk about the big moments. */
-export function PeggyChatter({ events, me }: { events: GameEvent[]; me: Seat }) {
+export function PeggyChatter({
+  events,
+  me,
+  className = "fixed bottom-4 left-3",
+}: {
+  events: GameEvent[];
+  me: Seat;
+  /** Where she perches. */
+  className?: string;
+}) {
   const { peggy } = useSettings();
   const [line, setLine] = useState<{ text: string; key: number } | null>(null);
 
@@ -27,7 +36,7 @@ export function PeggyChatter({ events, me }: { events: GameEvent[]; me: Seat }) 
       key={line.key}
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed bottom-4 left-3 z-30 flex items-end gap-1"
+      className={`pointer-events-none z-30 flex items-end gap-1 ${className}`}
       style={{ animation: "pop-in 220ms ease-out" }}
     >
       <Peggy squawk className="h-20 w-auto drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]" />

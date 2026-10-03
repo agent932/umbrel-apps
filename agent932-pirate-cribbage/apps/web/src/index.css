@@ -157,3 +157,360 @@ body {
     opacity: 0;
   }
 }
+
+/* ---------- The game table (screens/GameScreen.tsx) ----------
+ * One fixed screen, no scrolling. Landscape: board down the left, opponent along the top, the play
+ * in the middle, your hand fanned along the bottom, menu and powers down the right. Portrait stacks
+ * the same pieces, with the board lying across the middle. Sizes come from the table itself (cq units). */
+.table-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  container: table / size;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: #0b1520 url("./assets/table/table-land.webp") center / cover no-repeat;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (orientation: portrait) {
+  .table-stage {
+    background-image: url("./assets/table/table-port.webp");
+  }
+}
+.table-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 10cqmin rgb(0 0 0 / 0.55);
+}
+
+.table-grid {
+  --spread: 0.42;
+  --ch: min(29cqh, 15cqw, 230px);
+  --och: min(17cqh, 130px);
+  --pch: min(21cqh, 160px);
+  --sch: min(15cqh, 115px);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  height: 100%;
+  grid-template-columns: 19cqw 1fr 10cqw;
+  grid-template-rows: 25cqh 1fr 37cqh;
+  grid-template-areas:
+    "board opp rail"
+    "board mid rail"
+    "board hand rail";
+}
+.t-board {
+  grid-area: board;
+  min-width: 0;
+  min-height: 0;
+  padding: 3cqmin;
+}
+.t-opp-fan {
+  grid-area: opp;
+  position: relative;
+}
+.t-opp-chip {
+  grid-area: opp;
+  justify-self: start;
+  align-self: center;
+  margin-left: 2cqw;
+}
+.t-status {
+  grid-area: mid;
+  justify-self: center;
+  align-self: start;
+  margin-top: 1cqh;
+  z-index: 3;
+}
+.t-play {
+  grid-area: mid;
+  align-self: end;
+  margin-bottom: 1.5cqh;
+}
+/* Action buttons only appear while the play pile is empty, so they take its place. */
+.t-act {
+  grid-area: mid;
+  justify-self: center;
+  align-self: end;
+  margin-bottom: calc(1.5cqh + var(--sch) * 0.3);
+  z-index: 3;
+}
+.t-hand {
+  grid-area: hand;
+  position: relative;
+}
+.t-you-chip {
+  grid-area: hand;
+  justify-self: start;
+  align-self: end;
+  margin: 0 0 3cqh 2cqw;
+  z-index: 3;
+}
+.t-menu {
+  grid-area: rail;
+  justify-self: center;
+  align-self: start;
+  margin-top: 2cqh;
+  z-index: 4;
+}
+.t-powers {
+  grid-area: rail;
+  justify-self: center;
+  align-self: center;
+  display: grid;
+  gap: 1.6cqh;
+  margin-top: 8cqh;
+}
+.t-powers.many {
+  grid-template-columns: repeat(2, auto);
+  gap: 1.2cqh 4px;
+}
+.t-powers.many .t-round {
+  width: min(42px, 4.6cqw);
+  height: min(42px, 4.6cqw);
+}
+.t-peggy {
+  position: absolute;
+  top: 3cqh;
+  right: 12cqw;
+}
+
+/* Cards on the table: --h is the card's height; everything inside scales from it. */
+.t-card {
+  height: var(--h, var(--ch));
+  width: calc(var(--h, var(--ch)) * 0.7);
+  font-size: calc(var(--h, var(--ch)) * 0.16);
+  border-radius: calc(var(--h, var(--ch)) * 0.08);
+}
+.t-slot {
+  position: absolute;
+  left: 50%;
+}
+.t-hand .t-slot {
+  --h: var(--ch);
+  bottom: calc(var(--ch) * -0.1);
+  transform-origin: 50% 140%;
+  transform: translateX(calc(-50% + (var(--i) - (var(--n) - 1) / 2) * var(--h) * var(--spread)))
+    translateY(var(--lift, 0px)) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 4deg));
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.t-hand .t-slot.sel {
+  --lift: calc(var(--ch) * -0.2);
+}
+.t-hand .t-slot.playable {
+  animation: t-nudge 1.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.08s);
+}
+.t-hand .t-slot.playable:hover {
+  --lift: calc(var(--ch) * -0.08);
+}
+@keyframes t-nudge {
+  0%,
+  70%,
+  100% {
+    translate: 0 0;
+  }
+  80% {
+    translate: 0 calc(var(--ch) * -0.04);
+  }
+}
+.t-opp-fan .t-slot {
+  --h: var(--och);
+  top: calc(var(--och) * -0.04);
+  transform-origin: 50% -30%;
+  transform: translateX(calc(-50% + (var(--i) - (var(--n) - 1) / 2) * var(--h) * 0.45))
+    rotate(calc((var(--i) - (var(--n) - 1) / 2) * -4deg));
+  transition: transform 0.3s ease;
+}
+.t-pile {
+  --h: var(--pch);
+}
+.t-pile > * + * {
+  margin-left: calc(var(--pch) * -0.46);
+}
+.t-stack {
+  --h: var(--sch);
+  position: relative;
+  height: var(--sch);
+  width: calc(var(--sch) * 0.7);
+}
+
+.t-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: rgb(4 18 28 / 0.75);
+  border: 1px solid rgb(201 150 44 / 0.45);
+  white-space: nowrap;
+  max-width: 34cqw;
+}
+.t-avatar {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4a6a80, #1a3346);
+  font-family: var(--font-pirate);
+  color: var(--color-parchment);
+}
+.t-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  background: url("./assets/table/ring.webp") center / contain no-repeat;
+}
+.t-round {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  position: relative;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.55));
+  transition:
+    transform 0.1s,
+    filter 0.2s,
+    opacity 0.2s;
+}
+.t-round:not(:disabled):active {
+  transform: scale(0.92);
+}
+.t-round.ready {
+  filter: drop-shadow(0 0 10px rgb(242 184 75 / 0.9)) drop-shadow(0 4px 6px rgb(0 0 0 / 0.55));
+}
+.t-round:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.t-round.used {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.45;
+}
+.t-plank {
+  min-width: 150px;
+  min-height: 52px;
+  padding: 12px 30px 14px;
+  background: url("./assets/table/plank.webp") center / 100% 100% no-repeat;
+  color: #fbe7b8;
+  font-family: var(--font-pirate);
+  font-size: 1.3rem;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgb(40 20 5 / 0.8);
+  filter: drop-shadow(0 5px 6px rgb(0 0 0 / 0.55));
+  transition:
+    transform 0.08s,
+    opacity 0.2s;
+}
+.t-plank:not(:disabled):active {
+  transform: translateY(2px) scale(0.98);
+}
+.t-plank:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.t-medallion {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 3.1rem;
+  height: 3.4rem;
+  padding-top: 0.3rem;
+  background: url("./assets/table/medallion.webp") center / contain no-repeat;
+  color: #3a2508;
+  font-family: var(--font-pirate);
+  font-size: 1.45rem;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgb(255 230 160 / 0.6);
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.6));
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-hand .t-slot.playable {
+    animation: none;
+  }
+  .t-hand .t-slot,
+  .t-opp-fan .t-slot {
+    transition: none;
+  }
+}
+
+/* Big screens: scale the table's controls up with the cards. */
+.t-chip,
+.t-round,
+.t-plank,
+.t-medallion,
+.t-status {
+  zoom: var(--ui, 1);
+}
+@media (min-width: 1000px) and (min-height: 650px) {
+  .table-grid {
+    --ui: 1.45;
+  }
+}
+
+/* Portrait: last, so it overrides the landscape rules above. */
+@container table (orientation: portrait) {
+  .table-grid {
+    --spread: 0.34;
+    --ch: min(18cqh, 27cqw);
+    --och: 9cqh;
+    --pch: 12cqh;
+    --sch: 9cqh;
+    grid-template-columns: 1fr;
+    grid-template-rows: 12cqh 17cqh 1fr 30cqh 9cqh;
+    grid-template-areas: "opp" "board" "mid" "hand" "rail";
+  }
+  .t-opp-chip {
+    margin-left: 3cqw;
+    max-width: 50cqw;
+  }
+  .t-opp-fan .t-slot {
+    left: 68%;
+  }
+  .t-play {
+    align-self: center;
+    margin: 5cqh 0 0;
+  }
+  .t-act {
+    grid-area: hand;
+    justify-self: end;
+    align-self: start;
+    margin: 1cqh 3cqw 0 0;
+  }
+  .t-you-chip {
+    align-self: start;
+    margin: 1cqh 0 0 3cqw;
+  }
+  .t-menu {
+    grid-area: opp;
+    justify-self: end;
+    margin: 2cqh 3cqw 0 0;
+  }
+  .t-powers,
+  .t-powers.many {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    gap: 8px;
+    margin-top: 0;
+  }
+  .t-powers.many .t-round {
+    width: min(48px, 13cqw);
+    height: min(48px, 13cqw);
+  }
+  .t-hand .t-slot {
+    bottom: calc(var(--ch) * 0.05);
+  }
+  .t-peggy {
+    top: 31cqh;
+    right: 3cqw;
+  }
+}

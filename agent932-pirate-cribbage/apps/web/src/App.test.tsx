@@ -113,6 +113,7 @@ describe("playing vs the bot", () => {
   it("offers to resume a saved game", async () => {
     const user = await startGame("Classic");
     await waitFor(() => expect(hand().getAllByRole("button")).toHaveLength(6));
+    await user.click(screen.getByRole("button", { name: "Menu" }));
     await user.click(screen.getByRole("button", { name: /Harbour/ }));
     await user.click(screen.getByRole("button", { name: /Resume/ }));
     expect(hand().getAllByRole("button")).toHaveLength(6);

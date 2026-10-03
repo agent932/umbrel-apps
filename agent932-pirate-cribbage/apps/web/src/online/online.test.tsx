@@ -155,6 +155,7 @@ describe("online game screen", () => {
     expect(ws.sent.at(-1)).toMatchObject({ t: "act", gameId, action: { type: "discard" } });
 
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: "Menu" }));
     await user.click(screen.getByRole("button", { name: "Forfeit" }));
     expect(ws.sent.at(-1)).toEqual({ t: "forfeit", gameId });
   });

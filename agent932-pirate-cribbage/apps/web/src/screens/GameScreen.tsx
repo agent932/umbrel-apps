@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   type Card as CardType,
   type PowerId,
+  POWER_INFO,
   cardLabel,
   cardValue,
   other,
@@ -10,15 +11,23 @@ import {
 } from "@pirate/engine";
 import { Cinematics } from "../brand/Cinematics.js";
 import { PeggyChatter } from "../brand/PeggyChatter.js";
-import { Board, PEG_COLORS } from "../components/Board.js";
-import { SettingsButton } from "../components/SettingsButton.js";
+import { PEG_COLORS } from "../components/Board.js";
+import { SettingsButton, SettingsFields } from "../components/SettingsButton.js";
+import { PaintedBoard } from "../components/table/PaintedBoard.js";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
 import { CountThenShow } from "../components/Counting.js";
 import { CutForDealPanel, CutReveal } from "../components/CutForDeal.js";
-import { POWER_ICONS, PowerBar } from "../components/PowerBar.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
 import type { FeedItem, GameController } from "../game/types.js";
+import menuUrl from "../assets/table/btn-menu.webp";
+import captainUrl from "../assets/table/captain.webp";
+import spyglassUrl from "../assets/table/p-spyglass.webp";
+import crowsNestUrl from "../assets/table/p-crowsNest.webp";
+import parleyUrl from "../assets/table/p-parley.webp";
+import pickpocketUrl from "../assets/table/p-pickpocket.webp";
+import reburyUrl from "../assets/table/p-rebury.webp";
+import belayUrl from "../assets/table/p-belay.webp";
 
 interface Props {
   game: GameController;
@@ -35,6 +44,9 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
   const me = view.seat;
   const opp = other(me);
   const oppName = label[opp];
+  const stageRef = useRef<HTMLElement>(null);
+  const upright = useUpright(stageRef);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Sound effects for each new step.
   useEffect(() => {
@@ -124,217 +136,287 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
   // Before the first hand: both players cut the deck to see who deals.
   if (view.phase === "cutForDeal") {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 px-4 py-3">
-        <header className="flex items-center justify-between text-sm">
-          <button type="button" className="text-parchment/70 hover:text-gold" onClick={onExit}>
-            ← Harbour
-          </button>
-          <span className="flex items-center gap-2 text-parchment/70">
-            {pirate ? "Pirate rules" : "Classic"}
-            <SettingsButton />
-          </span>
-        </header>
-        <CutForDealPanel
-          view={view}
-          names={label}
-          onPick={(index) => act({ type: "pickCut", index })}
-        />
-        <Feed items={p.feed.slice(0, 3)} />
-        {error && (
-          <p role="alert" className="text-center text-sm text-red-300">
-            {error}
-          </p>
-        )}
+      <main className="table-stage">
+        <div className="relative z-[1] mx-auto flex h-full max-w-2xl flex-col gap-4 overflow-y-auto px-4 py-3">
+          <header className="flex items-center justify-between text-sm">
+            <button type="button" className="text-parchment/80 hover:text-gold" onClick={onExit}>
+              ← Harbour
+            </button>
+            <span className="flex items-center gap-2 text-parchment/80">
+              {pirate ? "Pirate rules" : "Classic"}
+              <SettingsButton />
+            </span>
+          </header>
+          <CutForDealPanel
+            view={view}
+            names={label}
+            onPick={(index) => act({ type: "pickCut", index })}
+          />
+          <Feed items={p.feed.slice(0, 3)} />
+          {error && (
+            <p role="alert" className="text-center text-sm text-red-300">
+              {error}
+            </p>
+          )}
+        </div>
       </main>
     );
   }
 
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-3 px-4 py-3">
-      <header className="flex items-center justify-between text-sm">
-        <button type="button" className="text-parchment/70 hover:text-gold" onClick={onExit}>
-          ← Harbour
-        </button>
-        <span className="flex items-center gap-2 text-parchment/70">
-          Round {Math.max(view.round, 1)} · {pirate ? "Pirate rules" : "Classic"}
-          <SettingsButton />
-        </span>
-        {online && view.phase !== "gameOver" && (
-          <button
-            type="button"
-            className="text-parchment/60 hover:text-red-300"
-            onClick={() => {
-              if (window.confirm(`Abandon ship? ${oppName} wins this game.`)) online.forfeit();
-            }}
-          >
-            Forfeit
-          </button>
-        )}
-      </header>
+  const action = mustDiscard ? (
+    <button
+      type="button"
+      className="t-plank t-act"
+      disabled={selected.length !== 2}
+      onClick={() => act({ type: "discard", cards: selected })}
+    >
+      Throw to crib
+    </button>
+  ) : mustCut ? (
+    <button type="button" className="t-plank t-act" onClick={() => act({ type: "cut" })}>
+      Cut the deck
+    </button>
+  ) : inPreplay ? (
+    <button type="button" className="t-plank t-act" onClick={() => act({ type: "ready" })}>
+      Set sail
+    </button>
+  ) : null;
 
-      <PlayerStrip
-        name={label[opp]}
-        score={view.scores[opp]}
-        dealer={view.dealer === opp}
-        powersLeft={view.opponentPowersLeft}
-        offline={online ? !online.online[opp] : false}
-        returnBy={online?.returnBy[opp] ?? null}
-      >
+  return (
+    <main className="table-stage" ref={stageRef}>
+      <div className="table-grid">
+        <div className="t-board">
+          <PaintedBoard
+            scores={view.scores}
+            backPegs={p.backPegs}
+            rules={view.rules}
+            names={label}
+            me={me}
+            upright={upright}
+          />
+        </div>
+
+        {/* Opponent: cards along the top edge, portrait and score beside them. */}
         {view.spied && view.phase === "discard" ? (
-          <div className="flex gap-1" aria-label="Opponent's hand seen through the spyglass">
-            {view.spied.map((c) => (
-              <Card key={cardLabel(c)} card={c} small />
+          <div className="t-opp-fan" aria-label="Opponent's hand seen through the spyglass">
+            {view.spied.map((c, i) => (
+              <div key={cardLabel(c)} className="t-slot" style={fan(i, view.spied!.length)}>
+                <Card card={c} fluid />
+              </div>
             ))}
           </div>
         ) : (
-          <div
-            className="flex -space-x-6"
-            aria-label={`Opponent holds ${view.opponentCardCount} cards`}
-          >
+          <div className="t-opp-fan" aria-label={`Opponent holds ${view.opponentCardCount} cards`}>
             {Array.from({ length: view.opponentCardCount }, (_, i) => (
-              <Card key={i} small hidden />
+              <div key={i} className="t-slot" style={fan(i, view.opponentCardCount)}>
+                <Card fluid hidden />
+              </div>
             ))}
           </div>
         )}
-      </PlayerStrip>
+        <PlayerChip
+          className="t-opp-chip"
+          name={oppName}
+          score={view.scores[opp]}
+          dealer={view.dealer === opp}
+          portrait={!online}
+          powersLeft={pirate ? view.opponentPowersLeft : undefined}
+          offline={online ? !online.online[opp] : false}
+          returnBy={online?.returnBy[opp] ?? null}
+        />
 
-      <Board scores={view.scores} backPegs={p.backPegs} rules={view.rules} names={label} me={me} />
+        {/* What's happening now, and the last thing that happened. */}
+        <div className="t-status flex max-w-[60cqw] flex-col items-center gap-1 text-center">
+          {prompt && (
+            <p
+              className="rounded-full border border-gold/35 bg-night/80 px-4 py-1 text-sm font-bold"
+              aria-live="polite"
+            >
+              {prompt}
+            </p>
+          )}
+          <Feed items={p.feed.slice(0, 1)} />
+          {error && (
+            <p role="alert" className="rounded-full bg-night/80 px-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+        </div>
+        {action}
 
-      <section className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-        <div className="flex flex-col items-center gap-1 text-[11px] text-parchment/70">
-          <div className="relative">
-            <Card small hidden label="Deck" />
+        <div className="t-play flex items-center justify-between gap-2 px-[3cqw]">
+          <div className="t-stack" aria-label={view.cut ? "Deck and cut card" : "Deck"}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="absolute" style={{ left: -i * 2, top: -i * 2 }}>
+                <Card fluid hidden label="Deck" />
+              </div>
+            ))}
             {view.cut && (
               <motion.div
-                className="absolute top-0 left-3"
+                className="absolute"
+                style={{ left: "22%", top: "-12%", rotate: 8 }}
                 initial={{ rotateY: 90 }}
                 animate={{ rotateY: 0 }}
               >
-                <Card card={view.cut} small label={`Cut card: ${cardLabel(view.cut)}`} />
+                <Card card={view.cut} fluid label={`Cut card: ${cardLabel(view.cut)}`} />
               </motion.div>
             )}
+            <span className="absolute top-full left-1/2 mt-1 -translate-x-1/2 text-[11px] whitespace-nowrap text-parchment/75">
+              {view.cut ? "Cut" : "Deck"}
+            </span>
           </div>
-          <span>{view.cut ? "Cut" : "Deck"}</span>
-        </div>
 
-        <div className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-xl bg-sea-deep/50 p-2">
-          {view.pegging ? (
-            <>
-              <div className="flex -space-x-5">
-                <AnimatePresence>
-                  {pile.map((p) => (
-                    <motion.div
-                      key={cardLabel(p.card)}
-                      initial={{ y: p.seat === me ? 40 : -40, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                    >
-                      <Card card={p.card} small />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-              <span className="num text-2xl text-gold lantern-glow" aria-label={`Count ${count}`}>
-                {count}
-              </span>
-            </>
-          ) : (
-            <span className="text-center text-sm text-parchment/60">{prompt}</span>
-          )}
-        </div>
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-3">
+            {view.pegging && (
+              <>
+                <span className="t-medallion" aria-label={`Count ${count}`}>
+                  {count}
+                </span>
+                <div className="t-pile flex">
+                  <AnimatePresence>
+                    {pile.map((p) => (
+                      <motion.div
+                        key={cardLabel(p.card)}
+                        initial={{ y: p.seat === me ? 60 : -60, opacity: 0, scale: 1.1 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                      >
+                        <Card card={p.card} fluid />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </>
+            )}
+          </div>
 
-        <div className="flex flex-col items-center gap-1 text-[11px] text-parchment/70">
-          <div className="relative h-14 w-10">
+          <div className="t-stack" aria-label={cribLabel}>
             {Array.from({ length: Math.min(view.cribCount, 4) }, (_, i) => (
-              <div key={i} className="absolute" style={{ top: -i * 2, left: i * 1 }}>
-                <Card small hidden label="Crib card" />
+              <div key={i} className="absolute" style={{ left: i * 2, top: -i * 2 }}>
+                <Card fluid hidden label="Crib card" />
               </div>
             ))}
             {view.cribCount === 0 && (
-              <div className="h-14 w-10 rounded-lg border border-dashed border-parchment/30" />
+              <div className="h-full w-full rounded-lg border border-dashed border-parchment/35" />
             )}
+            <span className="absolute top-full left-1/2 mt-1 -translate-x-1/2 text-[11px] whitespace-nowrap text-parchment/75">
+              {cribLabel}
+            </span>
           </div>
-          <span>{cribLabel}</span>
         </div>
-      </section>
 
-      <Feed items={p.feed.slice(0, 4)} />
-
-      <PlayerStrip name={label[me]} score={view.scores[me]} dealer={view.dealer === me} you>
-        <p className="text-sm text-parchment/85" aria-live="polite">
-          {view.pegging ? prompt : ""}
-          {online && myMove && <Countdown deadline={online.deadline} />}
-        </p>
-      </PlayerStrip>
-
-      <section className="flex flex-col items-center gap-3">
-        <div
-          className="flex justify-center -space-x-3 sm:gap-1.5 sm:space-x-0"
-          aria-label="Your hand"
-        >
-          {preplayPool.map((c) => {
+        {/* Your hand, fanned along the bottom edge. */}
+        <div className="t-hand" aria-label="Your hand">
+          {preplayPool.map((c, i) => {
             const inCrib = !inHand(c);
             const playable = myTurnToPeg && count + cardValue(c) <= 31;
             const clickable = mustDiscard || inPreplay || playable;
             return (
-              <div key={cardLabel(c)} className="flex flex-col items-center">
+              <div
+                key={cardLabel(c)}
+                className={`t-slot ${isSelected(c) ? "sel" : ""} ${playable ? "playable" : ""}`}
+                style={fan(i, preplayPool.length)}
+              >
                 <Card
                   card={c}
+                  fluid
                   selected={isSelected(c)}
                   disabled={!clickable}
                   onClick={() => onCardClick(c)}
                 />
-                {inCrib && <span className="mt-0.5 text-[10px] text-gold">in crib</span>}
+                {inCrib && (
+                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 rounded-full bg-night/85 px-2 text-[11px] whitespace-nowrap text-gold">
+                    in crib
+                  </span>
+                )}
               </div>
             );
           })}
         </div>
+        <PlayerChip
+          className="t-you-chip"
+          name={label[me]}
+          score={view.scores[me]}
+          dealer={view.dealer === me}
+          you
+        >
+          {online && myMove && <Countdown deadline={online.deadline} />}
+        </PlayerChip>
 
-        {error && (
-          <p role="alert" className="text-sm text-red-300">
-            {error}
+        <button
+          type="button"
+          className="t-round t-menu"
+          style={{ backgroundImage: `url("${menuUrl}")` }}
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+        />
+        {pirate && pirate.powers.length > 0 && (
+          <div
+            className={`t-powers ${pirate.powers.length > 4 ? "many" : ""}`}
+            role="group"
+            aria-label="Pirate powers"
+          >
+            {pirate.powers.map((power) => {
+              const used = !view.powersLeft.includes(power);
+              const usable = powerReady.includes(power);
+              const info = POWER_INFO[power];
+              const hint = POWER_HINTS[power];
+              return (
+                <button
+                  key={power}
+                  type="button"
+                  className={`t-round ${used ? "used" : usable ? "ready" : ""}`}
+                  style={{ backgroundImage: `url("${POWER_ART[power]}")` }}
+                  disabled={!usable}
+                  onClick={() => triggerPower(power)}
+                  aria-label={info.name}
+                  title={`${info.name}: ${info.description}${pirate.powerCost ? ` Costs ${pirate.powerCost} points.` : ""}${hint && !used ? ` ${hint}` : ""}`}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {menuOpen && (
+        <div
+          role="dialog"
+          aria-label="Menu"
+          className="absolute top-3 right-3 z-30 w-64 rounded-2xl border border-gold/40 bg-sea/95 p-4 text-sm text-parchment shadow-2xl"
+        >
+          <p className="mb-3 font-pirate text-xl text-gold">
+            Round {Math.max(view.round, 1)} · {pirate ? "Pirate rules" : "Classic"}
           </p>
-        )}
-
-        <div className="flex flex-wrap justify-center gap-2">
-          {mustDiscard && (
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={selected.length !== 2}
-              onClick={() => act({ type: "discard", cards: selected })}
-            >
-              Throw to crib
+          <div className="flex flex-col gap-2">
+            <button type="button" className="btn-secondary" onClick={onExit}>
+              Harbour
             </button>
-          )}
-          {mustCut && (
-            <button type="button" className="btn-primary" onClick={() => act({ type: "cut" })}>
-              Cut the deck
-            </button>
-          )}
-          {inPreplay && (
-            <button type="button" className="btn-primary" onClick={() => act({ type: "ready" })}>
-              Set sail ⛵
-            </button>
-          )}
+            {online && view.phase !== "gameOver" && (
+              <button
+                type="button"
+                className="rounded-xl border border-red-400/50 px-5 py-2 font-bold text-red-200 hover:bg-red-900/30"
+                onClick={() => {
+                  if (window.confirm(`Abandon ship? ${oppName} wins this game.`)) online.forfeit();
+                }}
+              >
+                Forfeit
+              </button>
+            )}
+          </div>
+          <div className="mt-4 border-t border-parchment/15 pt-3">
+            <SettingsFields />
+          </div>
+          <button
+            type="button"
+            className="mt-3 w-full text-xs text-parchment/60 hover:text-gold"
+            onClick={() => setMenuOpen(false)}
+          >
+            Close
+          </button>
         </div>
+      )}
 
-        {pirate && (
-          <PowerBar
-            powers={pirate.powers}
-            left={view.powersLeft}
-            ready={powerReady}
-            cost={pirate.powerCost}
-            onUse={triggerPower}
-            hint={{
-              parley: "Select one card first.",
-              pickpocket: "Select one card from your hand first.",
-              rebury: "Select the two cards you want in the crib.",
-            }}
-          />
-        )}
-      </section>
-
-      <PeggyChatter events={p.lastEvents} me={me} />
+      <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
       <CutReveal events={p.lastEvents} names={label} me={me} />
       {!instant && <Cinematics events={p.lastEvents} names={label} me={me} />}
 
@@ -387,56 +469,106 @@ export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
   );
 }
 
-function PlayerStrip({
+/** Where card i of n sits in a fan (the fan's shape is in `.t-slot` CSS). */
+const fan = (i: number, n: number) => ({ "--i": i, "--n": n }) as React.CSSProperties;
+
+const POWER_ART: Record<PowerId, string> = {
+  spyglass: spyglassUrl,
+  crowsNest: crowsNestUrl,
+  parley: parleyUrl,
+  pickpocket: pickpocketUrl,
+  rebury: reburyUrl,
+  belay: belayUrl,
+};
+
+const POWER_HINTS: Partial<Record<PowerId, string>> = {
+  parley: "Select one card first.",
+  pickpocket: "Select one card from your hand first.",
+  rebury: "Select the two cards you want in the crib.",
+};
+
+/** True when the table is wider than tall: the board then stands upright down the side. */
+function useUpright(ref: React.RefObject<HTMLElement | null>) {
+  const [upright, setUpright] = useState(
+    () => typeof window === "undefined" || window.innerWidth >= window.innerHeight,
+  );
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) setUpright(entry.contentRect.width >= entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return upright;
+}
+
+function PlayerChip({
+  className,
   name,
   score,
   dealer,
   you,
+  portrait,
   powersLeft,
   offline,
   returnBy,
   children,
 }: {
+  className: string;
   name: string;
-  offline?: boolean;
-  /** When an offline opponent forfeits unless they're back. */
-  returnBy?: number | null;
   score: number;
   dealer: boolean;
   you?: boolean;
+  /** Cap'n Bot's painted portrait instead of an initial. */
+  portrait?: boolean;
   powersLeft?: PowerId[];
+  offline?: boolean;
+  /** When an offline opponent forfeits unless they're back. */
+  returnBy?: number | null;
   children?: React.ReactNode;
 }) {
   return (
-    <section className="flex items-center justify-between gap-3" aria-label={name}>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
+    <section className={`t-chip ${className}`} aria-label={name}>
+      <span
+        className="t-avatar"
+        style={
+          portrait ? { background: `url("${captainUrl}") center / 118% no-repeat` } : undefined
+        }
+        aria-hidden
+      >
+        {portrait ? "" : name.slice(0, 1).toUpperCase()}
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-sm leading-tight font-bold">
           <span
-            className="h-2.5 w-2.5 rounded-full"
+            className="h-2 w-2 shrink-0 rounded-full"
             style={{ background: you ? PEG_COLORS.me : PEG_COLORS.opponent }}
-            aria-hidden
           />
-          <span className="truncate font-semibold">{name}</span>
-          {dealer && <span className="rounded bg-rum px-1.5 text-[10px] uppercase">dealer</span>}
+          <span className="truncate">{name}</span>
+          {dealer && (
+            <span className="rounded bg-rum px-1 text-[9px] tracking-wide uppercase">dealer</span>
+          )}
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="num text-xl leading-none text-gold" aria-label={`${name} score`}>
+            {score}
+          </span>
+          {powersLeft && powersLeft.length > 0 && (
+            <span className="flex gap-0.5" title="Powers left">
+              {powersLeft.map((p) => (
+                <img key={p} src={POWER_ART[p]} alt={p} className="h-4 w-4" />
+              ))}
+            </span>
+          )}
           {offline && (
-            <span className="rounded bg-red-900/60 px-1.5 text-[10px] uppercase" role="status">
+            <span className="rounded bg-red-900/70 px-1 text-[10px] uppercase" role="status">
               offline{returnBy ? <ReturnClock until={returnBy} /> : null}
             </span>
           )}
-        </div>
-        {powersLeft && powersLeft.length > 0 && (
-          <div className="mt-0.5 text-xs" title="Powers left">
-            {powersLeft.map((p) => (
-              <span key={p} aria-label={p}>
-                {POWER_ICONS[p]}
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="mt-1">{children}</div>
-      </div>
-      <span className="num text-4xl text-gold lantern-glow" aria-label={`${name} score`}>
-        {score}
+          {children}
+        </span>
       </span>
     </section>
   );
@@ -444,7 +576,10 @@ function PlayerStrip({
 
 function Feed({ items }: { items: FeedItem[] }) {
   return (
-    <ol className="flex min-h-20 flex-col gap-0.5 text-sm" aria-label="Game log">
+    <ol
+      className="flex flex-col gap-0.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+      aria-label="Game log"
+    >
       {/* New lines slide in; old ones just drop off the end (animating them out overlapped new lines). */}
 
       {items.map((item, i) => (
@@ -452,7 +587,7 @@ function Feed({ items }: { items: FeedItem[] }) {
           key={item.id}
           initial={{ opacity: 0, x: -12 }}
           animate={{ opacity: i === 0 ? 1 : 0.6 - i * 0.1, x: 0 }}
-          className="flex items-center justify-between gap-2"
+          className="flex items-center justify-center gap-2"
         >
           <span className="truncate">{item.text}</span>
           {item.points !== 0 && (
