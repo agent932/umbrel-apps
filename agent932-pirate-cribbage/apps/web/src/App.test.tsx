@@ -48,16 +48,15 @@ describe("playing vs the bot", () => {
     expect(a).toHaveAttribute("aria-pressed", "true");
     await user.click(throwBtn);
 
-    // After both discard the pone cuts; if that's us, we press the button.
+    // After both discard the pone cuts; if that's us, we press the button. (The cut card stays on
+    // the deck; the log line about it can scroll away as soon as the bot plays.)
+    const cutCard = () => screen.queryByRole("img", { name: /^Cut card:/ });
     await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "Cut the deck" }) ??
-          screen.queryAllByText(/The cut is/)[0],
-      ).toBeTruthy(),
+      expect(screen.queryByRole("button", { name: "Cut the deck" }) ?? cutCard()).toBeTruthy(),
     );
     const cut = screen.queryByRole("button", { name: "Cut the deck" });
     if (cut) await user.click(cut);
-    await waitFor(() => expect(screen.getAllByText(/The cut is/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(cutCard()).toBeTruthy());
     await waitFor(() => expect(hand().getAllByRole("button").length).toBeLessThanOrEqual(4));
   });
 
