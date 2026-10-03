@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.12.1"
+version: "0.13.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Painted panels everywhere: menus, the cut for the deal, the end-of-round
-  count, game over and the Ship's Log now sit on brass-trimmed ship's
-  planking with parchment titles.
+  Online games get chattier: tap the speech-bubble button to call out "Arr!",
+  "Well played, matey", "Shiver me timbers!" and more, shown by your name.
+  After a friendly (unranked) online game, press Rematch to play the same
+  opponent again with the same rules.
 
 
 developer: agent932

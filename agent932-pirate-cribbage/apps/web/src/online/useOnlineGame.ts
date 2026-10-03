@@ -2,13 +2,17 @@ import { useEffect, useState } from "react";
 import type { Seat } from "@pirate/engine";
 import { initialPresentation, present } from "../game/present.js";
 import type { GameController, Presentation, UiAction } from "../game/types.js";
-import type { StateMessage } from "./protocol.js";
+import type { Emote, StateMessage } from "./protocol.js";
 import { socket } from "./socket.js";
 
 interface OnlineState {
   p: Presentation | null;
   names: [string, string];
   avatars: [number | null, number | null];
+  ranked: boolean;
+  emote: { seat: Seat; emote: Emote; key: number } | null;
+  rematch: "none" | "waiting" | "offered";
+  rematchGameId: string | null;
   deadline: number | null;
   online: [boolean, boolean];
   returnBy: [number | null, number | null];
@@ -29,6 +33,10 @@ export function useOnlineGame(
     p: null,
     names: ["You", "Opponent"],
     avatars: [null, null],
+    ranked: false,
+    emote: null,
+    rematch: "none",
+    rematchGameId: null,
     deadline: null,
     online: [true, true],
     returnBy: [null, null],
@@ -40,6 +48,11 @@ export function useOnlineGame(
   useEffect(() => {
     const release = socket.use();
     const stopListening = socket.listen((m) => {
+      // A rematch you asked for has started: it arrives under the new game's id.
+      if (m.t === "matched") {
+        setS((prev) => (prev.rematch === "none" ? prev : { ...prev, rematchGameId: m.gameId }));
+        return;
+      }
       if ("gameId" in m && m.gameId !== gameId) return;
       switch (m.t) {
         case "state":
@@ -51,6 +64,7 @@ export function useOnlineGame(
               p: present(base, m.step.events, m.step.view, names),
               names,
               avatars: m.avatars ?? [null, null],
+              ranked: m.ranked ?? false,
               deadline: m.deadline,
               online: m.online,
               returnBy: m.returnBy ?? [null, null],
@@ -67,6 +81,15 @@ export function useOnlineGame(
           break;
         case "forfeit":
           setS((prev) => ({ ...prev, forfeitedBy: m.seat }));
+          break;
+        case "emote":
+          setS((prev) => ({ ...prev, emote: { seat: m.seat, emote: m.emote, key: Date.now() } }));
+          break;
+        case "rematchOffer":
+          setS((prev) => (prev.rematch === "waiting" ? prev : { ...prev, rematch: "offered" }));
+          break;
+        case "rematchWaiting":
+          setS((prev) => ({ ...prev, rematch: "waiting" }));
           break;
         case "error":
           setS((prev) => ({ ...prev, error: m.message }));
@@ -92,6 +115,12 @@ export function useOnlineGame(
     ranked: true,
     online: {
       avatars: s.avatars,
+      ranked: s.ranked,
+      emote: s.emote,
+      sendEmote: (emote: Emote) => socket.send({ t: "emote", gameId, emote }),
+      rematch: s.rematch,
+      requestRematch: () => socket.send({ t: "rematch", gameId }),
+      rematchGameId: s.rematchGameId,
       deadline: s.deadline,
       online: s.online,
       returnBy: s.returnBy,

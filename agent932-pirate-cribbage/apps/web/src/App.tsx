@@ -62,6 +62,12 @@ function RemotePlay({ res, botDelay, ...rest }: PlayProps & { res: GameResponse 
 
 function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) {
   const game = useOnlineGame(gameId);
+  const [, navigate] = useLocation();
+  // Both players asked for a rematch: on to the new game.
+  const rematch = "loading" in game ? null : (game.online?.rematchGameId ?? null);
+  useEffect(() => {
+    if (rematch) navigate(`/online/${rematch}`);
+  }, [rematch, navigate]);
   if ("loading" in game) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">

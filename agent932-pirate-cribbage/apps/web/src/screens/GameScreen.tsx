@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   type Card as CardType,
   type PowerId,
+  type Seat,
   POWER_INFO,
   cardLabel,
   cardValue,
@@ -18,6 +19,8 @@ import { HandSlot } from "../components/table/HandSlot.js";
 import { ScorePops } from "../components/table/ScorePops.js";
 import { buzz } from "../haptics.js";
 import { avatarUrl } from "../brand/avatars.js";
+import { EMOTES, type Emote } from "../online/protocol.js";
+import blankButtonUrl from "../assets/table/btn-blank.webp";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
 import { CountThenShow } from "../components/Counting.js";
@@ -48,6 +51,8 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
   const oppName = label[opp];
   const upright = useUpright();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [emotesOpen, setEmotesOpen] = useState(false);
+  const callout = useCallout(online?.emote ?? null);
 
   // Sound effects for each new step.
   useEffect(() => {
@@ -234,6 +239,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
           powersLeft={pirate ? view.opponentPowersLeft : undefined}
           offline={online ? !online.online[opp] : false}
           returnBy={online?.returnBy[opp] ?? null}
+          callout={callout?.seat === opp ? EMOTES[callout.emote] : null}
         />
 
         {/* What's happening now, and the last thing that happened. */}
@@ -355,6 +361,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
         </div>
         <PlayerChip
           className="t-you-chip"
+          callout={callout?.seat === me ? EMOTES[callout.emote] : null}
           name={label[me]}
           score={view.scores[me]}
           dealer={view.dealer === me}
@@ -399,6 +406,51 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
           </div>
         )}
       </div>
+
+      {online && view.phase !== "gameOver" && (
+        <div className="t-emote">
+          <button
+            type="button"
+            className="t-round grid place-items-center"
+            style={{ backgroundImage: `url("${blankButtonUrl}")` }}
+            aria-label="Call out"
+            aria-expanded={emotesOpen}
+            onClick={() => setEmotesOpen((o) => !o)}
+          >
+            <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
+              <path
+                d="M4 5h16v10H9l-4 4v-4H4z"
+                fill="#f3e5c0"
+                stroke="#3a2410"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {emotesOpen && (
+            <div
+              className="t-emote-menu panel flex w-48 flex-col gap-1 p-2"
+              role="menu"
+              aria-label="Call outs"
+            >
+              {(Object.keys(EMOTES) as Emote[]).map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  role="menuitem"
+                  className="rounded-lg px-3 py-1.5 text-left text-sm font-bold hover:bg-gold/20"
+                  onClick={() => {
+                    online.sendEmote(e);
+                    setEmotesOpen(false);
+                  }}
+                >
+                  {EMOTES[e]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {menuOpen && (
         <div
@@ -484,10 +536,29 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar }: Pro
                   Play again
                 </button>
               )}
+              {online && !online.ranked && online.forfeitedBy == null && (
+                <button
+                  type="button"
+                  className="btn-primary flex-1"
+                  disabled={online.rematch === "waiting"}
+                  onClick={online.requestRematch}
+                >
+                  {online.rematch === "waiting"
+                    ? `Waiting for ${oppName}…`
+                    : online.rematch === "offered"
+                      ? "Accept rematch"
+                      : "Rematch"}
+                </button>
+              )}
               <button type="button" className="btn-secondary flex-1" onClick={onExit}>
                 Harbour
               </button>
             </div>
+            {online?.rematch === "offered" && (
+              <p className="mt-2 text-center text-sm text-gold" role="status">
+                {oppName} wants a rematch!
+              </p>
+            )}
           </CountThenShow>
         </Modal>
       )}
@@ -520,6 +591,20 @@ function useUpright() {
   return upright;
 }
 
+/** The latest call-out, for a couple of seconds. */
+function useCallout(emote: { seat: Seat; emote: Emote; key: number } | null) {
+  const [shown, setShown] = useState(emote);
+  useEffect(() => {
+    if (!emote) return;
+    // Shown from an effect because it reacts to a message arriving.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShown(emote);
+    const t = setTimeout(() => setShown((s) => (s?.key === emote.key ? null : s)), 2600);
+    return () => clearTimeout(t);
+  }, [emote]);
+  return shown;
+}
+
 function PlayerChip({
   className,
   name,
@@ -530,6 +615,7 @@ function PlayerChip({
   powersLeft,
   offline,
   returnBy,
+  callout,
   children,
 }: {
   className: string;
@@ -543,10 +629,17 @@ function PlayerChip({
   offline?: boolean;
   /** When an offline opponent forfeits unless they're back. */
   returnBy?: number | null;
+  /** Something they just called out ("Arr!"), shown in a speech bubble. */
+  callout?: string | null;
   children?: React.ReactNode;
 }) {
   return (
-    <section className={`t-chip ${className}`} aria-label={name}>
+    <section className={`t-chip relative ${className}`} aria-label={name}>
+      {callout && (
+        <span className="t-callout" role="status">
+          {callout}
+        </span>
+      )}
       <span
         className="t-avatar"
         style={image ? { background: `url("${image}") center / 118% no-repeat` } : undefined}

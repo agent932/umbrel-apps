@@ -121,6 +121,12 @@ export async function onlineRoutes(
           case "acceptChallenge":
             await matchmaker.acceptChallenge(seeker, msg.challengeId);
             break;
+          case "emote":
+            await rooms.emote(msg.gameId, user.id, msg.emote);
+            break;
+          case "rematch":
+            await matchmaker.rematch(seeker, msg.gameId);
+            break;
           case "declineChallenge":
             matchmaker.declineChallenge(seeker, msg.challengeId);
             break;

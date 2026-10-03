@@ -10,6 +10,11 @@ export const Menu = z.object({
 });
 export type Menu = z.infer<typeof Menu>;
 
+/** Quick lines a player can call out during an online game. */
+export const EMOTES = ["ahoy", "arr", "wellPlayed", "shiver", "yoho", "oops"] as const;
+export const Emote = z.enum(EMOTES);
+export type Emote = z.infer<typeof Emote>;
+
 /** Messages from the browser. */
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("queue"), menu: Menu }),
@@ -23,6 +28,9 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("challenge"), friendId: z.string().uuid(), menu: Menu }),
   z.object({ t: z.literal("acceptChallenge"), challengeId: z.string().max(40) }),
   z.object({ t: z.literal("declineChallenge"), challengeId: z.string().max(40) }),
+  z.object({ t: z.literal("emote"), gameId: z.string().uuid(), emote: Emote }),
+  /** Play the same opponent again with the same rules (unranked games only). */
+  z.object({ t: z.literal("rematch"), gameId: z.string().uuid() }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -39,6 +47,7 @@ export type ServerMessage =
       names: [string, string];
       /** Each player's crew portrait (1-8), or null for their initial. */
       avatars: [number | null, number | null];
+      ranked: boolean;
       step: { events: GameEvent[]; view: PlayerView };
       /** When the server will move for whoever is holding things up (ms since epoch). */
       deadline: number | null;
@@ -61,4 +70,9 @@ export type ServerMessage =
   | { t: "challengeDeclined"; challengeId: string; by: string }
   /** Your friends list changed (a request arrived, was accepted, or removed). */
   | { t: "friends" }
+  | { t: "emote"; gameId: string; seat: Seat; emote: Emote }
+  /** Your opponent wants a rematch of this finished game. */
+  | { t: "rematchOffer"; gameId: string; from: string }
+  /** You asked for a rematch; waiting for your opponent. */
+  | { t: "rematchWaiting"; gameId: string }
   | { t: "error"; message: string; gameId?: string };

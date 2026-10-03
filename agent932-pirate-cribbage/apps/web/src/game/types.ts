@@ -1,3 +1,4 @@
+import type { Emote } from "../online/protocol.js";
 import type { BotLevel, Card, GameEvent, PlayerView, Seat } from "@pirate/engine";
 
 /** What the table asks for. Seats and randomness are filled in by whoever runs the game. */
@@ -42,6 +43,15 @@ export interface OnlineInfo {
   online: [boolean, boolean];
   /** Each player's crew portrait (1-8), or null for their initial. */
   avatars: [number | null, number | null];
+  ranked: boolean;
+  /** The latest call-out from either player, to show by their name. */
+  emote: { seat: Seat; emote: Emote; key: number } | null;
+  sendEmote: (emote: Emote) => void;
+  /** Rematch: nobody asked, you asked, or your opponent asked. */
+  rematch: "none" | "waiting" | "offered";
+  requestRematch: () => void;
+  /** Set when the rematch has started: the new game to go to. */
+  rematchGameId: string | null;
   /** When a disconnected player forfeits unless they're back (ms since epoch). */
   returnBy: [number | null, number | null];
   /** Seats that pressed "Next round" on the summary. */

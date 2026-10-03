@@ -159,4 +159,40 @@ describe("online game screen", () => {
     await user.click(screen.getByRole("button", { name: "Forfeit" }));
     expect(ws.sent.at(-1)).toEqual({ t: "forfeit", gameId });
   });
+  it("calls out to the other player, and offers a rematch when the game is over", async () => {
+    const user = userEvent.setup();
+    const gameId = "44444444-4444-4444-8444-444444444444";
+    render(<OnlineTable gameId={gameId} />);
+    await opened();
+    const ws = FakeSocket.last!;
+    const state = applyAction(createGame(0, CLASSIC_RULES), {
+      type: "deal",
+      deck: shuffle(createDeck()),
+    }).state;
+    const message = (view: ReturnType<typeof viewFor>): ServerMessage => ({
+      t: "state",
+      gameId,
+      seat: 0,
+      names: ["Anne", "Bonny"],
+      ranked: false,
+      step: { events: [], view },
+      deadline: null,
+      online: [true, true],
+      returnBy: [null, null],
+      nextRoundReady: [],
+    });
+    ws.push(message(viewFor(state, 0)));
+
+    await user.click(screen.getByRole("button", { name: "Call out" }));
+    await user.click(screen.getByRole("menuitem", { name: "Arr!" }));
+    expect(ws.sent.at(-1)).toEqual({ t: "emote", gameId, emote: "arr" });
+    ws.push({ t: "emote", gameId, seat: 1, emote: "shiver" });
+    expect(screen.getByLabelText("Bonny")).toHaveTextContent("Shiver me timbers!");
+
+    ws.push(message({ ...viewFor(state, 0), phase: "gameOver", winner: 0, skunk: 0 }));
+    ws.push({ t: "rematchOffer", gameId, from: "Bonny" });
+    expect(screen.getByText("Bonny wants a rematch!")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Accept rematch" }));
+    expect(ws.sent.at(-1)).toEqual({ t: "rematch", gameId });
+  });
 });

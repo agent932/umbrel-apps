@@ -630,6 +630,39 @@ body {
   }
 }
 
+/* Online call-outs: the button sits at the foot of the rail; bubbles pop up by each name. */
+.t-emote {
+  position: absolute;
+  z-index: 6;
+  right: calc(5cqw - 27px);
+  bottom: 3cqh;
+}
+.t-emote-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+}
+.t-callout {
+  position: absolute;
+  left: 44px;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  padding: 5px 10px;
+  border-radius: 12px 12px 12px 2px;
+  background: var(--color-parchment);
+  color: #3a2410;
+  font-weight: 800;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 0.5);
+  animation: pop-in 220ms ease-out;
+}
+.t-opp-chip .t-callout {
+  bottom: auto;
+  top: calc(100% + 6px);
+  border-radius: 2px 12px 12px 12px;
+}
+
 /* Big screens: scale the table's controls up with the cards. */
 .t-chip,
 .t-round,
@@ -713,5 +746,22 @@ body {
   }
   .t-pop {
     animation-name: t-pop-port;
+  }
+  /* Beside the board, which leaves a little room on each side. */
+  .t-emote {
+    right: auto;
+    left: 4px;
+    bottom: auto;
+    top: calc(20.5cqh - 22px);
+  }
+  .t-emote > .t-round {
+    width: 44px;
+    height: 44px;
+  }
+  .t-emote-menu {
+    right: auto;
+    left: 0;
+    bottom: auto;
+    top: calc(100% + 8px);
   }
 }

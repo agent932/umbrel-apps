@@ -8,6 +8,17 @@ export interface Menu {
   ranked?: boolean;
 }
 
+/** Quick lines a player can call out during an online game. */
+export const EMOTES = {
+  ahoy: "Ahoy!",
+  arr: "Arr!",
+  wellPlayed: "Well played, matey",
+  shiver: "Shiver me timbers!",
+  yoho: "Yo ho ho!",
+  oops: "Blimey…",
+} as const;
+export type Emote = keyof typeof EMOTES;
+
 export type ClientMessage =
   | { t: "queue"; menu: Menu }
   | { t: "cancelQueue" }
@@ -18,6 +29,8 @@ export type ClientMessage =
   | { t: "act"; gameId: string; action: UiAction }
   | { t: "forfeit"; gameId: string }
   | { t: "challenge"; friendId: string; menu: Menu }
+  | { t: "emote"; gameId: string; emote: Emote }
+  | { t: "rematch"; gameId: string }
   | { t: "acceptChallenge"; challengeId: string }
   | { t: "declineChallenge"; challengeId: string };
 
@@ -28,6 +41,7 @@ export type StateMessage = {
   names: [string, string];
   /** Each player's crew portrait (1-8), or null for their initial. */
   avatars?: [number | null, number | null];
+  ranked?: boolean;
   step: { events: GameEvent[]; view: PlayerView };
   deadline: number | null;
   online: [boolean, boolean];
@@ -55,4 +69,7 @@ export type ServerMessage =
   | { t: "challengeSent"; challengeId: string; to: string }
   | { t: "challengeDeclined"; challengeId: string; by: string }
   | { t: "friends" }
+  | { t: "emote"; gameId: string; seat: Seat; emote: Emote }
+  | { t: "rematchOffer"; gameId: string; from: string }
+  | { t: "rematchWaiting"; gameId: string }
   | { t: "error"; message: string; gameId?: string };

@@ -224,6 +224,48 @@ describe("online play", () => {
     await app2.close();
   });
 
+  describe("emotes", () => {
+    it("passes a call-out to both players, but not a flood of them", async () => {
+      const { gameId, a, b, sa } = await pair();
+      a.send({ t: "emote", gameId, emote: "arr" });
+      const seen = { gameId, seat: sa.seat, emote: "arr", t: "emote" };
+      expect(await a.next((m) => m.t === "emote")).toMatchObject(seen);
+      expect(await b.next((m) => m.t === "emote")).toMatchObject(seen);
+      // A second one straight away is dropped; the next message Bonny sees is her own.
+      a.send({ t: "emote", gameId, emote: "ahoy" });
+      b.send({ t: "emote", gameId, emote: "wellPlayed" });
+      expect(await b.next((m) => m.t === "emote")).toMatchObject({ emote: "wellPlayed" });
+    });
+  });
+
+  describe("rematch", () => {
+    it("starts a new game with the same rules once both players ask", async () => {
+      const { gameId, a, b } = await pair(LONG, "pirate");
+      await playOut(gameId, [a, b]);
+      a.send({ t: "rematch", gameId });
+      expect(await a.next((m) => m.t === "rematchWaiting")).toMatchObject({ gameId });
+      expect(await b.next((m) => m.t === "rematchOffer")).toMatchObject({ gameId, from: "Anne" });
+      b.send({ t: "rematch", gameId });
+      const { gameId: next } = await a.next<Extract<ServerMessage, { t: "matched" }>>(
+        (m) => m.t === "matched",
+      );
+      expect(next).not.toBe(gameId);
+      expect(await b.next((m) => m.t === "matched")).toMatchObject({ gameId: next });
+      b.send({ t: "watch", gameId: next });
+      const s = await b.next<StateMsg>((m) => m.t === "state" && m.gameId === next);
+      expect(s.step.view.rules.pirate).toBeTruthy();
+    }, 60_000);
+
+    it("isn't offered for ranked games or games still being played", async () => {
+      t = await testApp(undefined, LONG);
+      const { gameId, a } = await matchedPair(t, { variant: "classic", ranked: true });
+      a.send({ t: "rematch", gameId });
+      expect(await a.next((m) => m.t === "error")).toMatchObject({
+        message: expect.stringMatching(/isn't over/),
+      });
+    });
+  });
+
   describe("invites", () => {
     it("lets a friend join with the code", async () => {
       t = await testApp(undefined, LONG);

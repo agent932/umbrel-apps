@@ -25,7 +25,10 @@ import type { ClientAction } from "../games/actions.js";
 import { type RatingChange, type Tx, recordMatch } from "../games/record.js";
 import { toEngineAction } from "../games/toEngine.js";
 import { currentSeason } from "../seasons/seasons.js";
-import type { ServerMessage } from "./protocol.js";
+import type { Emote, ServerMessage } from "./protocol.js";
+
+/** The shortest gap between one player's emotes. */
+const EMOTE_GAP_MS = 2500;
 
 export interface Timing {
   /** Time to make a move before the server makes a sensible one for you. */
@@ -61,6 +64,8 @@ export class RoomError extends Error {}
 class Room {
   readonly clients: [Set<Client>, Set<Client>] = [new Set(), new Set()];
   nextRoundVotes = new Set<Seat>();
+  /** When each seat last called out an emote (rate limit). */
+  lastEmote: [number, number] = [0, 0];
   turnTimer: ReturnType<typeof setTimeout> | null = null;
   deadline: number | null = null;
   disconnectTimers: [ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null] = [
@@ -236,6 +241,39 @@ export class RoomManager {
     });
   }
 
+  /** Pass a quick call-out ("Arr!") to both players. At most one every few seconds each. */
+  async emote(gameId: string, userId: string, emote: Emote): Promise<void> {
+    const room = this.rooms.get(gameId);
+    const seat = room?.seatOf(userId);
+    if (!room || seat == null) throw new RoomError("You're not in that game");
+    const now = Date.now();
+    if (now - room.lastEmote[seat] < EMOTE_GAP_MS) return;
+    room.lastEmote[seat] = now;
+    this.broadcast(room, () => ({ t: "emote", gameId, seat, emote }));
+  }
+
+  /** Who played a finished online game and how, for a rematch. Null if it isn't one. */
+  async rematchInfo(gameId: string) {
+    const [row] = await this.db
+      .select()
+      .from(games)
+      .where(and(eq(games.id, gameId), eq(games.mode, "online")));
+    if (!row || !row.user2Id || !row.finishedAt) return null;
+    const people = await this.db
+      .select({ id: users.id, username: users.username, avatar: users.avatar })
+      .from(users)
+      .where(or(eq(users.id, row.userId), eq(users.id, row.user2Id)));
+    const player = (id: string) => {
+      const p = people.find((x) => x.id === id);
+      return { userId: id, username: p?.username ?? "Pirate", avatar: p?.avatar ?? null };
+    };
+    return {
+      players: [player(row.userId), player(row.user2Id)] as const,
+      rules: row.state.rules,
+      ranked: row.ranked,
+    };
+  }
+
   async forfeitByUser(gameId: string, userId: string): Promise<void> {
     const room = await this.load(gameId);
     const seat = room?.seatOf(userId);
@@ -404,6 +442,7 @@ export class RoomManager {
       seat,
       names: [room.players[0].username, room.players[1].username],
       avatars: [room.players[0].avatar ?? null, room.players[1].avatar ?? null],
+      ranked: room.ranked,
       step: { events: events.map((e) => redactEvent(e, seat)), view: viewFor(room.state, seat) },
       deadline: room.state.phase === "gameOver" ? null : room.deadline,
       online: [room.online(0), room.online(1)],

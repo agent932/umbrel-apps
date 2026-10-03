@@ -25,6 +25,9 @@ export class Matchmaker {
   private queues = new Map<string, Seeker>();
   private invites = new Map<string, { host: Seeker; menu: Menu; expires: number }>();
 
+  /** Finished games where one player asked for a rematch: game id -> who asked. */
+  private rematches = new Map<string, string>();
+
   /** Games that started while their host was offline; told as soon as they reconnect. */
   private pendingMatches = new Map<string, string>();
 
@@ -91,6 +94,27 @@ export class Matchmaker {
     }
     guest.client.send({ t: "matched", gameId });
     return gameId;
+  }
+
+  /** Ask to play the same opponent again. When both have asked, the new game starts. */
+  async rematch(seeker: Seeker, gameId: string): Promise<string | null> {
+    const info = await this.rooms.rematchInfo(gameId);
+    if (!info) throw new RoomError("That game isn't over yet");
+    if (info.ranked) throw new RoomError("Ranked games can't be rematched; queue up again");
+    const me = info.players.findIndex((p) => p.userId === seeker.userId);
+    if (me < 0) throw new RoomError("You weren't in that game");
+    const opponent = info.players[1 - me]!;
+    const asked = this.rematches.get(gameId);
+    if (!asked || asked === seeker.userId) {
+      this.rematches.set(gameId, seeker.userId);
+      seeker.client.send({ t: "rematchWaiting", gameId });
+      this.presence.notify(opponent.userId, { t: "rematchOffer", gameId, from: seeker.username });
+      return null;
+    }
+    this.rematches.delete(gameId);
+    const newId = await this.rooms.create(info.players[0], info.players[1], info.rules, false);
+    for (const p of info.players) this.presence.notify(p.userId, { t: "matched", gameId: newId });
+    return newId;
   }
 
   /** A player just connected: tell them about a game a friend started while they were away. */
