@@ -102,3 +102,9 @@ export function playEvents(events: GameEvent[], me: Seat) {
     }
   }
 }
+
+/** A short chime for each score while hands are counted out. */
+export function chime(points: number) {
+  const base = 784;
+  tone(base * 2 ** (Math.min(points, 6) / 12), 0, 0.14, "triangle", 0.08);
+}

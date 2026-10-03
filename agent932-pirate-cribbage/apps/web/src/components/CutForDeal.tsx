@@ -98,12 +98,17 @@ export function CutReveal({
   const [shown, setShown] = useState<{ cards: [CardType, CardType]; dealer: Seat } | null>(null);
   useEffect(() => {
     if (!done) return;
-    // Shown when the dealer is decided; it hides itself after a moment.
+    // Shown when the dealer is decided.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShown({ cards: done.cards, dealer: done.dealer });
+  }, [done]);
+  // Hides itself after a moment. Its own timer: new game events (like the deal) arriving must
+  // not cancel it, or the reveal would stay up until tapped.
+  useEffect(() => {
+    if (!shown) return;
     const t = setTimeout(() => setShown(null), 2400);
     return () => clearTimeout(t);
-  }, [done]);
+  }, [shown]);
   if (!shown) return null;
   const meDeal = shown.dealer === me;
   return (

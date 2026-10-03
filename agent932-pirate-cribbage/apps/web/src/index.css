@@ -96,6 +96,32 @@ body {
     transform: translateX(-50%);
   }
 }
+@keyframes float-up {
+  from {
+    transform: translate(-50%, 6px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -18px);
+    opacity: 0;
+  }
+}
+@keyframes float-up-right {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}
 @keyframes pop-in {
   from {
     transform: translateY(12px) scale(0.92);
@@ -113,5 +139,21 @@ body {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+/* ---------- Pirate scenes (see brand/Cinematics.tsx): the overlay fades in and out. ---------- */
+@keyframes cin-fade {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }

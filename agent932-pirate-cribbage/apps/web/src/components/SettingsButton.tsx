@@ -40,6 +40,15 @@ export function SettingsButton() {
               className="accent-[var(--color-gold)]"
             />
           </label>
+          <label className="mt-2 flex items-center justify-between gap-2">
+            Pirate animations
+            <input
+              type="checkbox"
+              checked={settings.animations}
+              onChange={(e) => updateSettings({ animations: e.target.checked })}
+              className="accent-[var(--color-gold)]"
+            />
+          </label>
           <fieldset className="mt-3">
             <legend className="mb-1 text-parchment/70">Cap'n Bot's speed</legend>
             <div className="flex gap-1">

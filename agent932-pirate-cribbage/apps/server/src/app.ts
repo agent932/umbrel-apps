@@ -1,3 +1,4 @@
+import { sep } from "node:path";
 import Fastify from "fastify";
 import fastifyCookie from "@fastify/cookie";
 import fastifyHelmet from "@fastify/helmet";
@@ -112,7 +113,15 @@ export async function buildApp({
   await app.register(adminRoutes, { db, rooms, presence });
 
   if (webDist) {
-    await app.register(fastifyStatic, { root: webDist });
+    await app.register(fastifyStatic, {
+      root: webDist,
+      // Painted scene clips are large and rarely change: let browsers keep them for a week.
+      setHeaders: (res, path) => {
+        if (path.includes(`${sep}cinematics${sep}`)) {
+          res.header("cache-control", "public, max-age=604800");
+        }
+      },
+    });
     // Single-page app: unknown non-API routes fall back to index.html.
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith("/api/")) return reply.code(404).send({ error: "Not found" });

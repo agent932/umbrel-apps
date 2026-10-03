@@ -7,6 +7,7 @@ import {
   handScoreParts,
 } from "@pirate/engine";
 import { Card } from "./Card.js";
+import { CountThenShow } from "./Counting.js";
 
 type ShowEvent = Extract<GameEvent, { type: "hand" | "crib" }>;
 
@@ -21,6 +22,8 @@ interface Props {
   /** Your six cards and throw this round, for the discard review. */
   decision?: { hand: CardType[]; discarded: CardType[] } | null;
   isDealer?: boolean;
+  /** Skip the counting animation (tests). */
+  instant?: boolean;
 }
 
 /** How your throw compared with the best one, by expected points (hand over every cut ± crib). */
@@ -102,17 +105,21 @@ export function RoundSummary({
   waitingNote,
   decision,
   isDealer = false,
+  instant,
 }: Props) {
   return (
     <Modal title="The Show">
-      {decision && <DiscardReview decision={decision} isDealer={isDealer} />}
-      <ShowList show={show} cut={cut} names={names} />
-      {onNext && (
-        <button type="button" className="btn-primary mt-4 w-full" onClick={onNext} autoFocus>
-          {nextLabel}
-        </button>
-      )}
-      {waitingNote && <p className="mt-4 text-center text-parchment/70">{waitingNote}</p>}
+      {/* Count each hand out in order first, then the totals and the next-round button. */}
+      <CountThenShow show={show} cut={cut} names={names} instant={instant}>
+        {decision && <DiscardReview decision={decision} isDealer={isDealer} />}
+        <ShowList show={show} cut={cut} names={names} />
+        {onNext && (
+          <button type="button" className="btn-primary mt-4 w-full" onClick={onNext} autoFocus>
+            {nextLabel}
+          </button>
+        )}
+        {waitingNote && <p className="mt-4 text-center text-parchment/70">{waitingNote}</p>}
+      </CountThenShow>
     </Modal>
   );
 }

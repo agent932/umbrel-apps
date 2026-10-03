@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.8.5"
+version: "0.9.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,12 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Friendlier online games: you now have 5 minutes (up from 2) to come back
-  before forfeiting, your opponent sees a countdown while you're away, and the
-  game reconnects the moment you return to the tab.
+  Pirate showtime! Each player now cuts a card from the deck to decide who
+  deals first. At the end of each round both hands and the crib are counted
+  out step by step in the proper order ("fifteen two, fifteen four, a pair is six").
+  Pirate powers, buried treasure, the Kraken, the Black Spot and skunks now
+  play short, painted animated scenes. You can tap to skip them or turn them
+  off in Settings.
 
 
 developer: agent932

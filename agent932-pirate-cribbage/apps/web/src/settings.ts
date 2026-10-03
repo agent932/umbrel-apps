@@ -6,10 +6,12 @@ export interface Settings {
   speed: "slow" | "normal" | "fast";
   /** Peggy the parrot's commentary during games. */
   peggy: boolean;
+  /** Short pirate animations for powers, treasure, the Kraken, the Black Spot and skunks. */
+  animations: boolean;
 }
 
 const KEY = "pirate-cribbage:settings";
-const DEFAULTS: Settings = { sound: true, speed: "normal", peggy: true };
+const DEFAULTS: Settings = { sound: true, speed: "normal", peggy: true, animations: true };
 const listeners = new Set<() => void>();
 
 function read(): Settings {

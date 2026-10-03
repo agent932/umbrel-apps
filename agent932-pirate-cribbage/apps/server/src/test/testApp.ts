@@ -13,6 +13,7 @@ export async function testApp(
     fileURLToPath(new URL("../../drizzle", import.meta.url)),
   timing?: Timing,
   messageLimit = 100_000,
+  webDist?: string,
 ) {
   const client = new PGlite();
   const pg = drizzle(client, { schema });
@@ -27,6 +28,7 @@ export async function testApp(
       logger: false,
       timing,
       socketMessageLimit: messageLimit,
+      webDist,
     });
   const app = await build();
   return {

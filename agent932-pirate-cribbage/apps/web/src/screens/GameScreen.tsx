@@ -8,11 +8,13 @@ import {
   other,
   sameCard,
 } from "@pirate/engine";
+import { Cinematics } from "../brand/Cinematics.js";
 import { PeggyChatter } from "../brand/PeggyChatter.js";
 import { Board, PEG_COLORS } from "../components/Board.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
+import { CountThenShow } from "../components/Counting.js";
 import { CutForDealPanel, CutReveal } from "../components/CutForDeal.js";
 import { POWER_ICONS, PowerBar } from "../components/PowerBar.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
@@ -22,9 +24,11 @@ interface Props {
   game: GameController;
   onExit: () => void;
   onPlayAgain: () => void;
+  /** Skip animations (tests that play at full bot speed). */
+  instant?: boolean;
 }
 
-export function GameScreen({ game, onExit, onPlayAgain }: Props) {
+export function GameScreen({ game, onExit, onPlayAgain, instant }: Props) {
   const { p, names: label, act, error, online } = game;
   const view = p.view;
   // Seat-relative: online you may be seat 1.
@@ -332,6 +336,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
 
       <PeggyChatter events={p.lastEvents} me={me} />
       <CutReveal events={p.lastEvents} names={label} me={me} />
+      {!instant && <Cinematics events={p.lastEvents} names={label} me={me} />}
 
       {view.phase === "roundEnd" && (
         <RoundSummary
@@ -340,6 +345,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
           names={label}
           onNext={online && !waitingForMe ? undefined : () => act({ type: "nextRound" })}
           waitingNote={online && !waitingForMe ? `Waiting for ${oppName}…` : undefined}
+          instant={instant}
           decision={view.myDiscardDecision}
           isDealer={view.dealer === me}
         />
@@ -347,26 +353,34 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
 
       {view.phase === "gameOver" && (
         <Modal title={view.winner === me ? "Victory! 🏴‍☠️" : "Defeat…"}>
-          {online?.forfeitedBy != null && (
-            <p className="mb-2 text-center text-parchment/80">
-              {online.forfeitedBy === me ? "You abandoned ship." : `${oppName} abandoned ship.`}
-            </p>
-          )}
-          <p className="mb-3 text-center">
-            {view.winner === me ? "Ye won" : `${oppName} won`} {view.scores[me]}–{view.scores[opp]}
-            {view.skunk === 2 ? " — a double skunk!" : view.skunk === 1 ? " — a skunk!" : "."}
-          </p>
-          {p.show.length > 0 && <ShowList show={p.show} cut={view.cut} names={label} />}
-          <div className="mt-4 flex gap-2">
-            {!online && (
-              <button type="button" className="btn-primary flex-1" onClick={onPlayAgain} autoFocus>
-                Play again
-              </button>
+          <CountThenShow show={p.show} cut={view.cut} names={label} instant={instant}>
+            {online?.forfeitedBy != null && (
+              <p className="mb-2 text-center text-parchment/80">
+                {online.forfeitedBy === me ? "You abandoned ship." : `${oppName} abandoned ship.`}
+              </p>
             )}
-            <button type="button" className="btn-secondary flex-1" onClick={onExit}>
-              Harbour
-            </button>
-          </div>
+            <p className="mb-3 text-center">
+              {view.winner === me ? "Ye won" : `${oppName} won`} {view.scores[me]}–
+              {view.scores[opp]}
+              {view.skunk === 2 ? " — a double skunk!" : view.skunk === 1 ? " — a skunk!" : "."}
+            </p>
+            {p.show.length > 0 && <ShowList show={p.show} cut={view.cut} names={label} />}
+            <div className="mt-4 flex gap-2">
+              {!online && (
+                <button
+                  type="button"
+                  className="btn-primary flex-1"
+                  onClick={onPlayAgain}
+                  autoFocus
+                >
+                  Play again
+                </button>
+              )}
+              <button type="button" className="btn-secondary flex-1" onClick={onExit}>
+                Harbour
+              </button>
+            </div>
+          </CountThenShow>
         </Modal>
       )}
     </main>

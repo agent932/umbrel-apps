@@ -12,6 +12,7 @@ import { ChallengeToast } from "./online/ChallengeToast.js";
 import { JoinInvite, OnlineLobby } from "./online/OnlineLobby.js";
 import { useOnlineGame } from "./online/useOnlineGame.js";
 import { AccountScreen } from "./screens/AccountScreen.js";
+import { AnimationLab } from "./screens/AnimationLab.js";
 import { AdminScreen } from "./screens/AdminScreen.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
 import { FriendsScreen } from "./screens/FriendsScreen.js";
@@ -36,11 +37,23 @@ function useBotDelay(override?: number) {
 }
 
 function LocalPlay({ game, botDelay, ...rest }: PlayProps & { game: LocalGame }) {
-  return <GameScreen game={useLocalGame(game, useBotDelay(botDelay))} {...rest} />;
+  return (
+    <GameScreen
+      game={useLocalGame(game, useBotDelay(botDelay))}
+      instant={botDelay === 0}
+      {...rest}
+    />
+  );
 }
 
 function RemotePlay({ res, botDelay, ...rest }: PlayProps & { res: GameResponse }) {
-  return <GameScreen game={useRemoteGame(res, useBotDelay(botDelay))} {...rest} />;
+  return (
+    <GameScreen
+      game={useRemoteGame(res, useBotDelay(botDelay))}
+      instant={botDelay === 0}
+      {...rest}
+    />
+  );
 }
 
 function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) {
@@ -187,6 +200,11 @@ function Routes({ botDelay }: { botDelay?: number }) {
       <Route path="/signup">
         <AuthScreen mode="signup" />
       </Route>
+      {import.meta.env.DEV && (
+        <Route path="/lab">
+          <AnimationLab />
+        </Route>
+      )}
       <Route path="/account">
         {loading ? null : user ? <AccountScreen /> : <Redirect to="/login" />}
       </Route>
