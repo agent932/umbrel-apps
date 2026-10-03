@@ -30,8 +30,9 @@ export interface PlayerStats {
   wins: number;
   losses: number;
   winRate: number;
-  winRateStartDealer: number;
-  winRateStartPone: number;
+  /** Null when you never started that way (a rate of nothing isn't 0). */
+  winRateStartDealer: number | null;
+  winRateStartPone: number | null;
   winStreak: number;
   winStreakMax: number;
   lossStreak: number;
@@ -156,8 +157,12 @@ export function computeStats(matches: readonly MatchForStats[]): PlayerStats {
     wins,
     losses: ordered.length - wins,
     winRate: rate(wins, ordered.length),
-    winRateStartDealer: rate(startDealer.filter(won).length, startDealer.length),
-    winRateStartPone: rate(startPone.filter(won).length, startPone.length),
+    winRateStartDealer: startDealer.length
+      ? rate(startDealer.filter(won).length, startDealer.length)
+      : null,
+    winRateStartPone: startPone.length
+      ? rate(startPone.filter(won).length, startPone.length)
+      : null,
     winStreak,
     winStreakMax,
     lossStreak,

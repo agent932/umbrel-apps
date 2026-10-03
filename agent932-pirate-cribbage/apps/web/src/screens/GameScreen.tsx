@@ -9,6 +9,8 @@ import {
   sameCard,
 } from "@pirate/engine";
 import { Board } from "../components/Board.js";
+import { SettingsButton } from "../components/SettingsButton.js";
+import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
 import { POWER_ICONS, PowerBar } from "../components/PowerBar.js";
 import { Modal, RoundSummary, ShowList } from "../components/RoundSummary.js";
@@ -27,6 +29,11 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
   const me = view.seat;
   const opp = other(me);
   const oppName = label[opp];
+
+  // Sound effects for each new step.
+  useEffect(() => {
+    if (p.lastEvents.length) playEvents(p.lastEvents, me);
+  }, [p.lastEvents, me]);
   const pirate = view.rules.pirate;
   // The selection belongs to one situation; when the phase or hand changes it's dropped.
   const situation = `${view.round}:${view.phase}:${view.hand.map(cardLabel).join()}`;
@@ -114,8 +121,9 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
         <button type="button" className="text-parchment/70 hover:text-gold" onClick={onExit}>
           ← Harbour
         </button>
-        <span className="text-parchment/70">
+        <span className="flex items-center gap-2 text-parchment/70">
           Round {Math.max(view.round, 1)} · {pirate ? "Pirate rules" : "Classic"}
+          <SettingsButton />
         </span>
         {online && view.phase !== "gameOver" && (
           <button
@@ -386,28 +394,27 @@ function PlayerStrip({
 function Feed({ items }: { items: FeedItem[] }) {
   return (
     <ol className="flex min-h-20 flex-col gap-0.5 text-sm" aria-label="Game log">
-      <AnimatePresence initial={false}>
-        {items.map((item, i) => (
-          <motion.li
-            key={item.id}
-            layout
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: i === 0 ? 1 : 0.6 - i * 0.1, x: 0 }}
-            className="flex items-center justify-between gap-2"
-          >
-            <span className="truncate">{item.text}</span>
-            {item.points !== 0 && (
-              <span
-                className={`shrink-0 rounded-full px-2 text-xs font-bold ${
-                  item.points > 0 ? "bg-gold/25 text-gold" : "bg-red-500/25 text-red-300"
-                }`}
-              >
-                {item.points > 0 ? `+${item.points}` : item.points}
-              </span>
-            )}
-          </motion.li>
-        ))}
-      </AnimatePresence>
+      {/* New lines slide in; old ones just drop off the end (animating them out overlapped new lines). */}
+
+      {items.map((item, i) => (
+        <motion.li
+          key={item.id}
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: i === 0 ? 1 : 0.6 - i * 0.1, x: 0 }}
+          className="flex items-center justify-between gap-2"
+        >
+          <span className="truncate">{item.text}</span>
+          {item.points !== 0 && (
+            <span
+              className={`shrink-0 rounded-full px-2 text-xs font-bold ${
+                item.points > 0 ? "bg-gold/25 text-gold" : "bg-red-500/25 text-red-300"
+              }`}
+            >
+              {item.points > 0 ? `+${item.points}` : item.points}
+            </span>
+          )}
+        </motion.li>
+      ))}
     </ol>
   );
 }

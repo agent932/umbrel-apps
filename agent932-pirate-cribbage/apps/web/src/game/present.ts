@@ -21,7 +21,14 @@ function eventPoints(e: GameEvent): number {
 }
 
 export function initialPresentation(view: PlayerView): Presentation {
-  return { view, feed: [], show: [], backPegs: [view.scores[0], view.scores[1]], nextId: 1 };
+  return {
+    view,
+    feed: [],
+    show: [],
+    backPegs: [view.scores[0], view.scores[1]],
+    nextId: 1,
+    lastEvents: [],
+  };
 }
 
 /** Fold one step (the events of an action and the view after it) into what's on screen. */
@@ -49,6 +56,7 @@ export function present(
     view,
     backPegs,
     nextId,
+    lastEvents: events,
     feed: [...fresh, ...prev.feed].slice(0, 40),
     show: dealt ? [] : [...prev.show, ...shown],
   };

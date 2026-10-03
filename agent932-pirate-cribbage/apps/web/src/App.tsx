@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { ApiError, type GameResponse, api } from "./api.js";
 import { AuthProvider, useAuth } from "./auth.js";
+import { SPEED_FACTOR, useSettings } from "./settings.js";
 import { type LocalGame, loadGame, newLocalGame, saveGame } from "./game/localGame.js";
 import { type MenuChoice, rulesFor } from "./game/menu.js";
-import { useLocalGame } from "./game/useLocalGame.js";
+import { BOT_DELAY_MS, useLocalGame } from "./game/useLocalGame.js";
 import { useRemoteGame } from "./game/useRemoteGame.js";
 import { ChallengeToast } from "./online/ChallengeToast.js";
 import { JoinInvite, OnlineLobby } from "./online/OnlineLobby.js";
@@ -25,12 +26,18 @@ interface PlayProps {
   botDelay?: number;
 }
 
+/** The bot's thinking time: the speed setting, unless a test pins it. */
+function useBotDelay(override?: number) {
+  const { speed } = useSettings();
+  return override ?? Math.round(BOT_DELAY_MS * SPEED_FACTOR[speed]);
+}
+
 function LocalPlay({ game, botDelay, ...rest }: PlayProps & { game: LocalGame }) {
-  return <GameScreen game={useLocalGame(game, botDelay)} {...rest} />;
+  return <GameScreen game={useLocalGame(game, useBotDelay(botDelay))} {...rest} />;
 }
 
 function RemotePlay({ res, botDelay, ...rest }: PlayProps & { res: GameResponse }) {
-  return <GameScreen game={useRemoteGame(res, botDelay)} {...rest} />;
+  return <GameScreen game={useRemoteGame(res, useBotDelay(botDelay))} {...rest} />;
 }
 
 function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) {

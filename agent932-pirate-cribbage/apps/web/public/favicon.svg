@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#0b2a3a"/><text x="32" y="44" font-size="34" text-anchor="middle">☠️</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="56" fill="#0b2a3a"/>
+  <rect x="40" y="150" width="176" height="48" rx="12" fill="#7a3b12"/>
+  <g fill="#f3e5c0">
+    <circle cx="68" cy="166" r="6"/><circle cx="96" cy="166" r="6"/><circle cx="124" cy="166" r="6"/><circle cx="152" cy="166" r="6"/><circle cx="180" cy="166" r="6"/>
+    <circle cx="68" cy="184" r="6"/><circle cx="96" cy="184" r="6"/><circle cx="124" cy="184" r="6"/><circle cx="152" cy="184" r="6"/><circle cx="180" cy="184" r="6"/>
+  </g>
+  <circle cx="124" cy="166" r="7" fill="#d4a017"/>
+  <circle cx="180" cy="184" r="7" fill="#c0392b"/>
+  <path d="M128 40c-30 0-52 20-52 46 0 15 7 27 18 35v13h68v-13c11-8 18-20 18-35 0-26-22-46-52-46z" fill="#f3e5c0"/>
+  <circle cx="108" cy="88" r="12" fill="#0b2a3a"/><circle cx="148" cy="88" r="12" fill="#0b2a3a"/>
+  <path d="M128 100l-7 14h14z" fill="#0b2a3a"/>
+  <path d="M106 124v10M118 124v10M130 124v10M142 124v10" stroke="#0b2a3a" stroke-width="4"/>
+</svg>

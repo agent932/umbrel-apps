@@ -31,6 +31,8 @@ export interface Presentation {
   /** Where each peg was before its last move (the "back peg"). */
   backPegs: [number, number];
   nextId: number;
+  /** Events from the latest step, for sounds. */
+  lastEvents: GameEvent[];
 }
 
 export interface OnlineInfo {

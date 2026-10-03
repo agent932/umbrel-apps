@@ -67,6 +67,7 @@ jobs:
             ${{ env.IMAGE }}:sha-${{ github.sha }}
           # Links the package to this repo so it shows up here and can inherit its visibility.
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          build-args: APP_VERSION=${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

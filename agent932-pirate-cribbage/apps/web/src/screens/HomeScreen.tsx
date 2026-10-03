@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
 import { useAuth } from "../auth.js";
 import { POWER_ICONS } from "../components/PowerBar.js";
+import { SettingsButton } from "../components/SettingsButton.js";
 import type { MenuChoice } from "../game/menu.js";
 
 interface Props {
@@ -74,6 +75,7 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-6">
       <nav className="flex items-center justify-end gap-3 text-sm" aria-label="Account">
+        <SettingsButton />
         {user ? (
           <>
             <span className="mr-auto text-parchment/80">

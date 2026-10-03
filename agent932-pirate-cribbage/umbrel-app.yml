@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.5.0"
+version: "0.6.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,10 +31,9 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Crew and ranked play: add friends by username, see who's online, challenge
-  them directly, and track your head-to-head record. Ranked matches (classic
-  rules) move your rating through Bronze, Silver, Gold, Platinum and Diamond,
-  with a leaderboard and a stats column for each tier.
+  Ready to launch: install it on your phone's home screen, play Cap'n Bot even
+  offline, sound effects (with a mute switch), and a speed setting for the bot.
+  The health check now reports the running version.
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage
@@ -43,7 +42,11 @@ repo: https://github.com/agent932/umbrel-apps
 support: https://github.com/agent932/umbrel-apps/issues
 
 port: 8121
-gallery: []
+gallery:
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-1-harbour.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-2-table.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-3-show.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-4-log.jpg
 path: ""
 
 defaultUsername: ""

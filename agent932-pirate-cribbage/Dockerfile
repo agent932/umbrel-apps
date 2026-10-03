@@ -18,7 +18,10 @@ COPY apps/web/package.json apps/web/
 RUN npm ci --omit=dev -w @pirate/server --include-workspace-root=false
 
 FROM node:22-alpine
-ENV NODE_ENV=production \
+# Shown by /api/health so you can tell which build is running.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION \
+    NODE_ENV=production \
     PORT=3000 \
     WEB_DIST=/app/web \
     MIGRATE_ON_START=true

@@ -195,6 +195,6 @@ describe("games vs the computer", () => {
 describe("health", () => {
   it("reports ok", async () => {
     const res = await t.app.inject({ url: "/api/health" });
-    expect(res.json()).toEqual({ status: "ok", db: "up" });
+    expect(res.json()).toMatchObject({ status: "ok", db: "up", version: "dev" });
   });
 });

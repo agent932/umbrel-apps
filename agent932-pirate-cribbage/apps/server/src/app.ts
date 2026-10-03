@@ -30,9 +30,12 @@ export async function buildApp({ db, checkDb, webDist, logger = true, timing }: 
 
   app.get("/api/health", async (_req, reply) => {
     const dbOk = await checkDb().catch(() => false);
-    return reply
-      .code(dbOk ? 200 : 503)
-      .send({ status: dbOk ? "ok" : "degraded", db: dbOk ? "up" : "down" });
+    return reply.code(dbOk ? 200 : 503).send({
+      status: dbOk ? "ok" : "degraded",
+      db: dbOk ? "up" : "down",
+      version: process.env.APP_VERSION ?? "dev",
+      uptimeSeconds: Math.round(process.uptime()),
+    });
   });
 
   attachSessions(app, db);

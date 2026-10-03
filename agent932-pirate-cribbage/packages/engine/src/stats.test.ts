@@ -154,6 +154,7 @@ describe("computeStats", () => {
   it("returns zeros, not NaN, with no games", () => {
     const s = computeStats([]);
     expect(s.winRate).toBe(0);
+    expect(s.winRateStartPone).toBeNull();
     expect(s.round.avg).toBe(0);
     expect(JSON.stringify(s)).not.toContain("null,null"); // sanity: arrays are numbers
   });
