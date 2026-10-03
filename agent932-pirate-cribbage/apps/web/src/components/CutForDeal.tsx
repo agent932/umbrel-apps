@@ -29,7 +29,7 @@ export function CutForDealPanel({
 
   return (
     <section className="panel flex flex-col items-center gap-4 p-4" aria-label="Cut for the deal">
-      <h2 className="font-pirate text-3xl text-gold">Cut for the deal</h2>
+      <h2 className="scroll-title">Cut for the deal</h2>
       <p className="text-center text-sm text-parchment/80">
         {myTurn
           ? "Pick a card. Low card deals first (aces are low)."

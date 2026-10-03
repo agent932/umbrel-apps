@@ -131,8 +131,8 @@ export function Modal({ title, children }: { title: string; children: React.Reac
       role="dialog"
       aria-label={title}
     >
-      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-gold/40 bg-sea p-5 shadow-2xl">
-        <h2 className="mb-3 text-center font-pirate text-3xl text-gold">{title}</h2>
+      <div className="panel max-h-[90dvh] w-full max-w-md overflow-y-auto p-5">
+        <h2 className="scroll-title mx-auto mb-4">{title}</h2>
         {children}
       </div>
     </div>

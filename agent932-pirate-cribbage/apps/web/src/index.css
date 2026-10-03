@@ -64,9 +64,57 @@ body {
   .btn-secondary {
     @apply rounded-xl border border-gold/50 bg-night/30 px-5 py-2.5 font-bold text-moon backdrop-blur-sm transition hover:border-gold hover:bg-gold/10;
   }
-  /* A frosted panel floating over the sea. */
+  /* A title on a strip of parchment, like a label pinned to the ship's log. */
+  .scroll-title {
+    display: inline-block;
+    width: fit-content;
+    padding: 0.15em 1.1em 0.25em;
+    border-radius: 4px;
+    background:
+      radial-gradient(120% 140% at 50% 50%, transparent 55%, rgb(120 72 22 / 0.35)),
+      url("./assets/ui/parchment.webp") center / cover;
+    color: #3a2410;
+    font-family: var(--font-pirate);
+    font-size: 1.9rem;
+    line-height: 1.15;
+    text-align: center;
+    box-shadow:
+      0 3px 0 rgb(90 55 15 / 0.6),
+      0 8px 16px -6px rgb(0 0 0 / 0.6);
+    clip-path: polygon(
+      0 8%,
+      3% 0,
+      97% 0,
+      100% 8%,
+      98% 50%,
+      100% 92%,
+      97% 100%,
+      3% 100%,
+      0 92%,
+      2% 50%
+    );
+  }
+
+  /* A board of dark ship's planking with a brass trim and a rivet in each corner. */
   .panel {
-    @apply rounded-2xl border border-moon/15 bg-sea-deep/70 shadow-2xl backdrop-blur-md;
+    position: relative;
+    border-radius: 18px;
+    border: 2px solid rgb(201 150 44 / 0.75);
+    background:
+      radial-gradient(circle, #f2cf7c 0 2.5px, #7a5512 3px 4px, transparent 4.5px) left 6px top
+        6px / 11px 11px no-repeat,
+      radial-gradient(circle, #f2cf7c 0 2.5px, #7a5512 3px 4px, transparent 4.5px) right 6px top
+        6px / 11px 11px no-repeat,
+      radial-gradient(circle, #f2cf7c 0 2.5px, #7a5512 3px 4px, transparent 4.5px) left 6px bottom
+        6px / 11px 11px no-repeat,
+      radial-gradient(circle, #f2cf7c 0 2.5px, #7a5512 3px 4px, transparent 4.5px) right 6px bottom
+        6px / 11px 11px no-repeat,
+      linear-gradient(rgb(6 20 30 / 0.58), rgb(6 20 30 / 0.76)),
+      url("./assets/table/table-land.webp") center / cover;
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.5),
+      inset 0 2px 22px rgb(0 0 0 / 0.55),
+      0 18px 40px -10px rgb(0 0 0 / 0.7);
   }
 }
 

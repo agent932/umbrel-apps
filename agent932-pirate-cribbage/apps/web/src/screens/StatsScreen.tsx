@@ -166,9 +166,9 @@ export function StatsScreen() {
 
       {data && (
         <>
-          <div className="overflow-x-auto rounded-xl border border-parchment/15">
+          <div className="panel overflow-x-auto p-2">
             <table className="w-full min-w-[560px] text-sm">
-              <thead className="sticky top-0 bg-sea">
+              <thead className="sticky top-0 bg-night/90">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold text-parchment/70">Stat</th>
                   {data.buckets.map((b) => (
@@ -181,11 +181,8 @@ export function StatsScreen() {
               {SECTIONS.map((section) => (
                 <tbody key={section.title}>
                   <tr>
-                    <th
-                      colSpan={data.buckets.length + 1}
-                      className="bg-sea-deep/70 px-3 py-1.5 text-left font-pirate text-lg text-gold"
-                    >
-                      {section.title}
+                    <th colSpan={data.buckets.length + 1} className="px-3 pt-4 pb-1.5 text-left">
+                      <span className="scroll-title !text-lg">{section.title}</span>
                     </th>
                   </tr>
                   {section.rows.map((row) => (
@@ -203,9 +200,9 @@ export function StatsScreen() {
             </table>
           </div>
 
-          <section className="flex flex-col gap-4 rounded-xl border border-parchment/15 p-4">
+          <section className="panel flex flex-col gap-4 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="mr-2 font-pirate text-2xl text-gold">Charts</h2>
+              <h2 className="scroll-title mr-2 !text-xl">Charts</h2>
               {data.buckets.map((b) => (
                 <button
                   key={b.key}
