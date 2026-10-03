@@ -9,7 +9,7 @@ import {
   sameCard,
 } from "@pirate/engine";
 import { PeggyChatter } from "../brand/PeggyChatter.js";
-import { Board } from "../components/Board.js";
+import { Board, PEG_COLORS } from "../components/Board.js";
 import { SettingsButton } from "../components/SettingsButton.js";
 import { playEvents } from "../sound.js";
 import { Card } from "../components/Card.js";
@@ -363,7 +363,11 @@ function PlayerStrip({
     <section className="flex items-center justify-between gap-3" aria-label={name}>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${you ? "bg-gold" : "bg-[#e05252]"}`} />
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: you ? PEG_COLORS.me : PEG_COLORS.opponent }}
+            aria-hidden
+          />
           <span className="truncate font-semibold">{name}</span>
           {dealer && <span className="rounded bg-rum px-1.5 text-[10px] uppercase">dealer</span>}
           {offline && (
