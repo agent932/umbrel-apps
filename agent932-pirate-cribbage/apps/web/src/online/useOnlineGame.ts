@@ -10,6 +10,7 @@ interface OnlineState {
   names: [string, string];
   deadline: number | null;
   online: [boolean, boolean];
+  returnBy: [number | null, number | null];
   nextRoundReady: Seat[];
   forfeitedBy: Seat | null;
   error: string | null;
@@ -28,6 +29,7 @@ export function useOnlineGame(
     names: ["You", "Opponent"],
     deadline: null,
     online: [true, true],
+    returnBy: [null, null],
     nextRoundReady: [],
     forfeitedBy: null,
     error: null,
@@ -48,6 +50,7 @@ export function useOnlineGame(
               names,
               deadline: m.deadline,
               online: m.online,
+              returnBy: m.returnBy ?? [null, null],
               nextRoundReady: m.nextRoundReady,
               error: null,
             };
@@ -57,7 +60,7 @@ export function useOnlineGame(
           setS((prev) => ({ ...prev, nextRoundReady: m.ready }));
           break;
         case "presence":
-          setS((prev) => ({ ...prev, online: m.online }));
+          setS((prev) => ({ ...prev, online: m.online, returnBy: m.returnBy ?? [null, null] }));
           break;
         case "forfeit":
           setS((prev) => ({ ...prev, forfeitedBy: m.seat }));
@@ -87,6 +90,7 @@ export function useOnlineGame(
     online: {
       deadline: s.deadline,
       online: s.online,
+      returnBy: s.returnBy,
       nextRoundReady: s.nextRoundReady,
       forfeitedBy: s.forfeitedBy,
       forfeit: () => socket.send({ t: "forfeit", gameId }),

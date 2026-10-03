@@ -31,14 +31,14 @@ export interface Timing {
   turnMs: number;
   /** Time on the round summary before the next round starts anyway. */
   nextRoundMs: number;
-  /** Time to reconnect before forfeiting. */
+  /** Time to reconnect before forfeiting (5 minutes: long enough to step away or switch apps). */
   disconnectMs: number;
 }
 
 export const DEFAULT_TIMING: Timing = {
   turnMs: 60_000,
   nextRoundMs: 30_000,
-  disconnectMs: 120_000,
+  disconnectMs: 5 * 60_000,
 };
 
 /** Anything that can receive messages: a WebSocket in production, a fake in tests. */
@@ -65,6 +65,8 @@ class Room {
     null,
     null,
   ];
+  /** When each disconnected player forfeits unless they're back (ms since epoch), or null. */
+  returnBy: [number | null, number | null] = [null, null];
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -178,6 +180,7 @@ export class RoomManager {
         clearTimeout(room.disconnectTimers[seat]!);
         room.disconnectTimers[seat] = null;
       }
+      room.returnBy[seat] = null;
       this.sendState(room, seat, client, []);
       if (!wasOnline) this.broadcastPresence(room);
     });
@@ -190,6 +193,7 @@ export class RoomManager {
     void room.run(async () => {
       for (const seat of [0, 1] as Seat[]) {
         if (!room.clients[seat].delete(client) || room.online(seat)) continue;
+        room.returnBy[seat] = Date.now() + this.timing.disconnectMs;
         this.broadcastPresence(room);
         room.disconnectTimers[seat] = setTimeout(() => {
           void room.run(() => this.forfeit(room, seat));
@@ -379,6 +383,7 @@ export class RoomManager {
       step: { events: events.map((e) => redactEvent(e, seat)), view: viewFor(room.state, seat) },
       deadline: room.state.phase === "gameOver" ? null : room.deadline,
       online: [room.online(0), room.online(1)],
+      returnBy: room.returnBy,
       nextRoundReady: [...room.nextRoundVotes],
     });
   }
@@ -393,6 +398,7 @@ export class RoomManager {
       t: "presence",
       gameId: room.id,
       online: [room.online(0), room.online(1)],
+      returnBy: room.returnBy,
     }));
   }
 

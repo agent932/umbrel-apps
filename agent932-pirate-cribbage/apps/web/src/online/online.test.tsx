@@ -140,9 +140,11 @@ describe("online game screen", () => {
       step: { events: [], view: viewFor(state, 1) },
       deadline: Date.now() + 42_000,
       online: [false, true],
+      returnBy: [Date.now() + 4 * 60_000 + 30_000, null],
       nextRoundReady: [],
     });
     expect(screen.getByLabelText("Anne")).toHaveTextContent(/offline/i);
+    expect(screen.getByLabelText("Anne")).toHaveTextContent(/4:(30|29) to return/);
     expect(screen.getByText(/Throw two cards to Anne's crib/)).toBeInTheDocument();
     expect(screen.getByTitle("Time to move")).toHaveTextContent(/4[12]s/);
 

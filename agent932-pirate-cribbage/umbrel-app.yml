@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.8.4"
+version: "0.8.5"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,8 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Allows Cloudflare Web Analytics through the security policy, for sites
-  published with a Cloudflare Tunnel.
+  Friendlier online games: you now have 5 minutes (up from 2) to come back
+  before forfeiting, your opponent sees a countdown while you're away, and the
+  game reconnects the moment you return to the tab.
+
 
 developer: agent932
 website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage

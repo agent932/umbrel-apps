@@ -39,6 +39,8 @@ export interface OnlineInfo {
   /** When the server will move for whoever is holding things up (ms since epoch). */
   deadline: number | null;
   online: [boolean, boolean];
+  /** When a disconnected player forfeits unless they're back (ms since epoch). */
+  returnBy: [number | null, number | null];
   /** Seats that pressed "Next round" on the summary. */
   nextRoundReady: Seat[];
   forfeit: () => void;

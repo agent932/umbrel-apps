@@ -41,10 +41,17 @@ export type ServerMessage =
       /** When the server will move for whoever is holding things up (ms since epoch). */
       deadline: number | null;
       online: [boolean, boolean];
+      returnBy: [number | null, number | null];
       nextRoundReady: Seat[];
     }
   | { t: "waiting"; gameId: string; for: "nextRound"; ready: Seat[] }
-  | { t: "presence"; gameId: string; online: [boolean, boolean] }
+  | {
+      t: "presence";
+      gameId: string;
+      online: [boolean, boolean];
+      /** When a disconnected player forfeits unless they're back (ms since epoch). */
+      returnBy: [number | null, number | null];
+    }
   | { t: "timeout"; gameId: string; seat: Seat }
   | { t: "forfeit"; gameId: string; seat: Seat }
   | { t: "challenge"; challengeId: string; from: { id: string; username: string }; menu: Menu }

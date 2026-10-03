@@ -29,6 +29,8 @@ export type StateMessage = {
   step: { events: GameEvent[]; view: PlayerView };
   deadline: number | null;
   online: [boolean, boolean];
+  /** When a disconnected player forfeits unless they're back (ms since epoch). */
+  returnBy: [number | null, number | null];
   nextRoundReady: Seat[];
 };
 
@@ -39,7 +41,12 @@ export type ServerMessage =
   | { t: "matched"; gameId: string }
   | StateMessage
   | { t: "waiting"; gameId: string; for: "nextRound"; ready: Seat[] }
-  | { t: "presence"; gameId: string; online: [boolean, boolean] }
+  | {
+      t: "presence";
+      gameId: string;
+      online: [boolean, boolean];
+      returnBy: [number | null, number | null];
+    }
   | { t: "timeout"; gameId: string; seat: Seat }
   | { t: "forfeit"; gameId: string; seat: Seat }
   | { t: "challenge"; challengeId: string; from: { id: string; username: string }; menu: Menu }

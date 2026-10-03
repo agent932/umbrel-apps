@@ -16,6 +16,24 @@ class Socket {
   private timer: ReturnType<typeof setTimeout> | null = null;
   connected = false;
 
+  constructor() {
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (
+          document.visibilityState === "visible" &&
+          this.users > 0 &&
+          !this.connected &&
+          !this.ws
+        ) {
+          if (this.timer) clearTimeout(this.timer);
+          this.timer = null;
+          this.retry = 0;
+          this.open();
+        }
+      });
+    }
+  }
+
   /** Start using the socket; returns a function to stop. The connection closes when nobody uses it. */
   use(): () => void {
     this.users++;

@@ -145,6 +145,7 @@ export function GameScreen({ game, onExit, onPlayAgain }: Props) {
         dealer={view.dealer === opp}
         powersLeft={view.opponentPowersLeft}
         offline={online ? !online.online[opp] : false}
+        returnBy={online?.returnBy[opp] ?? null}
       >
         {view.spied && view.phase === "discard" ? (
           <div className="flex gap-1" aria-label="Opponent's hand seen through the spyglass">
@@ -349,10 +350,13 @@ function PlayerStrip({
   you,
   powersLeft,
   offline,
+  returnBy,
   children,
 }: {
   name: string;
   offline?: boolean;
+  /** When an offline opponent forfeits unless they're back. */
+  returnBy?: number | null;
   score: number;
   dealer: boolean;
   you?: boolean;
@@ -371,7 +375,9 @@ function PlayerStrip({
           <span className="truncate font-semibold">{name}</span>
           {dealer && <span className="rounded bg-rum px-1.5 text-[10px] uppercase">dealer</span>}
           {offline && (
-            <span className="rounded bg-red-900/60 px-1.5 text-[10px] uppercase">offline</span>
+            <span className="rounded bg-red-900/60 px-1.5 text-[10px] uppercase" role="status">
+              offline{returnBy ? <ReturnClock until={returnBy} /> : null}
+            </span>
           )}
         </div>
         {powersLeft && powersLeft.length > 0 && (
@@ -438,4 +444,16 @@ function Countdown({ deadline }: { deadline: number | null }) {
       ⏳ {secs}s
     </span>
   );
+}
+
+/** "· 4:12 to return": time left for a disconnected player before they forfeit. */
+function ReturnClock({ until }: { until: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const secs = Math.max(0, Math.ceil((until - now) / 1000));
+  const text = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  return <span className="normal-case tabular-nums"> · {text} to return</span>;
 }

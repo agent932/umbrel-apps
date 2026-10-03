@@ -143,8 +143,15 @@ describe("online play", () => {
       nextRoundMs: 60_000,
       disconnectMs: 150,
     });
+    const mark = b.messages.length;
     a.ws.terminate();
-    expect(await b.next((m) => m.t === "presence")).toMatchObject({ t: "presence" });
+    const p = await b.after<Extract<ServerMessage, { t: "presence" }>>(
+      mark,
+      (m) => m.t === "presence",
+    );
+    // The opponent is told when the missing player forfeits unless they're back.
+    expect(p.returnBy[sa.seat]).toBeGreaterThan(Date.now());
+    expect(p.returnBy[1 - sa.seat]).toBeNull();
     const f = await b.next<Extract<ServerMessage, { t: "forfeit" }>>(
       (m) => m.t === "forfeit",
       3000,
