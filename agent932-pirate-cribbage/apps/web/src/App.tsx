@@ -10,6 +10,8 @@ import { useRemoteGame } from "./game/useRemoteGame.js";
 import { ChallengeToast } from "./online/ChallengeToast.js";
 import { JoinInvite, OnlineLobby } from "./online/OnlineLobby.js";
 import { useOnlineGame } from "./online/useOnlineGame.js";
+import { AccountScreen } from "./screens/AccountScreen.js";
+import { AdminScreen } from "./screens/AdminScreen.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
 import { FriendsScreen } from "./screens/FriendsScreen.js";
 import { LeaderboardScreen } from "./screens/LeaderboardScreen.js";
@@ -183,6 +185,12 @@ function Routes({ botDelay }: { botDelay?: number }) {
       </Route>
       <Route path="/signup">
         <AuthScreen mode="signup" />
+      </Route>
+      <Route path="/account">
+        {loading ? null : user ? <AccountScreen /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/admin">
+        {loading ? null : user?.isAdmin ? <AdminScreen /> : <Redirect to="/" />}
       </Route>
       <Route path="/friends">
         {loading ? null : user ? <FriendsScreen /> : <Redirect to="/login" />}

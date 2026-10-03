@@ -9,6 +9,8 @@ import {
   type SessionUser,
   createSession,
   deleteSession,
+  deleteUserSessions,
+  userColumns,
   userForToken,
 } from "./sessions.js";
 
@@ -86,20 +88,17 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
       const which = taken[0].email === body.email ? "email" : "username";
       return reply.code(409).send({ error: `That ${which} is already taken` });
     }
+    // The very first account is the admin (on Umbrel, that's normally the owner).
+    const [anyone] = await db.select({ id: users.id }).from(users).limit(1);
     const [user] = await db
       .insert(users)
       .values({
         username: body.username,
         email: body.email,
         passwordHash: await hashPassword(body.password),
+        isAdmin: !anyone,
       })
-      .returning({
-        id: users.id,
-        username: users.username,
-        email: users.email,
-        rating: users.rating,
-        rankedGames: users.rankedGames,
-      });
+      .returning(userColumns);
     await startSession(reply, user!.id);
     return reply.code(201).send({ user });
   });
@@ -121,6 +120,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
     if (!row || !(await verifyPassword(body.password, row.passwordHash))) {
       return reply.code(401).send({ error: "Wrong username or password" });
     }
+    if (row.disabledAt) return reply.code(403).send({ error: "This account has been disabled" });
     await startSession(reply, row.id);
     return {
       user: {
@@ -129,8 +129,37 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
         email: row.email,
         rating: row.rating,
         rankedGames: row.rankedGames,
+        isAdmin: row.isAdmin,
       },
     };
+  });
+
+  app.post("/api/auth/password", authLimit, async (req, reply) => {
+    const user = requireUser(req, reply);
+    if (!user) return;
+    const body = parseBody(
+      z.object({
+        current: z.string().min(1).max(200),
+        next: z.string().min(8, "Passwords need at least 8 characters").max(200),
+      }),
+      req.body,
+      reply,
+    );
+    if (!body) return;
+    const [row] = await db
+      .select({ hash: users.passwordHash })
+      .from(users)
+      .where(eq(users.id, user.id));
+    if (!row || !(await verifyPassword(body.current, row.hash))) {
+      return reply.code(401).send({ error: "Your current password isn't right" });
+    }
+    await db
+      .update(users)
+      .set({ passwordHash: await hashPassword(body.next) })
+      .where(eq(users.id, user.id));
+    // Sign out everywhere else; this browser stays signed in.
+    await deleteUserSessions(db, user.id, req.cookies[SESSION_COOKIE]);
+    return { ok: true };
   });
 
   app.post("/api/auth/logout", async (req, reply) => {

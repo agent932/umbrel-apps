@@ -81,11 +81,19 @@ export function HomeScreen({ canResume, onResume, onStart, starting, error, chil
             <span className="mr-auto text-parchment/80">
               Ahoy, <b className="text-gold">{user.username}</b>
             </span>
+            {user.isAdmin && (
+              <Link href="/admin" className="text-parchment hover:text-gold">
+                Admin
+              </Link>
+            )}
             <Link href="/friends" className="text-parchment hover:text-gold">
               Crew
             </Link>
             <Link href="/stats" className="text-parchment hover:text-gold">
               Ship's Log
+            </Link>
+            <Link href="/account" className="text-parchment/70 hover:text-gold">
+              Account
             </Link>
             <button
               type="button"

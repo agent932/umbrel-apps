@@ -6,10 +6,11 @@ import fastifyWebsocket from "@fastify/websocket";
 import { attachSessions, authRoutes } from "./auth/routes.js";
 import type { Db } from "./db/client.js";
 import { gameRoutes } from "./games/routes.js";
+import { adminRoutes } from "./admin/routes.js";
 import { friendRoutes } from "./friends/routes.js";
 import { Presence } from "./online/presence.js";
 import { onlineRoutes } from "./online/routes.js";
-import type { Timing } from "./online/rooms.js";
+import { RoomManager, type Timing } from "./online/rooms.js";
 
 export interface AppOptions {
   db: Db;
@@ -43,8 +44,12 @@ export async function buildApp({ db, checkDb, webDist, logger = true, timing }: 
   await app.register(gameRoutes, { db });
   // Shared so friend lists can show who's online and challenges reach the right people.
   const presence = new Presence();
-  await app.register(onlineRoutes, { db, timing, presence });
+  // Online games live here; the admin page lists and can end them.
+  const rooms = new RoomManager(db, timing);
+  app.addHook("onClose", async () => rooms.close());
+  await app.register(onlineRoutes, { db, rooms, presence });
   await app.register(friendRoutes, { db, presence });
+  await app.register(adminRoutes, { db, rooms, presence });
 
   if (webDist) {
     await app.register(fastifyStatic, { root: webDist });

@@ -27,6 +27,10 @@ export const users = pgTable(
     /** Elo rating for ranked play. */
     rating: integer("rating").notNull().default(1000),
     rankedGames: integer("ranked_games").notNull().default(0),
+    /** Can use the admin pages. The first account created is an admin. */
+    isAdmin: boolean("is_admin").notNull().default(false),
+    /** Disabled accounts can't sign in. */
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -48,6 +52,35 @@ export const sessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("sessions_user").on(t.userId)],
+);
+
+/** Ranked seasons. Exactly one has no `endedAt`: the current one. */
+export const seasons = pgTable("seasons", {
+  id: integer("id").primaryKey(),
+  name: text("name").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+});
+
+/** Final standings of a finished season. */
+export const seasonResults = pgTable(
+  "season_results",
+  {
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    rating: integer("rating").notNull(),
+    tier: text("tier").notNull(),
+    rankedGames: integer("ranked_games").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.seasonId, t.userId] }),
+    index("season_results_user").on(t.userId),
+  ],
 );
 
 /** One row per pair of players. `userId` sent the request; it's "pending" until `friendId` accepts. */
@@ -111,6 +144,8 @@ export const matches = pgTable("matches", {
   /** Seat that forfeited (left or timed out), if the game didn't finish normally. */
   forfeitedBy: smallint("forfeited_by"),
   ranked: boolean("ranked").notNull().default(false),
+  /** Season a ranked match counted toward. */
+  seasonId: integer("season_id").references(() => seasons.id),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
 });

@@ -5,15 +5,13 @@ import { areFriends } from "../friends/friends.js";
 import { Matchmaker } from "./matchmaker.js";
 import type { Presence } from "./presence.js";
 import { ClientMessage, type ServerMessage } from "./protocol.js";
-import { type Client, RoomError, RoomManager, type Timing } from "./rooms.js";
+import { type Client, RoomError, type RoomManager } from "./rooms.js";
 
 export async function onlineRoutes(
   app: FastifyInstance,
-  { db, timing, presence }: { db: Db; timing?: Timing; presence: Presence },
+  { db, rooms, presence }: { db: Db; rooms: RoomManager; presence: Presence },
 ) {
-  const rooms = new RoomManager(db, timing);
   const matchmaker = new Matchmaker(rooms, presence, (a, b) => areFriends(db, a, b));
-  app.addHook("onClose", async () => rooms.close());
 
   app.get("/api/online/active", async (req, reply) => {
     if (!req.user) return reply.code(401).send({ error: "Sign in first" });

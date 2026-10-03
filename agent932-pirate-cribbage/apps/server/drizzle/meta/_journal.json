@@ -29,6 +29,13 @@
       "when": 1790984771444,
       "tag": "0003_friends_and_ranked",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790986547099,
+      "tag": "0004_admin_and_seasons",
+      "breakpoints": true
     }
   ]
 }

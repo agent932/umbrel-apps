@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { sessions, users } from "../db/schema.js";
 
@@ -14,7 +14,18 @@ export interface SessionUser {
   email: string;
   rating: number;
   rankedGames: number;
+  isAdmin: boolean;
 }
+
+/** The columns a signed-in user (and the browser) gets to see. Never the password hash. */
+export const userColumns = {
+  id: users.id,
+  username: users.username,
+  email: users.email,
+  rating: users.rating,
+  rankedGames: users.rankedGames,
+  isAdmin: users.isAdmin,
+};
 
 export async function createSession(
   db: Db,
@@ -28,20 +39,31 @@ export async function createSession(
 
 export async function userForToken(db: Db, token: string): Promise<SessionUser | null> {
   const [row] = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      email: users.email,
-      rating: users.rating,
-      rankedGames: users.rankedGames,
-    })
+    .select(userColumns)
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .where(and(eq(sessions.id, hashToken(token)), gt(sessions.expiresAt, new Date())))
+    .where(
+      and(
+        eq(sessions.id, hashToken(token)),
+        gt(sessions.expiresAt, new Date()),
+        isNull(users.disabledAt),
+      ),
+    )
     .limit(1);
   return row ?? null;
 }
 
 export async function deleteSession(db: Db, token: string) {
   await db.delete(sessions).where(eq(sessions.id, hashToken(token)));
+}
+
+/** Sign a user out everywhere, optionally keeping one session (the one changing the password). */
+export async function deleteUserSessions(db: Db, userId: string, keepToken?: string) {
+  await db
+    .delete(sessions)
+    .where(
+      keepToken
+        ? and(eq(sessions.userId, userId), ne(sessions.id, hashToken(keepToken)))
+        : eq(sessions.userId, userId),
+    );
 }

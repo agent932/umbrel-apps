@@ -6,6 +6,7 @@ import { parseBody, requireUser } from "../auth/routes.js";
 import type { Db } from "../db/client.js";
 import { users } from "../db/schema.js";
 import type { Presence } from "../online/presence.js";
+import { currentSeason, listSeasons, seasonStandings } from "../seasons/seasons.js";
 import { headToHead } from "../stats/stats.js";
 import {
   FriendError,
@@ -96,6 +97,23 @@ export async function friendRoutes(
       .where(and(gt(users.rankedGames, 0)))
       .orderBy(desc(users.rating), users.username)
       .limit(50);
-    return { players: rows.map((r, i) => ({ ...r, rank: i + 1, tier: tierFor(r.rating).name })) };
+    return {
+      season: await currentSeason(db),
+      players: rows.map((r, i) => ({ ...r, rank: i + 1, tier: tierFor(r.rating).name })),
+    };
+  });
+
+  app.get("/api/seasons", async (req, reply) => {
+    if (!requireUser(req, reply)) return;
+    return { seasons: await listSeasons(db) };
+  });
+
+  /** Final standings of a finished season. */
+  app.get<{ Params: { id: string } }>("/api/seasons/:id/standings", async (req, reply) => {
+    if (!requireUser(req, reply)) return;
+    const id = z.coerce.number().int().positive().safeParse(req.params.id);
+    if (!id.success) return reply.code(400).send({ error: "Bad season" });
+    const rows = await seasonStandings(db, id.data);
+    return { standings: rows.map((r) => ({ ...r, tier: tierFor(r.rating).name })) };
   });
 }

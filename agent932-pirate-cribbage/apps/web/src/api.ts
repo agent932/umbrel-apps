@@ -30,6 +30,14 @@ export interface User {
   email: string;
   rating: number;
   rankedGames: number;
+  isAdmin: boolean;
+}
+
+export interface Season {
+  id: number;
+  name: string;
+  startedAt: string;
+  endedAt: string | null;
 }
 
 export interface Friend {

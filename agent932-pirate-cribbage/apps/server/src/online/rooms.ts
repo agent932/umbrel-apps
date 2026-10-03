@@ -23,6 +23,7 @@ import { games, users } from "../db/schema.js";
 import type { ClientAction } from "../games/actions.js";
 import { type RatingChange, type Tx, recordMatch } from "../games/record.js";
 import { toEngineAction } from "../games/toEngine.js";
+import { currentSeason } from "../seasons/seasons.js";
 import type { ServerMessage } from "./protocol.js";
 
 export interface Timing {
@@ -291,6 +292,7 @@ export class RoomManager {
     this.clearTimers(room);
     await this.db.transaction(async (tx) => {
       const ratings = room.ranked ? await this.rate(tx, room) : null;
+      const seasonId = room.ranked ? (await currentSeason(tx)).id : null;
       await recordMatch(
         tx,
         {
@@ -299,6 +301,7 @@ export class RoomManager {
           aiLevel: null,
           createdAt: room.createdAt,
           ranked: room.ranked,
+          seasonId,
         },
         [room.players[0].userId, room.players[1].userId],
         room.state,
@@ -389,6 +392,38 @@ export class RoomManager {
       gameId: room.id,
       online: [room.online(0), room.online(1)],
     }));
+  }
+
+  /** Games in memory right now, for the admin page. */
+  list() {
+    return [...this.rooms.values()].map((r) => ({
+      id: r.id,
+      players: r.players.map((p) => p.username),
+      online: [r.online(0), r.online(1)],
+      scores: r.state.scores,
+      round: r.state.round,
+      phase: r.state.phase,
+      ranked: r.ranked,
+      variant: r.state.rules.pirate ? "pirate" : "classic",
+      startedAt: r.createdAt,
+    }));
+  }
+
+  /** End a game without recording it (an admin clearing a stuck game). */
+  async abort(gameId: string): Promise<boolean> {
+    const room = await this.load(gameId);
+    if (!room) return false;
+    await room.run(async () => {
+      this.clearTimers(room);
+      await this.db.update(games).set({ finishedAt: new Date() }).where(eq(games.id, room.id));
+      this.broadcast(room, () => ({
+        t: "error",
+        gameId: room.id,
+        message: "An admin ended this game",
+      }));
+      this.rooms.delete(room.id);
+    });
+    return true;
   }
 
   /** Stop all timers (server shutdown, tests). Games stay saved and resume on next load. */

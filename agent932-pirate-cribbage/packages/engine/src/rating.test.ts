@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { START_RATING, expectedScore, rateGame, tierFor } from "./index.js";
+import { START_RATING, expectedScore, rateGame, seasonReset, tierFor } from "./index.js";
 
 describe("ratings", () => {
   it("gives even players even chances and moves 16 points", () => {
@@ -22,5 +22,12 @@ describe("ratings", () => {
     expect(tierFor(1450).key).toBe("platinum");
     expect(tierFor(2000).key).toBe("diamond");
     expect(tierFor(-50).key).toBe("bronze");
+  });
+
+  it("pulls ratings halfway back to 1000 for a new season", () => {
+    expect(seasonReset(1400)).toBe(1200);
+    expect(seasonReset(800)).toBe(900);
+    expect(seasonReset(1000)).toBe(1000);
+    expect(seasonReset(1555)).toBe(1278);
   });
 });

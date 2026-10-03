@@ -31,3 +31,8 @@ export function rateGame(
   const delta = Math.round(k * (1 - expectedScore(winner, loser)));
   return { winner: winner + delta, loser: loser - delta };
 }
+
+/** Start-of-season reset: everyone moves halfway back toward the starting rating. */
+export function seasonReset(rating: number): number {
+  return Math.round(START_RATING + (rating - START_RATING) / 2);
+}

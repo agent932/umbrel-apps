@@ -32,6 +32,7 @@ export async function recordMatch(
     aiLevel: "easy" | "medium" | "hard" | null;
     createdAt: Date;
     ranked?: boolean;
+    seasonId?: number | null;
   },
   players: [string | null, string | null],
   state: GameState,
@@ -50,6 +51,7 @@ export async function recordMatch(
     skunk: state.skunk,
     forfeitedBy,
     ranked: game.ranked ?? false,
+    seasonId: game.seasonId ?? null,
     startedAt: game.createdAt,
     endedAt: new Date(),
   });
