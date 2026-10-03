@@ -1,0 +1,16 @@
+{
+  "appId": "ca.atomicit.piratecribbage",
+  "appName": "Pirate Cribbage",
+  "webDir": "apps/web/dist",
+  "backgroundColor": "#04121c",
+  "server": {
+    "url": "https://pc.atomicit.ca",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
