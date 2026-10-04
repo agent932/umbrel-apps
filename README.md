@@ -16,7 +16,7 @@ This repository contains my custom Umbrel App Store. Unlike the official store, 
 | 1 | <img height="30" src="https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-intel-gpu-monitor/assets/agent932-intel-gpu-monitor.svg" /> | [Intel GPU Monitor](https://github.com/agent932/umbrel-apps/tree/main/agent932-intel-gpu-monitor) | Real-time Intel GPU monitoring for your home server | 8847 |
 | 2 | <img height="30" src="https://upload.wikimedia.org/wikipedia/commons/9/90/DaVinci_Resolve_17_logo.svg" /> | [DaVinci Resolve Studio Server](https://github.com/agent932/umbrel-apps/tree/main/agent932-davinci-studio-server) | Central project server for DaVinci Resolve collaboration | 8543 |
 | 3 | <img height="30" src="https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-teslamate/assets/agent932-teslamate.svg" /> | [TeslaMate](https://github.com/agent932/umbrel-apps/tree/main/agent932-teslamate) | A self-hosted data logger for your Tesla | 8841 |
-| 4 | <img height="30" src="https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg" /> | [Pirate Cribbage](https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage) | Online 2-player cribbage with stats, ranks and pirate rules | 8121 |
+| 4 | <img height="30" src="https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png" /> | [Deckhand Games](https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage) | Self-hosted card games with friends, starting with Pirate Cribbage | 8121 |
 
 TeslaMate also publishes Grafana on port 8842 and an MQTT broker on port 1884.
 

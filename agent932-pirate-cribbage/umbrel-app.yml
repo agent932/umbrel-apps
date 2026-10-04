@@ -1,53 +1,59 @@
 manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
-name: Pirate Cribbage
-version: "0.20.1"
-tagline: Online 2-player cribbage with stats, ranks and pirate rules
-icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
+name: Deckhand Games
+version: "0.21.0"
+tagline: Self-hosted card games with friends, starting with Pirate Cribbage
+icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
-  Pirate Cribbage is a self-hosted online cribbage game. Create an account,
-  play against the computer or against friends online, and track detailed
-  stats for every match: win rates, pegging, hand and crib averages, hand
-  distributions and a discard analyzer.
+  Deckhand Games is a self-hosted home for card games you play with friends.
+  One account, one friends list and one Ship's Log carry across every game.
+  The first game aboard is Pirate Cribbage, with more on the way.
 
 
-  Play classic cribbage, or switch on Pirate Rules for a few swashbuckling
-  twists.
+  Pirate Cribbage: play classic cribbage, or switch on Pirate Rules for six
+  sneaky powers and buried treasure. Play the computer crew (Easy, Medium,
+  Hard) or friends online, and track detailed stats for every match: win
+  rates, pegging, hand and crib averages, hand distributions and a discard
+  analyzer.
 
 
-  Playing with friends outside your home network: the game has its own
+  Playing with friends outside your home network: the app has its own
   player accounts, so it is published without the Umbrel login in front of it.
   Point a Cloudflare Tunnel (or Tailscale) at port 8121 to let friends join.
 
 
   Features:
 
-  - Player accounts and friends
+  - Player accounts, friends and avatars
 
-  - Play vs computer (Easy, Medium, Hard) or online
+  - Play the computer crew or friends online, with emotes and rematches
 
-  - Ranked play with tiers
+  - Ranked play with tiers, achievements and a daily discard puzzle
 
   - Detailed per-mode and head-to-head stats
+
+  - Optional email (via Resend) for invites, password resets and notices
+
+  - Daily database backups
 releaseNotes: >-
-  Your game data is now backed up every day: accounts, friends, the Ship's
-  Log and achievements are saved to the app's data folder on your Umbrel,
-  keeping the last 14 days. See docs/backups.md for how to restore one.
+  The app is now called Deckhand Games, with a new painted icon and
+  screenshots. Nothing else changes: your accounts, friends, stats and
+  backups stay exactly where they are, and no reinstall is needed.
 
 
 developer: agent932
-website: https://github.com/agent932/umbrel-apps/tree/main/agent932-pirate-cribbage
+website: https://deckhand.games
 dependencies: []
 repo: https://github.com/agent932/umbrel-apps
 support: https://github.com/agent932/umbrel-apps/issues
 
 port: 8121
 gallery:
-  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-1-harbour.jpg
-  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-2-table.jpg
-  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-3-show.jpg
-  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-4-log.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-1-hub.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-2-harbour.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-3-table.jpg
+  - https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/gallery-4-daily.jpg
 path: ""
 
 defaultUsername: ""
