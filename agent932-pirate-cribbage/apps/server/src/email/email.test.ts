@@ -134,3 +134,74 @@ describe("emailed invites", () => {
     expect(theirs.statusCode).toBe(400);
   });
 });
+
+describe("opt-in notices", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 100));
+
+  it("are off until a player turns them on, and one click turns them off again", async () => {
+    await setUpEmail();
+    const anne = await signUp(t.app, "Anne");
+    const bonny = await signUp(t.app, "Bonny");
+    expect((await json("GET", "/api/auth/notices", anne.cookie)).json()).toEqual({
+      game: false,
+      friends: false,
+    });
+    const before = sent.length;
+    await json("POST", "/api/friends/requests", bonny.cookie, { username: "Anne" });
+    await settle();
+    expect(sent.length).toBe(before);
+
+    await json("PUT", "/api/auth/notices", anne.cookie, { game: true, friends: true });
+    const carol = await signUp(t.app, "Carol");
+    await json("POST", "/api/friends/requests", carol.cookie, { username: "Anne" });
+    await settle();
+    const mail = sent.at(-1)!.email;
+    expect(mail.to).toBe("anne@example.test");
+    expect(mail.subject).toBe("Carol wants to join your crew");
+    const unsubscribe = /(https:\/\/deckhand\.games\/api\/email\/unsubscribe\/[\w-]+)/.exec(
+      mail.text,
+    )![1]!;
+
+    const page = await t.app.inject({ url: unsubscribe.replace("https://deckhand.games", "") });
+    expect(page.body).toContain("You won't get any more notice emails");
+    expect((await json("GET", "/api/auth/notices", anne.cookie)).json()).toEqual({
+      game: false,
+      friends: false,
+    });
+  });
+
+  it("tells you once when an online game is waiting for you", async () => {
+    await setUpEmail();
+    const anne = await signUp(t.app, "Anne");
+    const bonny = await signUp(t.app, "Bonny");
+    await json("PUT", "/api/auth/notices", anne.cookie, { game: true, friends: false });
+    const a = await connect(t.app, anne.cookie);
+    const b = await connect(t.app, bonny.cookie);
+    await a.next((m) => m.t === "hello");
+    await b.next((m) => m.t === "hello");
+    a.send({ t: "queue", menu: { variant: "classic" } });
+    await a.next((m) => m.t === "queued");
+    b.send({ t: "queue", menu: { variant: "classic" } });
+    const { gameId } = await a.next<Extract<ServerMessage, { t: "matched" }>>(
+      (m) => m.t === "matched",
+    );
+    a.send({ t: "watch", gameId });
+    await a.next((m) => m.t === "state");
+
+    const before = sent.length;
+    a.ws.terminate();
+    await settle();
+    const mail = sent.at(-1)!.email;
+    expect(sent.length).toBe(before + 1);
+    expect(mail.subject).toBe("Bonny is waiting for you at the cribbage table");
+    expect(mail.text).toContain(`https://deckhand.games/online/${gameId}`);
+
+    // Back and away again straight away: no second email.
+    const again = await connect(t.app, anne.cookie);
+    again.send({ t: "watch", gameId });
+    await again.next((m) => m.t === "state");
+    again.ws.terminate();
+    await settle();
+    expect(sent.length).toBe(before + 1);
+  });
+});

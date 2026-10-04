@@ -16,10 +16,11 @@ import {
   removeFriend,
   requestFriend,
 } from "./friends.js";
+import type { Notices } from "../email/notices.js";
 
 export async function friendRoutes(
   app: FastifyInstance,
-  { db, presence }: { db: Db; presence: Presence },
+  { db, presence, notices }: { db: Db; presence: Presence; notices?: Notices },
 ) {
   const withPresence = <T extends { id: string; rating: number }>(f: T) => ({
     ...f,
@@ -49,6 +50,7 @@ export async function friendRoutes(
       try {
         const { friend, accepted } = await requestFriend(db, user.id, body.username);
         presence.notify(friend.id, { t: "friends" });
+        if (!accepted) notices?.friendRequest(friend.id, user.username);
         return reply.code(201).send({ friend: withPresence(friend), accepted });
       } catch (e) {
         if (e instanceof FriendError) return reply.code(400).send({ error: e.message });

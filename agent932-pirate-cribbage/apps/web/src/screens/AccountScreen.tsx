@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { AvatarPicker } from "../components/AvatarPicker.js";
+import { NoticeSettings } from "../components/NoticeSettings.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 
 /** Pick your portrait, and change your password (e.g. after an admin gave you a temporary one). */
@@ -51,6 +52,7 @@ export function AccountScreen() {
         Signed in as <b className="text-gold">{user?.username}</b> ({user?.email})
       </p>
       <AvatarPicker />
+      <NoticeSettings />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <h2 className="font-pirate text-2xl text-gold">Change password</h2>
         <label className="flex flex-col gap-1 text-sm">

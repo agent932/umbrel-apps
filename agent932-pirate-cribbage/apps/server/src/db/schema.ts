@@ -29,6 +29,13 @@ export const users = pgTable(
     rankedGames: integer("ranked_games").notNull().default(0),
     /** Which painted crew portrait the player picked (1-8), or null for their initial. */
     avatar: smallint("avatar"),
+    /** Opt-in email notices (off unless the player turns them on). */
+    notifyGame: boolean("notify_game").notNull().default(false),
+    notifyFriends: boolean("notify_friends").notNull().default(false),
+    /** When we last emailed "your game is waiting", so we don't nag. */
+    notifiedGameAt: timestamp("notified_game_at", { withTimezone: true }),
+    /** Secret for the one-click unsubscribe link in notice emails. */
+    unsubscribeToken: uuid("unsubscribe_token").notNull().defaultRandom(),
     /** Can use the admin pages. The first account created is an admin. */
     isAdmin: boolean("is_admin").notNull().default(false),
     /** Disabled accounts can't sign in. */

@@ -77,6 +77,46 @@ export async function emailRoutes(
     return { ok: true, to: admin.email };
   });
 
+  /** Your opt-in email notices. */
+  app.get("/api/auth/notices", async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ error: "Sign in first" });
+    const [u] = await db
+      .select({ game: users.notifyGame, friends: users.notifyFriends })
+      .from(users)
+      .where(eq(users.id, req.user.id));
+    return u;
+  });
+
+  app.put("/api/auth/notices", async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ error: "Sign in first" });
+    const body = parseBody(z.object({ game: z.boolean(), friends: z.boolean() }), req.body, reply);
+    if (!body) return;
+    await db
+      .update(users)
+      .set({ notifyGame: body.game, notifyFriends: body.friends })
+      .where(eq(users.id, req.user.id));
+    return body;
+  });
+
+  /** The one-click link at the bottom of every notice: turns them all off, no sign-in needed. */
+  app.get<{ Params: { token: string } }>("/api/email/unsubscribe/:token", async (req, reply) => {
+    const token = z.string().uuid().safeParse(req.params.token);
+    if (token.success) {
+      await db
+        .update(users)
+        .set({ notifyGame: false, notifyFriends: false })
+        .where(eq(users.unsubscribeToken, token.data));
+    }
+    return reply
+      .type("text/html; charset=utf-8")
+      .send(
+        '<!doctype html><meta name="viewport" content="width=device-width"><title>Unsubscribed</title>' +
+          '<body style="font-family:Georgia,serif;background:#04121c;color:#f3e5c0;text-align:center;padding:48px">' +
+          '<h1 style="color:#f2b84b">Done, matey</h1><p>You won\'t get any more notice emails from Deckhand Games.</p>' +
+          "<p>You can turn them back on any time under Account.</p></body>",
+      );
+  });
+
   const limit = { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } };
 
   /** Always says the same thing, so nobody can use it to find out who has an account. */

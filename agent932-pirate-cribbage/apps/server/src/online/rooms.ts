@@ -107,6 +107,8 @@ export class RoomManager {
   constructor(
     private db: Db,
     private timing: Timing = DEFAULT_TIMING,
+    /** Called when a player's clock to come back starts (for the opt-in email notice). */
+    private onAway?: (userId: string, opponent: string, gameId: string) => void,
   ) {}
 
   /** Start a game between two players. Seats are assigned at random, as is the first dealer. */
@@ -221,6 +223,9 @@ export class RoomManager {
   }
 
   private awayClock(room: Room, seat: Seat) {
+    if (room.state.phase !== "gameOver") {
+      this.onAway?.(room.players[seat].userId, room.players[other(seat)].username, room.id);
+    }
     room.returnBy[seat] = Date.now() + this.timing.disconnectMs;
     this.broadcastPresence(room);
     room.disconnectTimers[seat] = setTimeout(() => {

@@ -12,6 +12,7 @@ import { adminRoutes } from "./admin/routes.js";
 import { friendRoutes } from "./friends/routes.js";
 import { achievementRoutes } from "./achievements/routes.js";
 import { emailRoutes } from "./email/routes.js";
+import { Notices } from "./email/notices.js";
 import { type Mailer, resendMailer } from "./email/mailer.js";
 import { Presence } from "./online/presence.js";
 import { onlineRoutes } from "./online/routes.js";
@@ -112,7 +113,10 @@ export async function buildApp({
   // Shared so friend lists can show who's online and challenges reach the right people.
   const presence = new Presence();
   // Online games live here; the admin page lists and can end them.
-  const rooms = new RoomManager(db, timing);
+  const notices = new Notices(db, mailer, app.log);
+  const rooms = new RoomManager(db, timing, (userId, opponent, gameId) =>
+    notices.gameWaiting(userId, opponent, gameId),
+  );
   app.addHook("onClose", async () => rooms.close());
   await app.register(onlineRoutes, {
     db,
@@ -121,7 +125,7 @@ export async function buildApp({
     messageLimit: socketMessageLimit,
     mailer,
   });
-  await app.register(friendRoutes, { db, presence });
+  await app.register(friendRoutes, { db, presence, notices });
   await app.register(achievementRoutes, { db });
   await app.register(emailRoutes, { db, mailer });
   await app.register(adminRoutes, { db, rooms, presence });
