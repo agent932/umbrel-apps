@@ -325,10 +325,24 @@ body {
   width: min(42px, 4.6cqw);
   height: min(42px, 4.6cqw);
 }
+/* Peggy's quips sit in the empty corner between the opponent's cards and the menu, small enough
+   to cover nothing. Her bubble opens towards the middle. */
 .t-peggy {
   position: absolute;
-  top: 3cqh;
-  right: 12cqw;
+  top: 2cqh;
+  right: calc(10cqw + 6px);
+  flex-direction: row-reverse;
+  align-items: center;
+}
+.t-peggy img {
+  height: 48px;
+}
+.t-peggy > div {
+  margin: 0;
+  max-width: min(170px, 20cqw);
+  padding: 4px 9px;
+  font-size: 0.78rem;
+  border-radius: 12px 12px 2px 12px;
 }
 
 /* Cards on the table: --h is the card's height; everything inside scales from it. */
@@ -686,7 +700,7 @@ body {
     --pch: 12cqh;
     --sch: 9cqh;
     grid-template-columns: 1fr;
-    grid-template-rows: 12cqh 17cqh 1fr 30cqh 9cqh;
+    grid-template-rows: 11cqh 22cqh 1fr 26cqh 9cqh;
     grid-template-areas: "opp" "board" "mid" "hand" "rail";
   }
   .t-opp-chip {
@@ -725,16 +739,26 @@ body {
     gap: 8px;
     margin-top: 0;
   }
+  .t-powers.many {
+    gap: 6px;
+  }
   .t-powers.many .t-round {
-    width: min(48px, 13cqw);
-    height: min(48px, 13cqw);
+    width: min(42px, 10.5cqw);
+    height: min(42px, 10.5cqw);
   }
   .t-hand .t-slot {
     bottom: calc(var(--ch) * 0.05);
   }
+  /* In the strip between the play and your hand, bubble to her right. */
   .t-peggy {
-    top: 31cqh;
-    right: 3cqw;
+    top: calc(65cqh - 56px);
+    right: auto;
+    left: 3cqw;
+    flex-direction: row;
+  }
+  .t-peggy > div {
+    max-width: 70cqw;
+    border-radius: 12px 12px 12px 2px;
   }
   .t-hand {
     --deal-x: -30cqw;
@@ -748,11 +772,12 @@ body {
     animation-name: t-pop-port;
   }
   /* Beside the board, which leaves a little room on each side. */
+  /* At the left end of the bottom row, beside the powers. */
   .t-emote {
     right: auto;
-    left: 4px;
+    left: 2cqw;
     bottom: auto;
-    top: calc(20.5cqh - 22px);
+    top: calc(95.5cqh - 22px);
   }
   .t-emote > .t-round {
     width: 44px;
@@ -761,7 +786,5 @@ body {
   .t-emote-menu {
     right: auto;
     left: 0;
-    bottom: auto;
-    top: calc(100% + 8px);
   }
 }

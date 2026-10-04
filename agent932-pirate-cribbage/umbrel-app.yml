@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.16.0"
+version: "0.16.1"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,9 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Meet the crew: the computer opponents now have names and portraits.
-  Swabbie Sal (Easy), Bosun Barnaby (Medium) and Cap'n Bot himself (Hard),
-  shown on the home screen and at the table.
+  Peggy moves out of the way: her comments now pop up small in an empty
+  corner of the table instead of covering text. The board is bigger when
+  you hold your phone upright.
 
 
 developer: agent932
