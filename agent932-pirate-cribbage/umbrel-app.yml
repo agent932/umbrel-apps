@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.20.0"
+version: "0.20.1"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,10 +31,9 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  New: the Daily discard. Everyone gets the same six cards each day; pick
-  the two you'd throw to the crib and see how close you came to the best
-  throw, with the expected points for each choice. Keep a streak going by
-  finding the best throw day after day.
+  Your game data is now backed up every day: accounts, friends, the Ship's
+  Log and achievements are saved to the app's data folder on your Umbrel,
+  keeping the last 14 days. See docs/backups.md for how to restore one.
 
 
 developer: agent932

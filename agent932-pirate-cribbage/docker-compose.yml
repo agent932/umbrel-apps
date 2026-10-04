@@ -32,3 +32,30 @@ services:
       - POSTGRES_PASSWORD=${APP_PIRATE_CRIBBAGE_DB_PASSWORD}
     volumes:
       - ${APP_DATA_DIR}/data/postgres:/var/lib/postgresql/data
+
+  # Nightly database backup: a compressed dump into the app's data folder, keeping the last 14.
+  # Restoring: see docs/backups.md.
+  backup:
+    image: postgres:17-alpine
+    restart: on-failure
+    stop_grace_period: 10s
+    depends_on:
+      - database
+    environment:
+      - PGPASSWORD=${APP_PIRATE_CRIBBAGE_DB_PASSWORD}
+    volumes:
+      - ${APP_DATA_DIR}/data/backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 120
+        while true; do
+          file=/backups/pirate_cribbage-$$(date +%F).dump
+          if pg_dump -h database -U pirate -d pirate_cribbage -Fc -f "$$file.part"; then
+            mv "$$file.part" "$$file"
+            ls -1t /backups/pirate_cribbage-*.dump | tail -n +15 | xargs -r rm -f
+          else
+            rm -f "$$file.part"
+          fi
+          sleep 86400
+        done
