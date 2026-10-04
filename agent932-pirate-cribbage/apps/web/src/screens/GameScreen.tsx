@@ -334,7 +334,8 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
             {view.cribCount === 0 && (
               <div className="h-full w-full rounded-lg border border-dashed border-parchment/35" />
             )}
-            <span className="absolute top-full left-1/2 mt-1 -translate-x-1/2 text-[11px] whitespace-nowrap text-parchment/75">
+            {/* Anchored right: the crib sits at the table's right edge, so long names grow inward. */}
+            <span className="absolute top-full right-0 mt-1 text-right text-[11px] whitespace-nowrap text-parchment/75">
               {cribLabel}
             </span>
           </div>

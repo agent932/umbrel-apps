@@ -30,8 +30,21 @@ html {
 body {
   color: var(--color-parchment);
   min-height: 100dvh;
+  /* Keep screens clear of the notch / Dynamic Island and home bar (the table pads itself). */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   font-size: 1.0625rem;
   -webkit-font-smoothing: antialiased;
+}
+/* iPhones zoom the page into any text field under 16px; keep fields at least that big. */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+/* Full-height screens fill what's left inside that padding, so they don't scroll by the inset. */
+body .min-h-dvh {
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
 }
 
 @utility num {
