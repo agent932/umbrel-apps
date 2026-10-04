@@ -93,7 +93,7 @@ export function HomeScreen({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-6">
-      <AccountBar />
+      <AccountBar home />
       <header className="flex flex-col items-center text-center">
         <Peggy bob className="mb-1 h-28 w-auto drop-shadow-[0_8px_14px_rgba(0,0,0,0.5)]" />
         <h1>

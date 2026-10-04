@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Link } from "wouter";
 import {
   type Card as CardType,
   type GameEvent,
@@ -492,6 +493,9 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
             <button type="button" className="btn-secondary" onClick={onExit}>
               Harbour
             </button>
+            <Link href="/" className="btn-secondary text-center">
+              Home (all games)
+            </Link>
             {online && view.phase !== "gameOver" && (
               <button
                 type="button"

@@ -2,8 +2,23 @@ import { Link } from "wouter";
 import { useAuth } from "../auth.js";
 import { SettingsButton } from "./SettingsButton.js";
 
-/** Who's signed in, and links to the crew, the Ship's Log and the account. Shared by every game. */
-export function AccountBar() {
+/** Back to the Deckhand Games hub. */
+function HomeLink() {
+  return (
+    <Link href="/" className="inline-flex items-center gap-1 text-parchment hover:text-gold">
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden fill="currentColor">
+        <path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z" />
+      </svg>
+      Home
+    </Link>
+  );
+}
+
+/**
+ * Who's signed in, and links to the crew, the Ship's Log and the account. Shared by every game;
+ * inside a game, `home` adds a link back to the Deckhand Games hub.
+ */
+export function AccountBar({ home = false }: { home?: boolean }) {
   const { user, logout } = useAuth();
   // On phones the greeting gets its own row and the links sit underneath.
   return (
@@ -17,6 +32,7 @@ export function AccountBar() {
             <SettingsButton />
             Ahoy, <b className="text-gold">{user.username}</b>
           </span>
+          {home && <HomeLink />}
           {user.isAdmin && (
             <Link href="/admin" className="text-parchment hover:text-gold">
               Admin
@@ -44,6 +60,7 @@ export function AccountBar() {
           <span className="mr-auto">
             <SettingsButton />
           </span>
+          {home && <HomeLink />}
           <Link href="/login" className="text-parchment hover:text-gold">
             Log in
           </Link>
