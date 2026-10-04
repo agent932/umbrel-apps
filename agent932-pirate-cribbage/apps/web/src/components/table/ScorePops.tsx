@@ -6,6 +6,8 @@ interface Pop {
   key: number;
   text: string;
   why: string;
+  /** Whose points: "You" or the opponent's name. */
+  who: string;
   mine: boolean;
   bad?: boolean;
 }
@@ -22,10 +24,12 @@ function pegWhy(s: PegScore) {
 }
 
 /** The points scored in a batch of events while playing (the show at round end counts its own). */
-function popsFor(events: GameEvent[], me: Seat): Omit<Pop, "key">[] {
-  const pops: Omit<Pop, "key">[] = [];
+function popsFor(events: GameEvent[], me: Seat, names: [string, string]): Omit<Pop, "key">[] {
+  const pops: Omit<Pop, "key" | "who">[] = [];
+  const whose: string[] = [];
   for (const e of events) {
     const mine = "seat" in e && e.seat === me;
+    const before = pops.length;
     if (e.type === "played" && e.score.total > 0)
       pops.push({ text: `+${e.score.total}`, why: pegWhy(e.score), mine });
     if (e.type === "go") pops.push({ text: "+1", why: "a go", mine });
@@ -34,15 +38,24 @@ function popsFor(events: GameEvent[], me: Seat): Omit<Pop, "key">[] {
     if (e.type === "treasure") pops.push({ text: `+${e.points}`, why: "buried treasure", mine });
     if (e.type === "kraken")
       pops.push({ text: `−${Math.abs(e.points)}`, why: "the Kraken", mine, bad: true });
+    if (pops.length > before && "seat" in e) whose.push(mine ? "You" : names[e.seat]);
   }
-  return pops;
+  return pops.map((p, i) => ({ ...p, who: whose[i] ?? "" }));
 }
 
 /** "+2 fifteen" floats up from the play and drifts toward the board. */
-export function ScorePops({ events, me }: { events: GameEvent[]; me: Seat }) {
+export function ScorePops({
+  events,
+  me,
+  names,
+}: {
+  events: GameEvent[];
+  me: Seat;
+  names: [string, string];
+}) {
   const [pops, setPops] = useState<Pop[]>([]);
   useEffect(() => {
-    const next = popsFor(events, me);
+    const next = popsFor(events, me, names);
     if (!next.length) return;
     const now = Date.now();
     // Shown from an effect because it reacts to new game events arriving.
@@ -51,6 +64,8 @@ export function ScorePops({ events, me }: { events: GameEvent[]; me: Seat }) {
     if (next.some((n) => n.mine && !n.bad)) buzz(20);
     const t = setTimeout(() => setPops((p) => p.filter((x) => x.key < now)), 1600);
     return () => clearTimeout(t);
+    // Names only change between games; the pops react to events.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, me]);
 
   return (
@@ -61,6 +76,7 @@ export function ScorePops({ events, me }: { events: GameEvent[]; me: Seat }) {
           className={`t-pop ${p.mine ? "mine" : "theirs"} ${p.bad ? "bad" : ""}`}
           style={{ animationDelay: `${i * 120}ms` }}
         >
+          <span className="t-pop-who">{p.who}</span>
           <span className="t-pop-num">{p.text}</span>
           {p.why && <span className="t-pop-why">{p.why}</span>}
         </div>

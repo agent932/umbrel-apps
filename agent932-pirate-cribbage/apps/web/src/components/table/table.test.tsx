@@ -19,7 +19,11 @@ describe("ScorePops", () => {
       },
       { type: "kraken", seat: 1, points: -4, hole: 26 },
     ];
-    const { container } = render(<ScorePops events={events} me={0} />);
+    const { container } = render(
+      <ScorePops events={events} me={0} names={["You", "Bosun Barnaby"]} />,
+    );
+    expect(container).toHaveTextContent("You+4");
+    expect(container).toHaveTextContent("Bosun Barnaby−4");
     expect(container).toHaveTextContent("+4");
     expect(container).toHaveTextContent("fifteen + a pair");
     expect(container.querySelector(".t-pop.mine")).not.toBeNull();
@@ -39,7 +43,7 @@ describe("ScorePops", () => {
         score: { fifteen: 0, thirtyOne: 0, pairs: 0, run: 0, total: 0 },
       },
     ];
-    const { container } = render(<ScorePops events={events} me={0} />);
+    const { container } = render(<ScorePops events={events} me={0} names={["You", "Anne"]} />);
     expect(container.querySelectorAll(".t-pop")).toHaveLength(0);
   });
 });

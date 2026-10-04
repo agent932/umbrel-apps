@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.16.1"
+version: "0.16.2"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,9 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Peggy moves out of the way: her comments now pop up small in an empty
-  corner of the table instead of covering text. The board is bigger when
-  you hold your phone upright.
+  At the end of a round the last cards played stay on the table for a few
+  seconds, so both players see them before the hands are counted. The
+  pirate scenes and score pop-ups now say who gets the bonus or penalty,
+  like "+3 points to You" or "−4 points to Bosun Barnaby".
 
 
 developer: agent932

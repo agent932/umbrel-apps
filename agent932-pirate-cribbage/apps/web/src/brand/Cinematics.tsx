@@ -28,39 +28,67 @@ const POWER_SCENES: Record<PowerId, Scene> = {
 export const SCENE_MS = 3400;
 
 /** The most dramatic scene for a batch of events (and a caption), or null. */
+/** What a scene does to the score: "+3 points to You", in gold for a bonus or red for a penalty. */
+export interface SceneEffect {
+  text: string;
+  good: boolean;
+}
+
 export function sceneFor(
   events: GameEvent[],
   names: [string, string],
   me: Seat,
-): { scene: Scene; caption: string } | null {
-  let best: { rank: number; scene: Scene; caption: string } | null = null;
-  const pick = (rank: number, scene: Scene, caption: string) => {
-    if (!best || rank > best.rank) best = { rank, scene, caption };
+): { scene: Scene; caption: string; effect?: SceneEffect } | null {
+  let best: { rank: number; scene: Scene; caption: string; effect?: SceneEffect } | null = null;
+  const pick = (rank: number, scene: Scene, caption: string, effect?: SceneEffect) => {
+    if (!best || rank > best.rank) best = { rank, scene, caption, effect };
   };
   const who = (s: Seat) => names[s];
+  /** "You find" / "Bosun Barnaby finds". */
+  const does = (s: Seat, verb: string) => (s === me ? `You ${verb}` : `${who(s)} ${verb}s`);
+  const points = (n: number, s: Seat): SceneEffect => ({
+    text: `${n > 0 ? "+" : "−"}${Math.abs(n)} point${Math.abs(n) === 1 ? "" : "s"} to ${s === me ? "You" : who(s)}`,
+    good: n > 0,
+  });
   for (const e of events) {
     switch (e.type) {
       case "power": {
         const captions: Record<PowerId, string> = {
           spyglass: `${who(e.seat)} spies from the crow's nest!`,
-          crowsNest: "Fire! The cut is revealed",
+          crowsNest: `${does(e.seat, "fire")} from the crow's nest: the cut is revealed!`,
           parley: `${who(e.seat)} swings in for a parley!`,
           pickpocket: `${who(e.seat)} pinches some loot!`,
           rebury: `${who(e.seat)} reburies the treasure`,
-          belay: "Belay that!",
+          belay: `${does(e.seat, "cry")} "Belay that!"`,
         };
-        pick(2, POWER_SCENES[e.power], captions[e.power]);
+        pick(
+          2,
+          POWER_SCENES[e.power],
+          captions[e.power],
+          e.cost ? points(-e.cost, e.seat) : undefined,
+        );
         break;
       }
       case "treasure":
-        pick(3, "chest", `Buried treasure! +${e.points}`);
+        pick(3, "chest", `${does(e.seat, "find")} buried treasure!`, points(e.points, e.seat));
         break;
       case "kraken":
-        pick(3, "sinking", `The Kraken! ${e.points}`);
+        pick(
+          3,
+          "sinking",
+          `The Kraken drags ${e.seat === me ? "you" : who(e.seat)} back!`,
+          points(-Math.abs(e.points), e.seat),
+        );
         break;
-      case "blackSpot":
-        pick(4, "plank", `The Black Spot! ${who(e.seat === 0 ? 1 : 0)} walks the plank`);
+      case "blackSpot": {
+        const victim = (e.seat === 0 ? 1 : 0) as Seat;
+        pick(
+          4,
+          "plank",
+          `The Black Spot! ${victim === me ? "You walk" : `${who(victim)} walks`} the plank`,
+        );
         break;
+      }
       case "gameOver":
         if (e.skunk) {
           const loser = (e.winner === 0 ? 1 : 0) as Seat;
@@ -73,9 +101,8 @@ export function sceneFor(
         break;
     }
   }
-  return best
-    ? { scene: (best as { scene: Scene }).scene, caption: (best as { caption: string }).caption }
-    : null;
+  const found = best as { scene: Scene; caption: string; effect?: SceneEffect } | null;
+  return found ? { scene: found.scene, caption: found.caption, effect: found.effect } : null;
 }
 
 /* ---------- Characters and props, drawn in a 400×240 scene ---------- */
@@ -99,9 +126,12 @@ export function Cinematics({
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const still = !animations || reduceMotion;
   useEffect(() => prefetchScenes(still), [still]);
-  const [playing, setPlaying] = useState<{ scene: Scene; caption: string; key: number } | null>(
-    null,
-  );
+  const [playing, setPlaying] = useState<{
+    scene: Scene;
+    caption: string;
+    effect?: SceneEffect;
+    key: number;
+  } | null>(null);
 
   useEffect(() => {
     const next = sceneFor(events, names, me);
@@ -123,7 +153,7 @@ export function Cinematics({
       className="fixed inset-0 z-40 grid place-items-center bg-night/60 p-4 backdrop-blur-[2px]"
       onClick={() => setPlaying(null)}
       role="status"
-      aria-label={playing.caption}
+      aria-label={playing.effect ? `${playing.caption} ${playing.effect.text}` : playing.caption}
       style={{ animation: `cin-fade ${SCENE_MS}ms ease-in-out forwards` }}
     >
       <div className="flex w-full max-w-lg flex-col items-center gap-2">
@@ -131,6 +161,13 @@ export function Cinematics({
         <p className="text-center font-pirate text-3xl text-gold lantern-glow sm:text-4xl">
           {playing.caption}
         </p>
+        {playing.effect && (
+          <p
+            className={`rounded-full px-4 py-1 text-lg font-extrabold ${playing.effect.good ? "bg-gold/25 text-gold" : "bg-red-900/60 text-red-200"}`}
+          >
+            {playing.effect.text}
+          </p>
+        )}
         <p className="text-xs text-parchment/50">tap to skip</p>
       </div>
     </div>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   type Card as CardType,
+  type GameEvent,
   type PowerId,
   type Seat,
   POWER_INFO,
@@ -138,9 +139,13 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
                     ? "Shuffling…"
                     : "";
 
-  const pile = view.pegging
+  const livePile = view.pegging
     ? view.pegging.played.slice(view.pegging.played.length - view.pegging.pile.length)
     : [];
+  // When pegging ends, the last cards stay on the table for a moment so both players see them.
+  const lastPlay = useLastPlay(livePile, count, !!view.pegging, p.lastEvents, !!instant);
+  const pile = lastPlay?.pile ?? livePile;
+  const shownCount = lastPlay?.count ?? count;
   const cribLabel =
     view.cribOwner === me || (view.cribOwner === null && view.dealer === me)
       ? "Your crib"
@@ -289,10 +294,10 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           </div>
 
           <div className="flex min-w-0 flex-1 items-center justify-center gap-3">
-            {view.pegging && (
+            {(view.pegging || lastPlay) && (
               <>
-                <span className="t-medallion" aria-label={`Count ${count}`}>
-                  {count}
+                <span className="t-medallion" aria-label={`Count ${shownCount}`}>
+                  {shownCount}
                 </span>
                 <div className="t-pile flex">
                   <AnimatePresence>
@@ -498,10 +503,10 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
       <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
       {tutorial && <TutorialTips phase={view.phase} />}
       <CutReveal events={p.lastEvents} names={label} me={me} />
-      {!instant && <ScorePops events={p.lastEvents} me={me} />}
+      {!instant && <ScorePops events={p.lastEvents} me={me} names={label} />}
       {!instant && <Cinematics events={p.lastEvents} names={label} me={me} />}
 
-      {view.phase === "roundEnd" && (
+      {view.phase === "roundEnd" && !lastPlay && (
         <RoundSummary
           show={p.show}
           cut={view.cut}
@@ -514,7 +519,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
         />
       )}
 
-      {view.phase === "gameOver" && (
+      {view.phase === "gameOver" && !lastPlay && (
         <Modal title={view.winner === me ? "Victory!" : "Defeat…"}>
           {view.winner === me && (
             <img src={flagUrl} alt="" className="mx-auto -mt-2 mb-2 h-16 w-auto" />
@@ -596,6 +601,52 @@ function useUpright() {
     return () => mq.removeEventListener("change", update);
   }, []);
   return upright;
+}
+
+/** How long the last cards of a round stay on the table before the hands are counted. */
+const LAST_PLAY_MS = 3500;
+
+type PilePlay = { card: CardType; seat: Seat };
+
+/**
+ * The cards and count from the end of pegging, held for a few seconds after the round moves on
+ * (the engine goes straight to counting hands, so the last card would otherwise vanish at once).
+ */
+export function useLastPlay(
+  livePile: PilePlay[],
+  count: number,
+  pegging: boolean,
+  events: GameEvent[],
+  instant: boolean,
+) {
+  const last = useRef<{ pile: PilePlay[]; count: number }>({ pile: [], count: 0 });
+  const [held, setHeld] = useState<{ pile: PilePlay[]; count: number } | null>(null);
+  useEffect(() => {
+    if (pegging) {
+      last.current = { pile: livePile, count };
+      return;
+    }
+    if (instant || !events.some((e) => e.type === "played")) return;
+    // Start from the table as it was, then add the plays that ended the round.
+    let pile = [...last.current.pile];
+    let shown = last.current.count;
+    let reset = false;
+    for (const e of events) {
+      if (e.type === "reset") reset = true;
+      if (e.type === "played") {
+        if (reset) pile = [];
+        reset = false;
+        pile.push({ card: e.card, seat: e.seat });
+        shown = e.count;
+      }
+    }
+    setHeld({ pile, count: shown });
+    const t = setTimeout(() => setHeld(null), LAST_PLAY_MS);
+    return () => clearTimeout(t);
+    // Re-run only when the game moves on, not for every re-render of the same step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pegging, events]);
+  return held;
 }
 
 /** The latest call-out, for a couple of seconds. */
