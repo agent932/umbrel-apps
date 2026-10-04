@@ -21,7 +21,8 @@
     "db:down": "docker compose -f docker-compose.dev.yml down",
     "db:generate": "npm run db:generate -w @pirate/server",
     "db:migrate": "npm run db:migrate -w @pirate/server",
-    "play": "tsx packages/engine/scripts/play.ts"
+    "play": "tsx packages/engine/scripts/play.ts",
+    "app:ios": "npm run build -w @pirate/web && cap sync ios"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",

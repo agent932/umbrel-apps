@@ -5,7 +5,7 @@ import fastifyHelmet from "@fastify/helmet";
 import fastifyRateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
-import { attachSessions, authRoutes } from "./auth/routes.js";
+import { APP_CLIENT_HEADER, attachSessions, authRoutes } from "./auth/routes.js";
 import type { Db } from "./db/client.js";
 import { gameRoutes } from "./games/routes.js";
 import { adminRoutes } from "./admin/routes.js";
@@ -15,7 +15,7 @@ import { emailRoutes } from "./email/routes.js";
 import { Notices } from "./email/notices.js";
 import { type Mailer, resendMailer } from "./email/mailer.js";
 import { Presence } from "./online/presence.js";
-import { onlineRoutes } from "./online/routes.js";
+import { APP_ORIGINS, onlineRoutes } from "./online/routes.js";
 import { RoomManager, type Timing } from "./online/rooms.js";
 
 export interface AppOptions {
@@ -44,6 +44,22 @@ export async function buildApp({
   // trustProxy: behind Umbrel's app proxy / Cloudflare, so req.protocol reflects HTTPS.
   const app = Fastify({ logger, trustProxy: true });
   await app.register(fastifyCookie);
+  // The iPhone app runs the game from its own bundle (origin capacitor://localhost) and calls this
+  // server with a bearer token, never a cookie, so letting it read API responses is safe.
+  app.addHook("onRequest", async (req, reply) => {
+    const origin = req.headers.origin;
+    if (!origin || !APP_ORIGINS.includes(origin) || !req.url.startsWith("/api/")) return;
+    reply.header("access-control-allow-origin", origin);
+    reply.header("vary", "origin");
+    if (req.method === "OPTIONS") {
+      return reply
+        .header("access-control-allow-methods", "GET, POST, PUT, DELETE")
+        .header("access-control-allow-headers", `content-type, authorization, ${APP_CLIENT_HEADER}`)
+        .header("access-control-max-age", "86400")
+        .code(204)
+        .send();
+    }
+  });
   await app.register(fastifyHelmet, {
     contentSecurityPolicy: {
       directives: {

@@ -1,4 +1,5 @@
 import type { BotLevel, GameEvent, PlayerStats, PlayerView } from "@pirate/engine";
+import { API_ORIGIN, appToken, isNativeApp, setAppToken } from "./native.js";
 
 export class ApiError extends Error {
   constructor(
@@ -13,14 +14,26 @@ export async function api<T>(
   path: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<T> {
-  const res = await fetch(path, {
+  const headers: Record<string, string> =
+    init.body === undefined ? {} : { "content-type": "application/json" };
+  if (isNativeApp) {
+    headers["x-deckhand-client"] = "app";
+    const token = appToken();
+    if (token) headers.authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(API_ORIGIN + path, {
     method: init.method ?? (init.body === undefined ? "GET" : "POST"),
-    headers: init.body === undefined ? {} : { "content-type": "application/json" },
+    headers,
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    credentials: "same-origin",
+    credentials: isNativeApp ? "omit" : "same-origin",
   });
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  const data = (await res.json().catch(() => ({}))) as { error?: string; token?: string };
   if (!res.ok) throw new ApiError(data.error ?? `Request failed (${res.status})`, res.status);
+  // The app keeps its session token itself (signing in returns it; signing out forgets it).
+  if (isNativeApp) {
+    if (data.token) setAppToken(data.token);
+    if (path === "/api/auth/logout" || path === "/api/auth/delete") setAppToken(null);
+  }
   return data as T;
 }
 

@@ -9,6 +9,7 @@ import trophyUrl from "../assets/ui/icon-trophy.webp";
 import { SPYGLASS_URL } from "../brand/powerArt.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 import { api } from "../api.js";
+import { SITE_ORIGIN } from "../native.js";
 import { useEmailEnabled } from "../email.js";
 
 type Status = { kind: "idle" } | { kind: "searching" } | { kind: "invite"; code: string };
@@ -45,7 +46,7 @@ export function OnlineLobby() {
     };
   }, [navigate]);
 
-  const inviteLink = status.kind === "invite" ? `${location.origin}/join/${status.code}` : "";
+  const inviteLink = status.kind === "invite" ? `${SITE_ORIGIN}/join/${status.code}` : "";
 
   return (
     <section className="panel flex flex-col gap-4 p-5" aria-label="Play online">

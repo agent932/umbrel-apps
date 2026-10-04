@@ -14,15 +14,18 @@ const KEEP_ALIVE_MS = 30_000;
 
 export const MAX_MESSAGES_PER_10S = 60;
 
+/** Where the iPhone app's bundled pages come from. It signs in with a token, not a cookie. */
+export const APP_ORIGINS = ["capacitor://localhost"];
+
 /**
  * Whether a socket's Origin header matches the host it connected to. No Origin means it isn't a
- * browser (scripts, future native apps), which can't borrow a player's cookie from another site.
+ * browser (scripts, the iPhone app), which can't borrow a player's cookie from another site.
  */
 export function sameOrigin(
   origin: string | undefined,
   headers: Record<string, string | string[] | undefined>,
 ) {
-  if (!origin) return true;
+  if (!origin || APP_ORIGINS.includes(origin)) return true;
   let originHost: string;
   try {
     originHost = new URL(origin).host;

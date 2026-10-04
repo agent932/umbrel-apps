@@ -15,7 +15,8 @@ export const LONG: Timing = { turnMs: 60_000, nextRoundMs: 60_000, disconnectMs:
  * A WebSocket test client. Every message is kept in arrival order; `next` hands out each
  * matching message once (oldest first), and `after` waits for one that arrives after a point.
  */
-export async function connect(app: TestApp["app"], cookie?: string) {
+/** `auth` is a cookie header, or the raw headers to send (e.g. the app's token subprotocol). */
+export async function connect(app: TestApp["app"], auth?: string | Record<string, string>) {
   await app.ready();
   const messages: ServerMessage[] = [];
   const taken = new Set<number>();
@@ -23,15 +24,19 @@ export async function connect(app: TestApp["app"], cookie?: string) {
   let resolveClosed: (code: number) => void = () => {};
   const closed = new Promise<number>((r) => (resolveClosed = r));
   // Listeners go on in onInit, before the socket opens, so the server's first message isn't missed.
-  const ws: WebSocket = await app.injectWS("/api/ws", cookie ? { headers: { cookie } } : {}, {
-    onInit: (socket: WebSocket) => {
-      socket.on("message", (raw) => {
-        messages.push(JSON.parse(String(raw)) as ServerMessage);
-        for (const l of [...listeners]) l();
-      });
-      socket.on("close", (code) => resolveClosed(code));
+  const ws: WebSocket = await app.injectWS(
+    "/api/ws",
+    { headers: typeof auth === "string" ? { cookie: auth } : (auth ?? {}) },
+    {
+      onInit: (socket: WebSocket) => {
+        socket.on("message", (raw) => {
+          messages.push(JSON.parse(String(raw)) as ServerMessage);
+          for (const l of [...listeners]) l();
+        });
+        socket.on("close", (code) => resolveClosed(code));
+      },
     },
-  });
+  );
 
   function waitFor<T extends ServerMessage>(find: () => T | undefined, ms: number): Promise<T> {
     const found = find();

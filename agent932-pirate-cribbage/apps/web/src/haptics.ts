@@ -1,9 +1,15 @@
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { isNativeApp } from "./native.js";
 import { getSettings } from "./settings.js";
 
-/** A short buzz on phones that support it (Android). Off with animations or reduced motion. */
+/** A short buzz: the Taptic Engine in the iPhone app, vibrate() on Android. Off with animations or reduced motion. */
 export function buzz(ms = 12) {
-  if (typeof navigator === "undefined" || !navigator.vibrate) return;
+  if (typeof navigator === "undefined") return;
   if (!getSettings().animations) return;
   if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-  navigator.vibrate(ms);
+  if (isNativeApp) {
+    void Haptics.impact({ style: ms >= 20 ? ImpactStyle.Medium : ImpactStyle.Light });
+    return;
+  }
+  navigator.vibrate?.(ms);
 }

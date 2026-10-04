@@ -1,3 +1,4 @@
+import { API_ORIGIN, appToken, isNativeApp } from "../native.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 
 type Listener = (m: ServerMessage) => void;
@@ -45,8 +46,11 @@ class Socket {
   }
 
   private open() {
-    const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws`;
-    const ws = new WebSocket(url);
+    const base = isNativeApp ? API_ORIGIN : `${location.protocol}//${location.host}`;
+    const url = `${base.replace(/^http/, "ws")}/api/ws`;
+    // The app can't send its token as a header on a socket, so it rides along as a subprotocol.
+    const token = appToken();
+    const ws = token ? new WebSocket(url, ["deckhand", `bearer.${token}`]) : new WebSocket(url);
     this.ws = ws;
     ws.onopen = () => {
       this.connected = true;

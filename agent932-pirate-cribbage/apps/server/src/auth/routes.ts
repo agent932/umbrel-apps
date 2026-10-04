@@ -50,6 +50,26 @@ export function requireUser(req: FastifyRequest, reply: FastifyReply): SessionUs
   return null;
 }
 
+/** The iPhone app sends this header; it signs in with a token instead of a cookie. */
+export const APP_CLIENT_HEADER = "x-deckhand-client";
+/** The app's WebSocket can't set headers, so it offers the token as a second subprotocol. */
+export const WS_TOKEN_PREFIX = "bearer.";
+
+const isAppClient = (req: FastifyRequest) => req.headers[APP_CLIENT_HEADER] === "app";
+
+/** The session token from the cookie (web), an Authorization header or the socket subprotocol (app). */
+export function sessionToken(req: FastifyRequest): string | undefined {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) return auth.slice(7).trim();
+  const protocols = req.headers["sec-websocket-protocol"];
+  if (typeof protocols === "string") {
+    const offered = protocols.split(",").map((p) => p.trim());
+    const bearer = offered.find((p) => p.startsWith(WS_TOKEN_PREFIX));
+    if (bearer) return bearer.slice(WS_TOKEN_PREFIX.length);
+  }
+  return req.cookies[SESSION_COOKIE];
+}
+
 /**
  * Attach the signed-in user to every request. Called on the root app (not inside a plugin)
  * so the hook covers all routes.
@@ -57,14 +77,20 @@ export function requireUser(req: FastifyRequest, reply: FastifyReply): SessionUs
 export function attachSessions(app: FastifyInstance, db: Db) {
   app.decorateRequest("user", null);
   app.addHook("onRequest", async (req) => {
-    const token = req.cookies[SESSION_COOKIE];
+    const token = sessionToken(req);
     req.user = token ? await userForToken(db, token) : null;
   });
 }
 
 export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
-  async function startSession(reply: FastifyReply, userId: string) {
+  /** Sign in: a cookie for the web, or the token in the response for the app (which has no cookies). */
+  async function startSession(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    userId: string,
+  ): Promise<{ token?: string }> {
     const { token, expiresAt } = await createSession(db, userId);
+    if (isAppClient(req)) return { token };
     reply.setCookie(SESSION_COOKIE, token, {
       path: "/",
       httpOnly: true,
@@ -73,6 +99,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
       secure: "auto",
       expires: expiresAt,
     });
+    return {};
   }
 
   const authLimit = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
@@ -102,8 +129,8 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
         isAdmin: !anyone,
       })
       .returning(userColumns);
-    await startSession(reply, user!.id);
-    return reply.code(201).send({ user });
+    const session = await startSession(req, reply, user!.id);
+    return reply.code(201).send({ user, ...session });
   });
 
   app.post("/api/auth/login", authLimit, async (req, reply) => {
@@ -131,8 +158,9 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
         .set({ passwordHash: await hashPassword(body.password) })
         .where(eq(users.id, row.id));
     }
-    await startSession(reply, row.id);
+    const session = await startSession(req, reply, row.id);
     return {
+      ...session,
       user: {
         id: row.id,
         username: row.username,
@@ -169,7 +197,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
       .set({ passwordHash: await hashPassword(body.next) })
       .where(eq(users.id, user.id));
     // Sign out everywhere else; this browser stays signed in.
-    await deleteUserSessions(db, user.id, req.cookies[SESSION_COOKIE]);
+    await deleteUserSessions(db, user.id, sessionToken(req));
     return { ok: true };
   });
 
@@ -206,7 +234,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
   });
 
   app.post("/api/auth/logout", async (req, reply) => {
-    const token = req.cookies[SESSION_COOKIE];
+    const token = sessionToken(req);
     if (token) await deleteSession(db, token);
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
