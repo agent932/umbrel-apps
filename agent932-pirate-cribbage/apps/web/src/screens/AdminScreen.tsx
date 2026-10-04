@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ApiError, type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
+import { CRIBBAGE_HOME } from "../routes.js";
 
 interface Overview {
   players: number;
@@ -358,7 +359,7 @@ export function AdminScreen() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-5 px-4 py-6">
       <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-parchment/70 hover:text-gold">
+        <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
           ← Harbour
         </Link>
         <h1 className="font-pirate text-4xl text-gold">Captain's Quarters</h1>

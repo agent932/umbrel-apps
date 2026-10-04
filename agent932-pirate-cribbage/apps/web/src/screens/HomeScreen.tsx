@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Link } from "wouter";
 import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
 import { useAuth } from "../auth.js";
 import { Peggy } from "../brand/Peggy.js";
 import logoUrl from "../assets/ui/logo-a.webp";
 import { BOT_CREW } from "../brand/botCrew.js";
 import { POWER_ART } from "../brand/powerArt.js";
-import { SettingsButton } from "../components/SettingsButton.js";
+import { AccountBar } from "../components/AccountBar.js";
 import type { MenuChoice } from "../game/menu.js";
 
 interface Props {
@@ -79,7 +78,7 @@ export function HomeScreen({
   error,
   children,
 }: Props) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [level, setLevel] = useState<BotLevel>("medium");
   const [mode, setMode] = useState<"classic" | "pirate">("pirate");
   const [cost, setCost] = useState<"free" | "plunder">("free");
@@ -94,56 +93,7 @@ export function HomeScreen({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-6">
-      {/* On phones the greeting gets its own row and the links sit underneath. */}
-      <nav
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm whitespace-nowrap"
-        aria-label="Account"
-      >
-        {user ? (
-          <>
-            <span className="flex w-full items-center gap-2 text-parchment/80 sm:mr-auto sm:w-auto">
-              <SettingsButton />
-              Ahoy, <b className="text-gold">{user.username}</b>
-            </span>
-            {user.isAdmin && (
-              <Link href="/admin" className="text-parchment hover:text-gold">
-                Admin
-              </Link>
-            )}
-            <Link href="/friends" className="text-parchment hover:text-gold">
-              Crew
-            </Link>
-            <Link href="/stats" className="text-parchment hover:text-gold">
-              Ship's Log
-            </Link>
-            <Link href="/account" className="text-parchment/70 hover:text-gold">
-              Account
-            </Link>
-            <button
-              type="button"
-              className="text-parchment/70 hover:text-gold"
-              onClick={() => void logout()}
-            >
-              Log out
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="mr-auto">
-              <SettingsButton />
-            </span>
-            <Link href="/login" className="text-parchment hover:text-gold">
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-lg border border-gold/60 px-3 py-1 hover:bg-gold/10"
-            >
-              Sign up
-            </Link>
-          </>
-        )}
-      </nav>
+      <AccountBar />
       <header className="flex flex-col items-center text-center">
         <Peggy bob className="mb-1 h-28 w-auto drop-shadow-[0_8px_14px_rgba(0,0,0,0.5)]" />
         <h1>

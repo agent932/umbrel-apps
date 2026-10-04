@@ -21,6 +21,8 @@ import { LeaderboardScreen } from "./screens/LeaderboardScreen.js";
 import { GameScreen } from "./screens/GameScreen.js";
 import { HomeScreen } from "./screens/HomeScreen.js";
 import { StatsScreen } from "./screens/StatsScreen.js";
+import { CRIBBAGE_HOME } from "./routes.js";
+import { HubScreen } from "./screens/HubScreen.js";
 
 /** The game being played: in the browser (guests) or on the server (signed in, counts for stats). */
 type Session = { kind: "local"; game: LocalGame } | { kind: "remote"; res: GameResponse };
@@ -78,7 +80,7 @@ function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) 
             <p role="alert" className="text-red-300">
               {game.error}
             </p>
-            <Link href="/" className="btn-secondary">
+            <Link href={CRIBBAGE_HOME} className="btn-secondary">
               Back to the harbour
             </Link>
           </>
@@ -150,17 +152,20 @@ function Routes({ botDelay }: { botDelay?: number }) {
     botDelay,
     onExit: () => {
       setRefresh((n) => n + 1);
-      navigate("/");
+      navigate(CRIBBAGE_HOME);
     },
     onPlayAgain: () => {
       if (lastChoice) void start(lastChoice);
-      else navigate("/");
+      else navigate(CRIBBAGE_HOME);
     },
   };
 
   return (
     <Switch>
       <Route path="/">
+        <HubScreen />
+      </Route>
+      <Route path={CRIBBAGE_HOME}>
         <HomeScreen
           canResume={!!resumable}
           onResume={() => resumable && play(resumable)}
@@ -186,7 +191,7 @@ function Routes({ botDelay }: { botDelay?: number }) {
               onExit={() => {
                 // A ranked game may have moved your rating.
                 void refreshUser();
-                navigate("/");
+                navigate(CRIBBAGE_HOME);
               }}
             />
           ) : (
@@ -205,7 +210,7 @@ function Routes({ botDelay }: { botDelay?: number }) {
       </Route>
       <Route path="/play">
         {!session ? (
-          <Redirect to="/" />
+          <Redirect to={CRIBBAGE_HOME} />
         ) : session.kind === "local" ? (
           <LocalPlay key={gameKey} game={session.game} {...playProps} />
         ) : (
@@ -227,7 +232,7 @@ function Routes({ botDelay }: { botDelay?: number }) {
         {loading ? null : user ? <AccountScreen /> : <Redirect to="/login" />}
       </Route>
       <Route path="/admin">
-        {loading ? null : user?.isAdmin ? <AdminScreen /> : <Redirect to="/" />}
+        {loading ? null : user?.isAdmin ? <AdminScreen /> : <Redirect to={CRIBBAGE_HOME} />}
       </Route>
       <Route path="/friends">
         {loading ? null : user ? <FriendsScreen /> : <Redirect to="/login" />}
@@ -239,7 +244,7 @@ function Routes({ botDelay }: { botDelay?: number }) {
         {loading ? null : user ? <StatsScreen /> : <Redirect to="/login" />}
       </Route>
       <Route>
-        <Redirect to="/" />
+        <Redirect to={CRIBBAGE_HOME} />
       </Route>
     </Switch>
   );

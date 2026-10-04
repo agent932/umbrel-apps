@@ -8,6 +8,7 @@ async function startGame(
   level: "Easy" | "Medium" = "Medium",
 ) {
   const user = userEvent.setup();
+  window.history.pushState({}, "", "/cribbage");
   render(<App botDelay={0} />);
   await user.click(screen.getByLabelText(new RegExp(`^${level}`)));
   await user.click(screen.getByLabelText(new RegExp(`^${rules}`)));
@@ -104,6 +105,7 @@ describe("playing vs the bot", () => {
 
   it("cuts for the deal before the first hand", async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, "", "/cribbage");
     render(<App botDelay={0} />);
     await user.click(screen.getByRole("button", { name: /set sail/i }));
     expect(screen.getByRole("heading", { name: "Cut for the deal" })).toBeInTheDocument();

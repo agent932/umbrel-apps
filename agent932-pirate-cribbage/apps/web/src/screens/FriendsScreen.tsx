@@ -6,6 +6,7 @@ import type { Menu } from "../online/protocol.js";
 import { socket } from "../online/socket.js";
 import { TierBadge } from "../components/TierBadge.js";
 import { CUTLASS_URL } from "../brand/powerArt.js";
+import { CRIBBAGE_HOME } from "../routes.js";
 
 function FriendTier({ friend }: { friend: Friend }) {
   return (
@@ -104,7 +105,7 @@ export function FriendsScreen() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 px-4 py-6">
       <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-parchment/70 hover:text-gold">
+        <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
           ← Harbour
         </Link>
         <h1 className="font-pirate text-4xl text-gold">Crew</h1>

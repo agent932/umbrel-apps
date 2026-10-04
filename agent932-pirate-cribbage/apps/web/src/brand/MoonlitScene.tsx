@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { CRIBBAGE_HOME } from "../routes.js";
 
 /**
  * The painted backdrop behind every page: the moonlit harbour on the title screen, a calm night
@@ -7,7 +8,7 @@ import { useLocation } from "wouter";
  */
 export function MoonlitScene() {
   const [location] = useLocation();
-  const scene = location === "/" ? "harbour" : "sea";
+  const scene = location === "/" || location === CRIBBAGE_HOME ? "harbour" : "sea";
   return (
     <div
       aria-hidden

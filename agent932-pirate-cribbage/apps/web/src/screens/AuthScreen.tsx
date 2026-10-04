@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ApiError } from "../api.js";
 import { useAuth } from "../auth.js";
+import { CRIBBAGE_HOME } from "../routes.js";
 
 export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const { login, signup } = useAuth();
@@ -24,7 +25,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
       } else {
         await login(String(form.get("login")), String(form.get("password")));
       }
-      navigate("/");
+      navigate(CRIBBAGE_HOME);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't reach the server");
     } finally {
@@ -36,7 +37,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
     "w-full rounded-lg border border-parchment/30 bg-sea-deep px-3 py-2 text-parchment outline-none focus:border-gold";
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col gap-6 px-4 py-12">
-      <Link href="/" className="text-sm text-parchment/70 hover:text-gold">
+      <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
         ← Harbour
       </Link>
       <h1 className="text-center font-pirate text-4xl text-gold">

@@ -7,6 +7,7 @@ import { socket } from "./socket.js";
 import { TierBadge } from "../components/TierBadge.js";
 import trophyUrl from "../assets/ui/icon-trophy.webp";
 import { SPYGLASS_URL } from "../brand/powerArt.js";
+import { CRIBBAGE_HOME } from "../routes.js";
 
 type Status = { kind: "idle" } | { kind: "searching" } | { kind: "invite"; code: string };
 
@@ -206,7 +207,7 @@ export function JoinInvite({ code }: { code: string }) {
           <p role="alert" className="text-red-300">
             {error}
           </p>
-          <button type="button" className="btn-secondary" onClick={() => navigate("/")}>
+          <button type="button" className="btn-secondary" onClick={() => navigate(CRIBBAGE_HOME)}>
             Back to the harbour
           </button>
         </>

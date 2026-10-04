@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { AvatarPicker } from "../components/AvatarPicker.js";
+import { CRIBBAGE_HOME } from "../routes.js";
 
 /** Pick your portrait, and change your password (e.g. after an admin gave you a temporary one). */
 export function AccountScreen() {
@@ -42,7 +43,7 @@ export function AccountScreen() {
     "w-full rounded-lg border border-parchment/30 bg-sea-deep px-3 py-2 outline-none focus:border-gold";
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col gap-6 px-4 py-6">
-      <Link href="/" className="text-sm text-parchment/70 hover:text-gold">
+      <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
         ← Harbour
       </Link>
       <h1 className="text-center font-pirate text-4xl text-gold">Your account</h1>

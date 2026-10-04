@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.16.3"
+version: "0.17.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,10 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Tap any pirate power to see what it does and how to use it. When it's
-  ready, the panel has a button to use it; when it isn't, it explains when
-  you can. Fixed: card numbers no longer show through the cards on top of
-  them.
+  Welcome to Deckhand Games! The home page is now a games hub, ready for
+  more card games, with Pirate Cribbage as the first table (now at
+  /cribbage). Your account, crew and Ship's Log carry across. Invite links
+  automatically use whichever address you play on.
 
 
 developer: agent932
