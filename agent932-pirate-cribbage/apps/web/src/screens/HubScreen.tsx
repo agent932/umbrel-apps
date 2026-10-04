@@ -50,6 +50,11 @@ export function HubScreen() {
           </span>
         </li>
       </ul>
+      <footer className="mt-auto text-center text-sm text-parchment/60">
+        <Link href="/privacy" className="hover:text-gold">
+          Privacy policy
+        </Link>
+      </footer>
     </main>
   );
 }

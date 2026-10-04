@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { AvatarPicker } from "../components/AvatarPicker.js";
+import { DeleteAccount } from "../components/DeleteAccount.js";
 import { NoticeSettings } from "../components/NoticeSettings.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 
@@ -99,6 +100,10 @@ export function AccountScreen() {
           Change password
         </button>
       </form>
+      <DeleteAccount />
+      <Link href="/privacy" className="text-center text-sm text-parchment/60 hover:text-gold">
+        Privacy policy
+      </Link>
     </main>
   );
 }

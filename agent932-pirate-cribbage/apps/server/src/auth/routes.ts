@@ -173,6 +173,38 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
     return { ok: true };
   });
 
+  /**
+   * Delete your own account for good. Your sessions, friends, stats, achievements and unfinished games go with it;
+   * finished matches stay in your opponents' history without your name.
+   */
+  app.post("/api/auth/delete", authLimit, async (req, reply) => {
+    const user = requireUser(req, reply);
+    if (!user) return;
+    const body = parseBody(z.object({ password: z.string().min(1).max(200) }), req.body, reply);
+    if (!body) return;
+    const [row] = await db
+      .select({ hash: users.passwordHash, isAdmin: users.isAdmin })
+      .from(users)
+      .where(eq(users.id, user.id));
+    if (!row || !(await verifyPassword(body.password, row.hash))) {
+      return reply.code(401).send({ error: "That password isn't right" });
+    }
+    if (row.isAdmin) {
+      const [count] = await db
+        .select({ admins: sql<number>`count(*)::int` })
+        .from(users)
+        .where(eq(users.isAdmin, true));
+      if ((count?.admins ?? 0) <= 1) {
+        return reply
+          .code(409)
+          .send({ error: "You're the only admin. Make another player an admin first." });
+      }
+    }
+    await db.delete(users).where(eq(users.id, user.id));
+    reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    return { ok: true };
+  });
+
   app.post("/api/auth/logout", async (req, reply) => {
     const token = req.cookies[SESSION_COOKIE];
     if (token) await deleteSession(db, token);

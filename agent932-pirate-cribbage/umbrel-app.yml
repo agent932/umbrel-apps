@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.21.0"
+version: "0.22.0"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,9 +37,10 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  The app is now called Deckhand Games, with a new painted icon and
-  screenshots. Nothing else changes: your accounts, friends, stats and
-  backups stay exactly where they are, and no reinstall is needed.
+  You can now delete your account from the Account page, and there's a
+  privacy policy page (linked from the home page and Account). Fonts are
+  now served by the app itself instead of Google, so nothing loads from
+  outside your Umbrel. This also gets the app ready for the iPhone App Store.
 
 
 developer: agent932

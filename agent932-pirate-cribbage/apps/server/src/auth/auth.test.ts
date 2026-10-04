@@ -112,6 +112,31 @@ describe("auth routes", () => {
     expect(unknown.json()).toEqual(wrong.json());
   });
 
+  it("deletes your own account after checking your password, but never the last admin", async () => {
+    const captain = await signUp(t.app, "Captain");
+    const crew = await signUp(t.app, "Bonny");
+    const del = (cookie: string, password: string) =>
+      t.app.inject({
+        method: "POST",
+        url: "/api/auth/delete",
+        headers: { cookie },
+        payload: { password },
+      });
+    expect((await del(crew.cookie, "wrong-password")).statusCode).toBe(401);
+    expect((await del(captain.cookie, "parrots-and-rum")).statusCode).toBe(409);
+    expect((await del(crew.cookie, "parrots-and-rum")).statusCode).toBe(200);
+    const me = await t.app.inject({ url: "/api/auth/me", headers: { cookie: crew.cookie } });
+    expect(me.json().user).toBeNull();
+    const again = await t.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { login: "Bonny", password: "parrots-and-rum" },
+    });
+    expect(again.statusCode).toBe(401);
+    // The name is free again.
+    expect((await signUp(t.app, "Bonny")).res.statusCode).toBe(201);
+  });
+
   it("logs out and the old cookie stops working", async () => {
     const { cookie } = await signUp(t.app);
     await t.app.inject({ method: "POST", url: "/api/auth/logout", headers: { cookie } });

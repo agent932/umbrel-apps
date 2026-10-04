@@ -1,9 +1,8 @@
 // Pirate Cribbage service worker: makes the app installable and lets guest games vs Cap'n Bot
 // work offline. The API and the game socket always go to the network.
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
-const FONTS = `fonts-${VERSION}`;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -15,7 +14,7 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  const keep = [SHELL, ASSETS, FONTS];
+  const keep = [SHELL, ASSETS];
   event.waitUntil(
     caches
       .keys()
@@ -59,21 +58,6 @@ self.addEventListener("fetch", (event) => {
             void caches.open(ASSETS).then((c) => c.put(req, copy));
             return res;
           }),
-      ),
-    );
-    return;
-  }
-
-  // Google Fonts: serve what we have, refresh in the background.
-  if (url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com")) {
-    event.respondWith(
-      caches.open(FONTS).then((c) =>
-        c.match(req).then((hit) => {
-          const fresh = fetch(req)
-            .then((res) => (c.put(req, res.clone()), res))
-            .catch(() => hit);
-          return hit ?? fresh;
-        }),
       ),
     );
   }

@@ -50,17 +50,14 @@ export async function buildApp({
         defaultSrc: ["'self'"],
         // Cloudflare Web Analytics (added to pages by Cloudflare when the site is behind it).
         scriptSrc: ["'self'", "https://static.cloudflareinsights.com"],
-        // React and the animation library set inline style attributes; fonts come from Google.
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        // React and the animation library set inline style attributes. Fonts are bundled.
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'"],
         // Vite inlines small images (the card back) as data: URIs.
         imgSrc: ["'self'", "data:"],
-        // The game socket is same-origin. The service worker also fetches Google Fonts to cache
-        // them for offline play, and runs under this same policy.
+        // The game socket is same-origin.
         connectSrc: [
           "'self'",
-          "https://fonts.googleapis.com",
-          "https://fonts.gstatic.com",
           // Where Cloudflare Web Analytics reports page views.
           "https://cloudflareinsights.com",
         ],
