@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.17.1"
+version: "0.18.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,8 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  A Home link in Pirate Cribbage (and in the in-game Menu) takes you back
-  to the Deckhand Games hub.
+  Email arrives! Admins can connect a Resend account under Captain's
+  Quarters → Email. Then players can reset a forgotten password from the
+  sign-in page, and email a game invite straight to a friend from the
+  online lobby.
 
 
 developer: agent932

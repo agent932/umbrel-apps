@@ -3,6 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { buildApp } from "../app.js";
+import type { Mailer } from "../email/mailer.js";
 import type { Timing } from "../online/rooms.js";
 import type { Db } from "../db/client.js";
 import * as schema from "../db/schema.js";
@@ -14,6 +15,7 @@ export async function testApp(
   timing?: Timing,
   messageLimit = 100_000,
   webDist?: string,
+  mailer?: Mailer,
 ) {
   const client = new PGlite();
   const pg = drizzle(client, { schema });
@@ -29,6 +31,7 @@ export async function testApp(
       timing,
       socketMessageLimit: messageLimit,
       webDist,
+      mailer: mailer ?? (async () => {}),
     });
   const app = await build();
   return {

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import { IllegalActionError } from "@pirate/engine";
 import type { Db } from "../db/client.js";
@@ -6,6 +7,7 @@ import { Matchmaker } from "./matchmaker.js";
 import type { Presence } from "./presence.js";
 import { ClientMessage, type ServerMessage } from "./protocol.js";
 import { type Client, RoomError, type RoomManager } from "./rooms.js";
+import { type Mailer, emailSettings, simpleEmail } from "../email/mailer.js";
 
 /** A real player sends a few messages a second at most. */
 const KEEP_ALIVE_MS = 30_000;
@@ -38,9 +40,56 @@ export async function onlineRoutes(
     rooms,
     presence,
     messageLimit = MAX_MESSAGES_PER_10S,
-  }: { db: Db; rooms: RoomManager; presence: Presence; messageLimit?: number },
+    mailer,
+  }: {
+    db: Db;
+    rooms: RoomManager;
+    presence: Presence;
+    messageLimit?: number;
+    mailer: Mailer;
+  },
 ) {
   const matchmaker = new Matchmaker(rooms, presence, (a, b) => areFriends(db, a, b));
+
+  /** Email a friend the link to your open invite. */
+  app.post(
+    "/api/invites/email",
+    { config: { rateLimit: { max: 10, timeWindow: "1 hour" } } },
+    async (req, reply) => {
+      if (!req.user) return reply.code(401).send({ error: "Sign in first" });
+      const body = z
+        .object({ code: z.string().max(20), to: z.string().trim().toLowerCase().email().max(254) })
+        .safeParse(req.body);
+      if (!body.success) return reply.code(400).send({ error: "That email doesn't look right" });
+      const host = matchmaker.inviteHost(body.data.code);
+      if (!host || host.userId !== req.user.id) {
+        return reply.code(400).send({ error: "That invite has expired; make a new one" });
+      }
+      const config = await emailSettings(db);
+      if (!config) return reply.code(400).send({ error: "Email isn't set up on this server" });
+      try {
+        await mailer(
+          config,
+          simpleEmail({
+            to: body.data.to,
+            subject: `${req.user.username} invites you to a game of Pirate Cribbage`,
+            lines: [
+              `Ahoy! ${req.user.username} has dealt you in for a game of Pirate Cribbage on Deckhand Games.`,
+              "The invite is good for an hour. You'll need a free account to play.",
+            ],
+            button: {
+              label: "Join the game",
+              url: `${config.siteUrl}/join/${body.data.code.toUpperCase()}`,
+            },
+          }),
+        );
+      } catch (e) {
+        req.log.error(e);
+        return reply.code(502).send({ error: "Couldn't send the email; try again" });
+      }
+      return { ok: true };
+    },
+  );
 
   app.get("/api/online/active", async (req, reply) => {
     if (!req.user) return reply.code(401).send({ error: "Sign in first" });

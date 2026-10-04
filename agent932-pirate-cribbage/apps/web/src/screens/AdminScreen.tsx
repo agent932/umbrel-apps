@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ApiError, type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { CRIBBAGE_HOME } from "../routes.js";
+import { EmailSettingsPanel } from "../components/EmailSettingsPanel.js";
 
 interface Overview {
   players: number;
@@ -43,7 +44,7 @@ interface LiveGame {
   startedAt: string;
 }
 
-const TABS = ["Overview", "Players", "Live games", "Seasons"] as const;
+const TABS = ["Overview", "Players", "Live games", "Seasons", "Email"] as const;
 type Tab = (typeof TABS)[number];
 
 function uptime(s: number) {
@@ -384,6 +385,7 @@ export function AdminScreen() {
         {tab === "Players" && <PlayersTab />}
         {tab === "Live games" && <GamesTab />}
         {tab === "Seasons" && <SeasonsTab />}
+        {tab === "Email" && <EmailSettingsPanel />}
       </section>
     </main>
   );

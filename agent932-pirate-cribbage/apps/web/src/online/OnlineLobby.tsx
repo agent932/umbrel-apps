@@ -8,11 +8,14 @@ import { TierBadge } from "../components/TierBadge.js";
 import trophyUrl from "../assets/ui/icon-trophy.webp";
 import { SPYGLASS_URL } from "../brand/powerArt.js";
 import { CRIBBAGE_HOME } from "../routes.js";
+import { api } from "../api.js";
+import { useEmailEnabled } from "../email.js";
 
 type Status = { kind: "idle" } | { kind: "searching" } | { kind: "invite"; code: string };
 
 /** Quick Match and invites. Shown on the home screen to signed-in players. */
 export function OnlineLobby() {
+  const emailOn = useEmailEnabled();
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [variant, setVariant] = useState<Menu["variant"]>("pirate");
@@ -160,6 +163,7 @@ export function OnlineLobby() {
           <p className="text-xs text-parchment/60">
             Code <b className="tracking-widest text-gold">{status.code}</b> · expires in an hour
           </p>
+          {emailOn && <EmailInvite code={status.code} />}
           <button
             type="button"
             className="self-start text-sm text-parchment/70 hover:text-gold"
@@ -215,5 +219,54 @@ export function JoinInvite({ code }: { code: string }) {
         <p className="animate-pulse">Rowing out to meet your friend</p>
       )}
     </main>
+  );
+}
+
+/** Send the invite link straight to a friend's inbox. */
+function EmailInvite({ code }: { code: string }) {
+  const [to, setTo] = useState("");
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="flex flex-col gap-1"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setNote(null);
+        try {
+          await api("/api/invites/email", { body: { code, to } });
+          setNote({ ok: true, text: `Invite sent to ${to}.` });
+          setTo("");
+        } catch (err) {
+          setNote({ ok: false, text: err instanceof Error ? err.message : "Couldn't send" });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <div className="flex gap-2">
+        <input
+          type="email"
+          required
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="friend@example.com"
+          aria-label="Friend's email"
+          className="min-w-0 flex-1 rounded-lg border border-parchment/30 bg-sea px-2 py-1 text-sm"
+        />
+        <button type="submit" className="btn-secondary px-3 py-1 text-sm" disabled={busy}>
+          Email it
+        </button>
+      </div>
+      {note && (
+        <p
+          role={note.ok ? "status" : "alert"}
+          className={`text-xs ${note.ok ? "text-gold" : "text-red-300"}`}
+        >
+          {note.text}
+        </p>
+      )}
+    </form>
   );
 }

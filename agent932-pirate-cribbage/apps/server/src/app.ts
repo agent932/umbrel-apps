@@ -11,6 +11,8 @@ import { gameRoutes } from "./games/routes.js";
 import { adminRoutes } from "./admin/routes.js";
 import { friendRoutes } from "./friends/routes.js";
 import { achievementRoutes } from "./achievements/routes.js";
+import { emailRoutes } from "./email/routes.js";
+import { type Mailer, resendMailer } from "./email/mailer.js";
 import { Presence } from "./online/presence.js";
 import { onlineRoutes } from "./online/routes.js";
 import { RoomManager, type Timing } from "./online/rooms.js";
@@ -25,6 +27,8 @@ export interface AppOptions {
   timing?: Timing;
   /** Socket messages allowed per connection per 10 seconds; tests that play at bot speed raise it. */
   socketMessageLimit?: number;
+  /** Sends email (Resend); tests pass a fake. */
+  mailer?: Mailer;
 }
 
 export async function buildApp({
@@ -34,6 +38,7 @@ export async function buildApp({
   logger = true,
   timing,
   socketMessageLimit,
+  mailer = resendMailer,
 }: AppOptions) {
   // trustProxy: behind Umbrel's app proxy / Cloudflare, so req.protocol reflects HTTPS.
   const app = Fastify({ logger, trustProxy: true });
@@ -109,9 +114,16 @@ export async function buildApp({
   // Online games live here; the admin page lists and can end them.
   const rooms = new RoomManager(db, timing);
   app.addHook("onClose", async () => rooms.close());
-  await app.register(onlineRoutes, { db, rooms, presence, messageLimit: socketMessageLimit });
+  await app.register(onlineRoutes, {
+    db,
+    rooms,
+    presence,
+    messageLimit: socketMessageLimit,
+    mailer,
+  });
   await app.register(friendRoutes, { db, presence });
   await app.register(achievementRoutes, { db });
+  await app.register(emailRoutes, { db, mailer });
   await app.register(adminRoutes, { db, rooms, presence });
 
   if (webDist) {

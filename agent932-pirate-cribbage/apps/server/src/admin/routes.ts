@@ -12,7 +12,7 @@ import type { Presence } from "../online/presence.js";
 import type { RoomManager } from "../online/rooms.js";
 import { currentSeason, endSeason } from "../seasons/seasons.js";
 
-function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
+export function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   if (!req.user) {
     void reply.code(401).send({ error: "Sign in first" });
     return null;

@@ -125,6 +125,13 @@ export class Matchmaker {
     client.send({ t: "matched", gameId });
   }
 
+  /** Who made a live invite code, or null if it's expired, cancelled or unknown. */
+  inviteHost(code: string): { userId: string; username: string } | null {
+    const invite = this.invites.get(code.toUpperCase());
+    if (!invite || invite.expires < Date.now()) return null;
+    return { userId: invite.host.userId, username: invite.host.username };
+  }
+
   /** Withdraw a player's invite links. */
   cancelInvites(userId: string) {
     for (const [code, inv] of this.invites)

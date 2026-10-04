@@ -3,8 +3,10 @@ import { Link, useLocation } from "wouter";
 import { ApiError } from "../api.js";
 import { useAuth } from "../auth.js";
 import { CRIBBAGE_HOME } from "../routes.js";
+import { useEmailEnabled } from "../email.js";
 
 export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
+  const emailOn = useEmailEnabled();
   const { login, signup } = useAuth();
   const [, navigate] = useLocation();
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +90,11 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
         <button type="submit" className="btn-primary" disabled={busy}>
           {mode === "signup" ? "Sign up" : "Log in"}
         </button>
+        {mode === "login" && emailOn && (
+          <Link href="/forgot" className="self-center text-sm text-parchment/70 hover:text-gold">
+            Forgot your password?
+          </Link>
+        )}
       </form>
       <p className="text-center text-sm text-parchment/70">
         {mode === "signup" ? (
