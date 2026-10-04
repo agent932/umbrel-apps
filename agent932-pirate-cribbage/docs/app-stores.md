@@ -1,92 +1,93 @@
-# Putting Pirate Cribbage in the App Store and Google Play
+# Deckhand Games on the iPhone App Store
 
-Pirate Cribbage is a web app. The quickest route into the stores is to wrap the same code in a native
-shell with [Capacitor](https://capacitorjs.com). This guide covers what that takes. Nothing here has
-been set up yet; the steps that need your Apple and Google accounts are yours to do.
+The iPhone app is a [Capacitor](https://capacitorjs.com) shell in `ios/`. The game's pages ship
+inside the app and talk to `https://deckhand.games`: the app signs in with a token rather than a
+cookie (see `apps/web/src/native.ts`), and the server allows the app's origin
+(`capacitor://localhost`). Because the game is bundled, playing the computer crew as a guest works
+with no connection.
 
-## What a store app adds
+| Setting          | Value                                                                     |
+| ---------------- | ------------------------------------------------------------------------- |
+| Bundle ID        | `games.deckhand.app` (permanent once the App Store Connect record exists) |
+| Display name     | Deckhand Games                                                            |
+| Orientations     | Portrait and landscape (iPhone), all four (iPad)                          |
+| Privacy policy   | https://deckhand.games/privacy                                            |
+| Account deletion | Account → Delete account (required by App Review)                         |
 
-- **Landscape lock** (or portrait), which a web page can't do on iPhone.
-- **Vibration on iPhone** through the native Haptics plugin (the web version only buzzes on Android).
-- A listing people can find and install, with its own icon and splash screen.
+## One-time Mac setup
 
-## Before you start
+```bash
+sudo xcodebuild -runFirstLaunch
+```
 
-| You need | Cost | Notes |
-| --- | --- | --- |
-| Apple Developer Program membership | US$99 / year | Needed to publish to the App Store or TestFlight. |
-| A Mac with Xcode | free | Builds and signs the iOS app. |
-| Google Play Console account | US$25 once | Identity verification can take a few days. |
-| Android Studio | free | Builds and signs the Android app. |
-| A privacy policy page | free | Both stores require a URL. The game stores accounts, game history and an email address. |
+Then in Xcode → Settings → Components, install the iOS platform (Simulator runtime) if it's missing.
 
-## Choose how the app loads the game
-
-**A. Load the live site (fastest).** The app opens `https://pc.atomicit.ca` inside the native shell
-(`server.url` in the Capacitor config). Updates on your Umbrel reach the app immediately and no code
-changes are needed. The catch: Apple can reject apps that are "just a website" (App Store Review
-Guideline 4.2). Native haptics and orientation lock help, but approval isn't guaranteed. Google
-Play is usually fine with this.
-
-**B. Ship the game inside the app (most robust).** The built web files are bundled into the app and
-talk to your server over the internet. This needs some code changes first:
-
-1. An API base URL setting in the web app (today every request goes to the same site the page came from).
-2. Session cookies sent across sites: `sameSite: "none"` and `secure: true` for requests from the app,
-   or switch the app to token-based sign-in.
-3. Allow the app's origin (`capacitor://localhost` on iOS, `https://localhost` on Android) in the
-   server's CORS and WebSocket origin checks (`sameOrigin` in `apps/server/src/online/routes.ts`).
-4. Update the Content Security Policy `connect-src` in `apps/server/src/app.ts`.
-
-Recommendation: start with **A** for Google Play and TestFlight testing, and move to **B** if Apple
-pushes back.
-
-## Setting it up (option A)
+## Build
 
 From `agent932-pirate-cribbage/`:
 
 ```bash
-npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android @capacitor/haptics @capacitor/screen-orientation
-npx cap init "Pirate Cribbage" ca.atomicit.piratecribbage --web-dir apps/web/dist
+npm run app:ios
 ```
 
-Then edit the generated `capacitor.config.ts` to match `docs/capacitor.config.example.json`
-(it points the app at the live site and sets the background colour). Add the platforms:
+This builds the web app and copies it into `ios/App/App/public`. Run it after every change you want
+in the app, then open the project:
 
 ```bash
-npm run build -w @pirate/web
-npx cap add ios
-npx cap add android
+npx cap open ios
 ```
 
-### Icons and splash screens
+## First run on the Simulator or your iPhone
 
-The painted app icon is in `art-kit/app-icon.png` (outside this repo). Generate every size with:
+1. In Xcode, select the **App** target → **Signing & Capabilities** → tick _Automatically manage
+   signing_ and pick your **Team**.
+2. Choose an iPhone Simulator (or your plugged-in iPhone) at the top and press **Run** (⌘R).
 
-```bash
-npx @capacitor/assets generate --iconBackgroundColor '#0e2034' --splashBackgroundColor '#04121c'
-```
+## TestFlight
 
-(put the icon at `assets/icon.png` and a splash image at `assets/splash.png` first).
+1. In [App Store Connect](https://appstoreconnect.apple.com) → Apps → **+** → New App: platform iOS,
+   name _Deckhand Games_, bundle ID `games.deckhand.app`, SKU e.g. `deckhand-games`.
+2. In Xcode set the version (General → Version, e.g. `1.0`) and bump **Build** for every upload.
+3. Choose _Any iOS Device (arm64)_ → **Product → Archive** → **Distribute App** → _App Store
+   Connect_ → Upload.
+4. After processing (10–30 min) the build appears under TestFlight. Add yourself as an internal
+   tester and install with the TestFlight app.
 
-### Small code changes worth making
+## App Store listing
 
-- **Haptics:** in `apps/web/src/haptics.ts`, call `Haptics.impact({ style: ImpactStyle.Light })` from
-  `@capacitor/haptics` when `Capacitor.isNativePlatform()`, and keep `navigator.vibrate` for the web.
-- **Orientation:** call `ScreenOrientation.lock({ orientation: "landscape" })` at start-up in the
-  native app if you want landscape only. The table works in both, so this is optional.
+- **Category:** Games → Card (secondary: Board).
+- **Subtitle:** Cribbage on the high seas
+- **Description:** Deckhand Games is a home for classic card games with a pirate twist. The first
+  game aboard is Pirate Cribbage: play the computer crew at three difficulties or friends online,
+  switch on Pirate Rules for buried treasure, the Kraken and six sneaky powers, and track every
+  match in the Ship's Log with detailed stats, ranks and achievements. Learn to play with Peggy the
+  parrot, and test your discards with the daily puzzle.
+- **Keywords:** cribbage,card game,pirate,crib,peg,board,multiplayer,friends,classic
+- **Support URL:** https://github.com/agent932/umbrel-apps/issues
+- **Privacy policy URL:** https://deckhand.games/privacy
+- **Age rating:** answer _None_ to everything (no gambling for money, no user-generated text: emotes
+  are fixed). Expect 4+.
+- **Screenshots:** 6.9" iPhone (1320 × 2868, or 2868 × 1320 landscape) is required; take them in
+  the Simulator with ⌘S (iPhone 17 Pro Max). The painted table in landscape looks best.
+- **Review notes:** give App Review a test account (username and password) so they can try online
+  play, and mention that guest play against the computer needs no account.
 
-### Build and submit
+## App Privacy answers
 
-- iOS: `npx cap open ios`, set your team under Signing & Capabilities, Product → Archive, then upload
-  to App Store Connect and test through TestFlight before submitting for review.
-- Android: `npx cap open android`, Build → Generate Signed Bundle (keep the keystore safe; you need it
-  for every update), then upload the `.aab` to Play Console (internal testing first).
+Data linked to the user, used for **App Functionality** only, **not** used for tracking:
 
-### Store listings need
+- Contact Info → Email Address
+- Identifiers → User ID
+- User Content → Gameplay Content (match history)
 
-- Screenshots: phone landscape and portrait (the painted table looks best), 6.7" and 5.5" iPhone sizes,
-  plus Android phone. Optional tablet shots.
-- Short and long descriptions, a category (Card games), and a content rating questionnaire (no
-  gambling for money; it's fine).
-- The privacy policy URL, and Apple's App Privacy answers (account, email, gameplay data; no tracking).
+No usage data or diagnostics are collected by the app, and there's no third-party advertising or
+analytics in it.
+
+## Notes
+
+- **Why bundled, not a web wrapper:** App Review Guideline 4.2 rejects apps that only show a
+  website. The bundled game, native haptics and offline play against the computer answer that.
+- **Live-site mode for quick testing:** add `server: { url: "https://deckhand.games" }` to
+  `capacitor.config.ts` temporarily to load the live site instead of the bundle (don't ship it).
+- **Android** later: `npm i @capacitor/android && npx cap add android`, then add
+  `https://localhost` to `APP_ORIGINS` in `apps/server/src/online/routes.ts`.
