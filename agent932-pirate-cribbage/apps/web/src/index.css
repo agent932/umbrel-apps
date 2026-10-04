@@ -458,6 +458,10 @@ body {
   cursor: default;
   opacity: 0.55;
 }
+/* Not usable right now, but still tappable to read what it does. */
+.t-round.idle {
+  opacity: 0.6;
+}
 .t-round.used {
   filter: grayscale(1) brightness(0.6);
   opacity: 0.45;

@@ -60,7 +60,7 @@ export function Card({
       ? "w-10 h-14 text-[11px]"
       : "w-14 h-20 text-sm sm:w-16 sm:h-24 sm:text-base";
   const faceDown = hidden || !card;
-  const base = `${size} relative shrink-0 select-none rounded-lg shadow-[0_4px_10px_-2px_rgba(0,0,0,0.55)] transition-transform duration-150`;
+  const base = `${size} relative isolate shrink-0 select-none rounded-lg shadow-[0_4px_10px_-2px_rgba(0,0,0,0.55)] transition-transform duration-150`;
 
   if (faceDown) {
     return (

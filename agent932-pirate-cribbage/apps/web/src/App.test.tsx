@@ -64,6 +64,9 @@ describe("playing vs the bot", () => {
     const user = await startGame("Pirate");
     await waitFor(() => expect(hand().getAllByRole("button")).toHaveLength(6));
     await user.click(screen.getByRole("button", { name: /Spyglass/ }));
+    // The power explains itself first; then you use it.
+    expect(screen.getByRole("dialog", { name: "Spyglass" })).toHaveTextContent(/Peek at/);
+    await user.click(screen.getByRole("button", { name: "Use Spyglass" }));
     const spied = await screen.findByLabelText("Opponent's hand seen through the spyglass");
     // Six cards, or the four they kept if the bot already discarded.
     expect(within(spied).getAllByRole("img").length).toBeGreaterThanOrEqual(4);
