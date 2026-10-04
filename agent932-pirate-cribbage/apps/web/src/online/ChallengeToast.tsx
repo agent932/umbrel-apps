@@ -49,7 +49,7 @@ export function ChallengeToast() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-4 z-30 mx-auto flex max-w-md flex-col gap-2 px-4"
+      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 mx-auto flex max-w-md flex-col gap-2 px-4"
       aria-live="polite"
     >
       {incoming.map((c) => (

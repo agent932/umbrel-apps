@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.23.1"
+version: "0.23.2"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,9 +37,8 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Phone fixes: screens now stay clear of the iPhone notch and Dynamic Island,
-  tapping a text field no longer zooms the page in, and a long opponent name
-  under the crib no longer runs off the edge of the table.
+  Peggy's tutorial tips, her table chatter and friend-challenge pop-ups now
+  stay clear of the iPhone notch and home bar.
 
 
 developer: agent932

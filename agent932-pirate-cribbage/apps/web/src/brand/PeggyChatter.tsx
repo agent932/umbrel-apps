@@ -8,7 +8,7 @@ import { quipFor } from "./quips.js";
 export function PeggyChatter({
   events,
   me,
-  className = "fixed bottom-4 left-3",
+  className = "fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-[calc(env(safe-area-inset-left)+0.75rem)]",
 }: {
   events: GameEvent[];
   me: Seat;

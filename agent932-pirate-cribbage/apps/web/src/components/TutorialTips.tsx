@@ -49,7 +49,7 @@ export function TutorialTips({ phase }: { phase: PlayerView["phase"] }) {
   return (
     <aside
       key={current}
-      className="fixed top-3 left-1/2 z-40 flex w-[min(94vw,560px)] -translate-x-1/2 items-start gap-3 rounded-2xl border-2 border-gold/70 bg-night/95 p-3 shadow-2xl"
+      className="fixed top-[calc(env(safe-area-inset-top)+0.75rem)] left-1/2 z-40 flex w-[min(94vw,560px)] -translate-x-1/2 items-start gap-3 rounded-2xl border-2 border-gold/70 bg-night/95 p-3 shadow-2xl"
       style={{ animation: "pop-in 260ms ease-out" }}
       aria-live="polite"
       aria-label="Peggy's tip"
