@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { useState } from "react";
 import { type BotLevel, POWER_INFO, POWERS } from "@pirate/engine";
 import { useAuth } from "../auth.js";
@@ -116,6 +117,9 @@ export function HomeScreen({
       <button type="button" className="btn-secondary" onClick={onLearn}>
         New to cribbage? Learn to play with Peggy
       </button>
+      <Link href="/cribbage/daily" className="btn-secondary text-center">
+        Daily discard: which two would you throw?
+      </Link>
 
       <section className="panel flex flex-col gap-5 p-5">
         <h2 className="font-pirate text-2xl text-gold">Play the crew</h2>

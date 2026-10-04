@@ -9,3 +9,4 @@ export * from "./analyzer.js";
 export * from "./cribTable.js";
 export * from "./rating.js";
 export * from "./achievements.js";
+export * from "./daily.js";

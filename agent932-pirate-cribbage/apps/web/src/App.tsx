@@ -24,6 +24,7 @@ import { StatsScreen } from "./screens/StatsScreen.js";
 import { CRIBBAGE_HOME } from "./routes.js";
 import { HubScreen } from "./screens/HubScreen.js";
 import { ForgotScreen, ResetScreen } from "./screens/PasswordResetScreens.js";
+import { DailyDiscardScreen } from "./screens/DailyDiscardScreen.js";
 
 /** The game being played: in the browser (guests) or on the server (signed in, counts for stats). */
 type Session = { kind: "local"; game: LocalGame } | { kind: "remote"; res: GameResponse };
@@ -217,6 +218,9 @@ function Routes({ botDelay }: { botDelay?: number }) {
         ) : (
           <RemotePlay key={gameKey} res={session.res} {...playProps} />
         )}
+      </Route>
+      <Route path="/cribbage/daily">
+        <DailyDiscardScreen />
       </Route>
       <Route path="/forgot">
         <ForgotScreen />

@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Pirate Cribbage
-version: "0.19.0"
+version: "0.20.0"
 tagline: Online 2-player cribbage with stats, ranks and pirate rules
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.svg
 description: >-
@@ -31,10 +31,10 @@ description: >-
 
   - Detailed per-mode and head-to-head stats
 releaseNotes: >-
-  Optional email notices: under Account, choose to be emailed when you've
-  left an online game and your opponent is waiting, or when someone sends
-  you a friend request. Both are off unless you turn them on, and every
-  email has a one-click link to stop them.
+  New: the Daily discard. Everyone gets the same six cards each day; pick
+  the two you'd throw to the crib and see how close you came to the best
+  throw, with the expected points for each choice. Keep a streak going by
+  finding the best throw day after day.
 
 
 developer: agent932
