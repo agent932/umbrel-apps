@@ -247,3 +247,20 @@ export const passwordResets = pgTable("password_resets", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
 });
+
+/** Messages from the support page. Admins read them on the Admin page, and by email once email is set up. */
+export const supportMessages = pgTable(
+  "support_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    /** Where to reply. */
+    email: text("email").notNull(),
+    topic: text("topic").notNull(),
+    message: text("message").notNull(),
+    /** Who sent it, if they were signed in. */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("support_messages_created").on(t.createdAt)],
+);

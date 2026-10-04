@@ -4,6 +4,7 @@ import { ApiError, type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 import { EmailSettingsPanel } from "../components/EmailSettingsPanel.js";
+import { SupportInbox } from "../components/SupportInbox.js";
 
 interface Overview {
   players: number;
@@ -44,7 +45,7 @@ interface LiveGame {
   startedAt: string;
 }
 
-const TABS = ["Overview", "Players", "Live games", "Seasons", "Email"] as const;
+const TABS = ["Overview", "Players", "Live games", "Seasons", "Support", "Email"] as const;
 type Tab = (typeof TABS)[number];
 
 function uptime(s: number) {
@@ -385,6 +386,7 @@ export function AdminScreen() {
         {tab === "Players" && <PlayersTab />}
         {tab === "Live games" && <GamesTab />}
         {tab === "Seasons" && <SeasonsTab />}
+        {tab === "Support" && <SupportInbox />}
         {tab === "Email" && <EmailSettingsPanel />}
       </section>
     </main>

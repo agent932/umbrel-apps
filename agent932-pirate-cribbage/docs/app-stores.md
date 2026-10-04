@@ -63,7 +63,7 @@ npx cap open ios
   match in the Ship's Log with detailed stats, ranks and achievements. Learn to play with Peggy the
   parrot, and test your discards with the daily puzzle.
 - **Keywords:** cribbage,card game,pirate,crib,peg,board,multiplayer,friends,classic
-- **Support URL:** https://github.com/agent932/umbrel-apps/issues
+- **Support URL:** https://deckhand.games/support
 - **Privacy policy URL:** https://deckhand.games/privacy
 - **Age rating:** answer _None_ to everything (no gambling for money, no user-generated text: emotes
   are fixed). Expect 4+.

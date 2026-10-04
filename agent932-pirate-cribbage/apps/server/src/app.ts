@@ -12,6 +12,7 @@ import { adminRoutes } from "./admin/routes.js";
 import { friendRoutes } from "./friends/routes.js";
 import { achievementRoutes } from "./achievements/routes.js";
 import { emailRoutes } from "./email/routes.js";
+import { supportRoutes } from "./support/routes.js";
 import { Notices } from "./email/notices.js";
 import { type Mailer, resendMailer } from "./email/mailer.js";
 import { Presence } from "./online/presence.js";
@@ -141,6 +142,7 @@ export async function buildApp({
   await app.register(friendRoutes, { db, presence, notices });
   await app.register(achievementRoutes, { db });
   await app.register(emailRoutes, { db, mailer });
+  await app.register(supportRoutes, { db, mailer });
   await app.register(adminRoutes, { db, rooms, presence });
 
   if (webDist) {

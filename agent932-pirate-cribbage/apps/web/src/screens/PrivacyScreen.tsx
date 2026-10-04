@@ -31,6 +31,10 @@ export function PrivacyScreen() {
             <b>Friends:</b> who you've added and pending requests.
           </li>
           <li>
+            <b>Support messages:</b> if you write to us from the Help &amp; support page, your name,
+            email address and message, until we've dealt with it and deleted it.
+          </li>
+          <li>
             <b>Email settings:</b> which optional notices you've switched on.
           </li>
           <li>
@@ -92,16 +96,11 @@ export function PrivacyScreen() {
       <section className="flex flex-col gap-2">
         <h2 className={h2}>Questions</h2>
         <p>
-          Open an issue at{" "}
-          <a
-            className="text-gold underline"
-            href="https://github.com/agent932/umbrel-apps/issues"
-            target="_blank"
-            rel="noreferrer"
-          >
-            github.com/agent932/umbrel-apps/issues
-          </a>
-          .
+          Use the{" "}
+          <Link href="/support" className="text-gold underline">
+            Help &amp; support
+          </Link>{" "}
+          page to send us a message.
         </p>
       </section>
     </main>

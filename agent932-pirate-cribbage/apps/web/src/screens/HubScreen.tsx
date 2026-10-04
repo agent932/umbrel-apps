@@ -51,6 +51,10 @@ export function HubScreen() {
         </li>
       </ul>
       <footer className="mt-auto text-center text-sm text-parchment/60">
+        <Link href="/support" className="hover:text-gold">
+          Help &amp; support
+        </Link>
+        {" · "}
         <Link href="/privacy" className="hover:text-gold">
           Privacy policy
         </Link>

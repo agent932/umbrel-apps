@@ -17,6 +17,7 @@ import { AnimationLab } from "./screens/AnimationLab.js";
 import { AdminScreen } from "./screens/AdminScreen.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
 import { PrivacyScreen } from "./screens/PrivacyScreen.js";
+import { SupportScreen } from "./screens/SupportScreen.js";
 import { FriendsScreen } from "./screens/FriendsScreen.js";
 import { LeaderboardScreen } from "./screens/LeaderboardScreen.js";
 import { GameScreen } from "./screens/GameScreen.js";
@@ -222,6 +223,9 @@ function Routes({ botDelay }: { botDelay?: number }) {
       </Route>
       <Route path="/cribbage/daily">
         <DailyDiscardScreen />
+      </Route>
+      <Route path="/support">
+        <SupportScreen />
       </Route>
       <Route path="/privacy">
         <PrivacyScreen />

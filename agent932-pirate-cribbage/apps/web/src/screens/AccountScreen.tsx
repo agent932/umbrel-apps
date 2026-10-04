@@ -101,9 +101,15 @@ export function AccountScreen() {
         </button>
       </form>
       <DeleteAccount />
-      <Link href="/privacy" className="text-center text-sm text-parchment/60 hover:text-gold">
-        Privacy policy
-      </Link>
+      <p className="text-center text-sm text-parchment/60">
+        <Link href="/support" className="hover:text-gold">
+          Help &amp; support
+        </Link>
+        {" · "}
+        <Link href="/privacy" className="hover:text-gold">
+          Privacy policy
+        </Link>
+      </p>
     </main>
   );
 }

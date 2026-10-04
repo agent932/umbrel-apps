@@ -16,6 +16,8 @@ export interface Email {
   subject: string;
   text: string;
   html: string;
+  /** Where replies go, if not the sender (e.g. the player who wrote to support). */
+  replyTo?: string;
 }
 
 /** Sends one email with the given settings. Swapped for a fake in tests. */
@@ -25,7 +27,14 @@ export const resendMailer: Mailer = async (config, email) => {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${config.apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: config.from, ...email }),
+    body: JSON.stringify({
+      from: config.from,
+      to: email.to,
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+      ...(email.replyTo ? { reply_to: email.replyTo } : {}),
+    }),
   });
   if (!res.ok) {
     const detail = (await res.json().catch(() => ({}))) as { message?: string };
