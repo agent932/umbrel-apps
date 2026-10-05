@@ -1,38 +1,68 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { type Settings, updateSettings, useSettings } from "../settings.js";
 import wheelUrl from "../assets/ui/icon-wheel.webp";
 
 /** The ship's wheel in the corner: sound on/off and how fast Cap'n Bot plays. Saved in this browser. */
 export function SettingsButton() {
-  const [open, setOpen] = useState(false);
+  // Where the panel drops from: under the wheel, wherever the wheel sits on the page.
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const open = at !== null;
+  function toggle() {
+    const r = button.current?.getBoundingClientRect();
+    setAt(open || !r ? null : { top: r.bottom + 8, right: r.right });
+  }
   return (
     <span className="relative">
       <button
+        ref={button}
         type="button"
         aria-label="Settings"
         aria-expanded={open}
         className="opacity-85 transition hover:scale-110 hover:opacity-100"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         <img src={wheelUrl} alt="" className="h-7 w-7" />
       </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Settings"
-          className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-gold/40 bg-sea p-3 text-left text-sm text-parchment shadow-2xl"
-        >
-          <SettingsFields />
-          <button
-            type="button"
-            className="mt-3 w-full text-xs text-parchment/60 hover:text-gold"
-            onClick={() => setOpen(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
+      {at && createPortal(<SettingsPanel at={at} onClose={() => setAt(null)} />, document.body)}
     </span>
+  );
+}
+
+/**
+ * The settings, dropped from the wheel: lined up with the wheel's right edge, but never past
+ * either side of the screen or its safe areas, and scrolling if the screen is short.
+ */
+function SettingsPanel({
+  at,
+  onClose,
+}: {
+  at: { top: number; right: number };
+  onClose: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-label="Settings"
+      className="float-panel settings-panel rounded-xl border border-gold/40 bg-sea p-3 text-left text-sm text-parchment shadow-2xl"
+      style={
+        {
+          top: at.top,
+          "--panel-top": `${at.top}px`,
+          "--at-right": `${at.right}px`,
+        } as React.CSSProperties
+      }
+    >
+      <SettingsFields />
+      <button
+        type="button"
+        className="mt-3 w-full text-xs text-parchment/60 hover:text-gold"
+        onClick={onClose}
+      >
+        Close
+      </button>
+    </div>
   );
 }
 

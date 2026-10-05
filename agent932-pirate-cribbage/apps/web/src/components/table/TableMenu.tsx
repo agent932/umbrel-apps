@@ -22,7 +22,7 @@ export function TableMenu({
     <div
       role="dialog"
       aria-label="Menu"
-      className="absolute top-3 right-3 z-30 w-64 rounded-2xl border border-gold/40 bg-sea/95 p-4 text-sm text-parchment shadow-2xl"
+      className="float-panel t-menu-panel rounded-2xl border border-gold/40 bg-sea/95 p-4 text-sm text-parchment shadow-2xl"
     >
       <p className="mb-3 font-pirate text-xl text-gold">
         Round {Math.max(round, 1)} · {pirate ? "Pirate rules" : "Classic"}

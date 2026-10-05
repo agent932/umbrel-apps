@@ -374,8 +374,9 @@ html[data-nav="pop"]::view-transition-old(root) {
 }
 
 /* ---------- The game table (screens/GameScreen.tsx) ----------
- * One fixed screen, no scrolling. Landscape (company/plans/table-redesign.md, section 2a): the board
- * stands tall down the left with the menu over its top corner and your plaque at its foot; the
+ * One fixed screen, no scrolling. Landscape (company/plans/table-redesign.md, section 2a): the menu
+ * button sits in the top-left corner and the board stands tall just right of it (clear of the
+ * screen's edge and rounded corners), with your plaque at its foot; the
  * opponent's cards hang from the top edge, their portrait in the porthole top right; the powers run
  * down the right edge; the pile, count, deck and crib sit in the middle; your hand fans along the
  * bottom with the action plank bottom right. Portrait stacks the same pieces (section 2b).
@@ -432,9 +433,14 @@ html[data-nav="pop"]::view-transition-old(root) {
   /* The opponent's column (porthole and plaque) and where the pile, deck and crib row starts. */
   --oppw: max(calc(var(--port) * 1.3), 124px);
   --play-top: 34cqh;
+  /* The menu button in the top-left corner, a margin in from the edge, and the board just right
+     of it (--bx is the board's left edge). */
+  --edge: max(8px, 1.2cqw);
+  --mw: calc(48px * var(--ui, 1));
+  --bx: calc(var(--edge) + var(--mw) + 0.8cqw);
   /* The open table between the board (left) and the powers (right). */
   --rail: 0px;
-  --left: calc(var(--bw) + 2cqw);
+  --left: calc(var(--bx) + var(--bw) + 2cqw);
   --right: calc(var(--rail) + 1.5cqw);
   position: relative;
   z-index: 1;
@@ -452,22 +458,22 @@ html[data-nav="pop"]::view-transition-old(root) {
 
 .t-board {
   z-index: 2;
-  left: 0;
+  left: var(--bx);
   top: max(0px, calc(48cqh - var(--bw) * var(--bratio) / 2));
   width: var(--bw);
   height: calc(var(--bw) * var(--bratio));
 }
-/* Beside the board's top corner (the board's track runs right up into its corners). */
+/* In the top-left corner, left of the board. */
 .t-menu {
   z-index: 6;
   /* (Divided by the zoom below, which scales its offsets too.) */
-  left: calc((var(--bw) + 0.5cqw) / var(--ui, 1));
-  top: 0;
+  left: calc(var(--edge) / var(--ui, 1));
+  top: calc(1cqh / var(--ui, 1));
 }
 /* Your plaque beside the board's foot, clear of the start holes. */
 .t-you {
   z-index: 6;
-  left: calc(var(--bw) + 0.5cqw);
+  left: calc(var(--bx) + var(--bw) + 0.5cqw);
   bottom: 1cqh;
   display: flex;
   align-items: flex-end;
@@ -477,8 +483,7 @@ html[data-nav="pop"]::view-transition-old(root) {
 .t-opp-fan {
   z-index: 3;
   top: 0;
-  /* Clear of the menu button beside the board's top. */
-  left: calc(var(--left) + 48px * var(--ui, 1));
+  left: var(--left);
   right: calc(var(--right) + var(--oppw) + 3cqw);
   height: var(--och);
 }
@@ -1208,4 +1213,47 @@ html[data-nav="pop"]::view-transition-old(root) {
     --med: min(88px, 7cqh);
     --port: min(13cqh, 20cqw);
   }
+}
+
+/* ---------- Menus and dialogs: always fully on screen ----------
+ * Every panel stays inside the safe areas (notch, Dynamic Island, home bar, rounded corners) with
+ * a margin, and scrolls inside itself when it's taller than the screen, so Close is always reachable. */
+.dialog-shade {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  /* One cell filling the space inside the margins, so the panel's max-height is that space. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+.dialog-shade > * {
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* A menu dropped from a button: placed by the button (top, left), held inside the screen. */
+.float-panel {
+  position: fixed;
+  z-index: 50;
+  width: min(var(--panel-w, 14rem), calc(100vw - 24px));
+  max-height: calc(100dvh - var(--panel-top, 12px) - max(12px, env(safe-area-inset-bottom, 0px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* The table's menu, in the top-left corner by the menu button. */
+.t-menu-panel {
+  top: max(8px, env(safe-area-inset-top, 0px));
+  left: max(8px, env(safe-area-inset-left, 0px));
+  --panel-top: max(8px, env(safe-area-inset-top, 0px));
+  --panel-w: 16rem;
+}
+/* The settings, under the wheel: right edges lined up (--at-right), but never past either side. */
+.settings-panel {
+  left: clamp(
+    max(12px, env(safe-area-inset-left, 0px)),
+    var(--at-right) - 14rem,
+    100vw - 14rem - max(12px, env(safe-area-inset-right, 0px))
+  );
 }

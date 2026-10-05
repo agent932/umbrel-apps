@@ -107,13 +107,13 @@ export function PowerPanel({
         : { text: "Not available right now.", tone: "text-parchment/70" };
   return (
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/50 p-4"
+      className="dialog-shade z-40 bg-black/50"
       onClick={onClose}
       role="dialog"
       aria-label={info.name}
     >
       <div
-        className="panel flex max-h-[94dvh] w-full max-w-sm flex-col items-center gap-2.5 overflow-y-auto p-4 text-center"
+        className="panel flex w-full max-w-sm flex-col items-center gap-2.5 p-4 text-center"
         onClick={(e) => e.stopPropagation()}
       >
         <img

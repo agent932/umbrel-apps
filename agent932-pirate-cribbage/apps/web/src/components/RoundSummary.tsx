@@ -139,11 +139,11 @@ export function Modal({
 }) {
   return (
     <div
-      className={`fixed inset-0 z-20 grid place-items-center p-4 ${seeBoard ? "bg-black/25" : "bg-black/60"}`}
+      className={`dialog-shade z-20 ${seeBoard ? "bg-black/25" : "bg-black/60"}`}
       role="dialog"
       aria-label={title}
     >
-      <div className="panel max-h-[90dvh] w-full max-w-md overflow-y-auto p-5">
+      <div className="panel w-full max-w-md p-5">
         <h2 className="scroll-title mx-auto mb-4">{title}</h2>
         {children}
       </div>
