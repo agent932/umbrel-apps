@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "wouter";
+import { NavBar } from "../components/NavBar.js";
 import { ApiError, type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { CRIBBAGE_HOME } from "../routes.js";
@@ -359,36 +359,33 @@ function SeasonsTab() {
 export function AdminScreen() {
   const [tab, setTab] = useState<Tab>("Overview");
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-5 px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
-          ← Harbour
-        </Link>
-        <h1 className="font-pirate text-4xl text-gold">Captain's Quarters</h1>
-        <span className="w-16" />
-      </header>
-      <div className="flex flex-wrap gap-2" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`rounded-full border px-3 py-1 text-sm ${tab === t ? "border-gold bg-gold/20" : "border-parchment/25"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      <section role="tabpanel" aria-label={tab}>
-        {tab === "Overview" && <OverviewTab />}
-        {tab === "Players" && <PlayersTab />}
-        {tab === "Live games" && <GamesTab />}
-        {tab === "Seasons" && <SeasonsTab />}
-        {tab === "Support" && <SupportInbox />}
-        {tab === "Email" && <EmailSettingsPanel />}
-      </section>
-    </main>
+    <>
+      <NavBar title="Captain's Quarters" back={{ to: CRIBBAGE_HOME, label: "Harbour" }} />
+      <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-5 px-4 pt-2 pb-6">
+        <h1 className="text-center font-pirate text-4xl text-gold">Captain's Quarters</h1>
+        <div className="flex flex-wrap gap-2" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`rounded-full border px-3 py-1 text-sm ${tab === t ? "border-gold bg-gold/20" : "border-parchment/25"}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <section role="tabpanel" aria-label={tab}>
+          {tab === "Overview" && <OverviewTab />}
+          {tab === "Players" && <PlayersTab />}
+          {tab === "Live games" && <GamesTab />}
+          {tab === "Seasons" && <SeasonsTab />}
+          {tab === "Support" && <SupportInbox />}
+          {tab === "Email" && <EmailSettingsPanel />}
+        </section>
+      </main>
+    </>
   );
 }

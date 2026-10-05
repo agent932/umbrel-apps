@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { NavBar } from "../components/NavBar.js";
 import {
   type Card as CardType,
   analyzeDiscard,
@@ -93,84 +93,81 @@ export function DailyDiscardScreen() {
 
   const streak = bestStreak(record.days, day);
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
-          ← Harbour
-        </Link>
-        <h1 className="font-pirate text-3xl text-gold">Daily discard</h1>
-        <span className="w-16" />
-      </header>
-      <section className="panel flex flex-col items-center gap-3 p-4 text-center">
-        <p className="text-sm text-parchment/85">
-          {isDealer
-            ? "You're the dealer, so the crib is yours. Throw two cards that help it."
-            : "Your opponent deals, so the crib is theirs. Don't feed it."}
-        </p>
-        <div
-          className="flex justify-center -space-x-2 sm:gap-1.5 sm:space-x-0"
-          aria-label="Today's hand"
-        >
-          {hand.map((c) => {
-            const chosen = (result ? result.chosen.discard : picked).some((x) => sameCard(x, c));
-            return (
-              <Card
-                key={cardLabel(c)}
-                card={c}
-                selected={chosen}
-                disabled={!!result}
-                onClick={() => toggle(c)}
-              />
-            );
-          })}
-        </div>
-        {!result && (
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={picked.length !== 2}
-            onClick={throwThem}
+    <>
+      <NavBar title="Daily discard" back={{ to: CRIBBAGE_HOME, label: "Harbour" }} />
+      <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 pt-2 pb-6">
+        <h1 className="text-center font-pirate text-3xl text-gold">Daily discard</h1>
+        <section className="panel flex flex-col items-center gap-3 p-4 text-center">
+          <p className="text-sm text-parchment/85">
+            {isDealer
+              ? "You're the dealer, so the crib is yours. Throw two cards that help it."
+              : "Your opponent deals, so the crib is theirs. Don't feed it."}
+          </p>
+          <div
+            className="flex justify-center -space-x-2 sm:gap-1.5 sm:space-x-0"
+            aria-label="Today's hand"
           >
-            Throw to the crib
-          </button>
-        )}
-        {result && (
-          <div className="flex w-full flex-col gap-2" role="status">
-            <p className="font-pirate text-2xl text-gold">
-              {result.score === 100
-                ? "The best throw! Sharp eye, matey."
-                : `${Math.round(result.score)} out of 100`}
-            </p>
-            {result.score !== 100 && (
-              <p className="text-sm">
-                Best: throw {result.best.discard.map(cardName).join(" and ")} (
-                {result.best.ev.toFixed(1)} points expected; yours {result.chosen.ev.toFixed(1)}).
-              </p>
-            )}
-            <ol className="mx-auto w-full max-w-sm text-left text-sm">
-              {result.choices.slice(0, 5).map((ch, i) => (
-                <li
-                  key={twoCards(ch.discard)}
-                  className={`flex justify-between rounded px-2 py-0.5 ${ch === result.chosen ? "bg-gold/20 font-bold" : ""}`}
-                >
-                  <span>
-                    {i + 1}. Throw {twoCards(ch.discard)}
-                  </span>
-                  <span className="tabular-nums">{ch.ev.toFixed(1)}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="text-xs text-parchment/70">
-              Points expected: your hand over every possible cut, {isDealer ? "plus" : "minus"} the
-              average crib those two cards make. A new hand comes tomorrow.
-            </p>
+            {hand.map((c) => {
+              const chosen = (result ? result.chosen.discard : picked).some((x) => sameCard(x, c));
+              return (
+                <Card
+                  key={cardLabel(c)}
+                  card={c}
+                  selected={chosen}
+                  disabled={!!result}
+                  onClick={() => toggle(c)}
+                />
+              );
+            })}
           </div>
-        )}
-        <p className="text-sm text-parchment/80">
-          Best-throw streak: <b className="text-gold">{streak}</b> day{streak === 1 ? "" : "s"}
-        </p>
-      </section>
-    </main>
+          {!result && (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={picked.length !== 2}
+              onClick={throwThem}
+            >
+              Throw to the crib
+            </button>
+          )}
+          {result && (
+            <div className="flex w-full flex-col gap-2" role="status">
+              <p className="font-pirate text-2xl text-gold">
+                {result.score === 100
+                  ? "The best throw! Sharp eye, matey."
+                  : `${Math.round(result.score)} out of 100`}
+              </p>
+              {result.score !== 100 && (
+                <p className="text-sm">
+                  Best: throw {result.best.discard.map(cardName).join(" and ")} (
+                  {result.best.ev.toFixed(1)} points expected; yours {result.chosen.ev.toFixed(1)}).
+                </p>
+              )}
+              <ol className="mx-auto w-full max-w-sm text-left text-sm">
+                {result.choices.slice(0, 5).map((ch, i) => (
+                  <li
+                    key={twoCards(ch.discard)}
+                    className={`flex justify-between rounded px-2 py-0.5 ${ch === result.chosen ? "bg-gold/20 font-bold" : ""}`}
+                  >
+                    <span>
+                      {i + 1}. Throw {twoCards(ch.discard)}
+                    </span>
+                    <span className="tabular-nums">{ch.ev.toFixed(1)}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="text-xs text-parchment/70">
+                Points expected: your hand over every possible cut, {isDealer ? "plus" : "minus"}{" "}
+                the average crib those two cards make. A new hand comes tomorrow.
+              </p>
+            </div>
+          )}
+          <p className="text-sm text-parchment/80">
+            Best-throw streak: <b className="text-gold">{streak}</b> day{streak === 1 ? "" : "s"}
+          </p>
+        </section>
+      </main>
+    </>
   );
 }
 

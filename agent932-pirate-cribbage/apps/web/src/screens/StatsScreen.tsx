@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { NavBar } from "../components/NavBar.js";
 import type { PlayerStats } from "@pirate/engine";
 import { type StatsResponse, api } from "../api.js";
 import { BarChart } from "../components/BarChart.js";
@@ -136,115 +136,112 @@ export function StatsScreen() {
   const focused = data?.buckets.find((b) => b.key === focus)?.stats;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-5 px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
-          ← Harbour
-        </Link>
-        <h1 className="font-pirate text-4xl text-gold">Ship's Log</h1>
-        <span className="w-16" />
-      </header>
+    <>
+      <NavBar title="Ship's Log" back={{ to: CRIBBAGE_HOME, label: "Harbour" }} />
+      <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-5 px-4 pt-2 pb-6">
+        <h1 className="text-center font-pirate text-4xl text-gold">Ship's Log</h1>
 
-      <div className="flex justify-center gap-2" role="group" aria-label="Rules filter">
-        {(["all", "classic", "pirate"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            aria-pressed={variant === v}
-            onClick={() => setVariant(v)}
-            className={`rounded-full border px-3 py-1 text-sm capitalize ${variant === v ? "border-gold bg-gold/20" : "border-parchment/25"}`}
-          >
-            {v === "all" ? "All rules" : v}
-          </button>
-        ))}
-      </div>
+        <div className="flex justify-center gap-2" role="group" aria-label="Rules filter">
+          {(["all", "classic", "pirate"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={variant === v}
+              onClick={() => setVariant(v)}
+              className={`rounded-full border px-3 py-1 text-sm capitalize ${variant === v ? "border-gold bg-gold/20" : "border-parchment/25"}`}
+            >
+              {v === "all" ? "All rules" : v}
+            </button>
+          ))}
+        </div>
 
-      {error && (
-        <p role="alert" className="text-center text-red-300">
-          {error}
-        </p>
-      )}
-      {!data && !error && <p className="text-center text-parchment/60">Reading the log…</p>}
+        {error && (
+          <p role="alert" className="text-center text-red-300">
+            {error}
+          </p>
+        )}
+        {!data && !error && <p className="text-center text-parchment/60">Reading the log…</p>}
 
-      <AchievementGrid />
+        <AchievementGrid />
 
-      {data && (
-        <>
-          <div className="panel overflow-x-auto p-2">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="sticky top-0 bg-night/90">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-parchment/70">Stat</th>
-                  {data.buckets.map((b) => (
-                    <th key={b.key} className="px-3 py-2 text-right font-semibold">
-                      {b.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              {SECTIONS.map((section) => (
-                <tbody key={section.title}>
+        {data && (
+          <>
+            <div className="panel overflow-x-auto p-2">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead className="sticky top-0 bg-night/90">
                   <tr>
-                    <th colSpan={data.buckets.length + 1} className="px-3 pt-4 pb-1.5 text-left">
-                      <span className="scroll-title !text-lg">{section.title}</span>
-                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-parchment/70">Stat</th>
+                    {data.buckets.map((b) => (
+                      <th key={b.key} className="px-3 py-2 text-right font-semibold">
+                        {b.label}
+                      </th>
+                    ))}
                   </tr>
-                  {section.rows.map((row) => (
-                    <tr key={section.title + row.label} className="border-t border-parchment/10">
-                      <td className="px-3 py-1 text-parchment/85">{row.label}</td>
-                      {data.buckets.map((b) => (
-                        <td key={b.key} className="px-3 py-1 text-right tabular-nums">
-                          {b.stats.matchesPlayed === 0 ? "—" : format(row.get(b.stats), row.fmt)}
-                        </td>
-                      ))}
+                </thead>
+                {SECTIONS.map((section) => (
+                  <tbody key={section.title}>
+                    <tr>
+                      <th colSpan={data.buckets.length + 1} className="px-3 pt-4 pb-1.5 text-left">
+                        <span className="scroll-title !text-lg">{section.title}</span>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              ))}
-            </table>
-          </div>
-
-          <section className="panel flex flex-col gap-4 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="scroll-title mr-2 !text-xl">Charts</h2>
-              {data.buckets.map((b) => (
-                <button
-                  key={b.key}
-                  type="button"
-                  aria-pressed={focus === b.key}
-                  onClick={() => setFocus(b.key)}
-                  className={`rounded-full border px-3 py-0.5 text-xs ${focus === b.key ? "border-gold bg-gold/20" : "border-parchment/25"}`}
-                >
-                  {b.label}
-                </button>
-              ))}
+                    {section.rows.map((row) => (
+                      <tr key={section.title + row.label} className="border-t border-parchment/10">
+                        <td className="px-3 py-1 text-parchment/85">{row.label}</td>
+                        {data.buckets.map((b) => (
+                          <td key={b.key} className="px-3 py-1 text-right tabular-nums">
+                            {b.stats.matchesPlayed === 0 ? "—" : format(row.get(b.stats), row.fmt)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                ))}
+              </table>
             </div>
-            {focused && focused.roundsPlayed > 0 ? (
-              <>
-                <BarChart
-                  title="Your hand scores"
-                  labels={focused.handCounts.map((_, i) => String(i))}
-                  values={focused.handCounts}
-                  format={(v) =>
-                    `${v} hand${v === 1 ? "" : "s"} (${((v / focused.roundsPlayed) * 100).toFixed(1)}%)`
-                  }
-                />
-                <BarChart
-                  title={`Cards dealt to you by rank (${focused.dealtTotal} cards)`}
-                  labels={RANK_LABELS}
-                  values={focused.dealtByRank.slice(1)}
-                  format={(v) => `${v} (${((v / focused.dealtTotal) * 100).toFixed(2)}%)`}
-                  height={120}
-                />
-              </>
-            ) : (
-              <p className="text-sm text-parchment/60">
-                No finished games here yet. Go play a few hands!
-              </p>
-            )}
-          </section>
-        </>
-      )}
-    </main>
+
+            <section className="panel flex flex-col gap-4 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="scroll-title mr-2 !text-xl">Charts</h2>
+                {data.buckets.map((b) => (
+                  <button
+                    key={b.key}
+                    type="button"
+                    aria-pressed={focus === b.key}
+                    onClick={() => setFocus(b.key)}
+                    className={`rounded-full border px-3 py-0.5 text-xs ${focus === b.key ? "border-gold bg-gold/20" : "border-parchment/25"}`}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+              {focused && focused.roundsPlayed > 0 ? (
+                <>
+                  <BarChart
+                    title="Your hand scores"
+                    labels={focused.handCounts.map((_, i) => String(i))}
+                    values={focused.handCounts}
+                    format={(v) =>
+                      `${v} hand${v === 1 ? "" : "s"} (${((v / focused.roundsPlayed) * 100).toFixed(1)}%)`
+                    }
+                  />
+                  <BarChart
+                    title={`Cards dealt to you by rank (${focused.dealtTotal} cards)`}
+                    labels={RANK_LABELS}
+                    values={focused.dealtByRank.slice(1)}
+                    format={(v) => `${v} (${((v / focused.dealtTotal) * 100).toFixed(2)}%)`}
+                    height={120}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-parchment/60">
+                  No finished games here yet. Go play a few hands!
+                </p>
+              )}
+            </section>
+          </>
+        )}
+      </main>
+    </>
   );
 }

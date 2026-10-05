@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { NavBar } from "../components/NavBar.js";
 import { type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { TierBadge } from "../components/TierBadge.js";
@@ -52,87 +52,84 @@ export function LeaderboardScreen() {
   const rows = loaded && loaded.seasonId === showing?.id ? loaded.rows : null;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href={CRIBBAGE_HOME} className="text-sm text-parchment/70 hover:text-gold">
-          ← Harbour
-        </Link>
-        <h1 className="font-pirate text-4xl text-gold">Most Feared</h1>
-        <span className="w-16" />
-      </header>
+    <>
+      <NavBar title="Most Feared" back={{ to: CRIBBAGE_HOME, label: "Harbour" }} />
+      <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 px-4 pt-2 pb-6">
+        <h1 className="text-center font-pirate text-4xl text-gold">Most Feared</h1>
 
-      {seasons.length > 0 && (
-        <div className="flex items-center justify-center gap-2 text-sm">
-          <label htmlFor="season">Season</label>
-          <select
-            id="season"
-            value={showing?.id ?? ""}
-            onChange={(e) => setSelected(Number(e.target.value))}
-            className="rounded-lg border border-parchment/30 bg-sea-deep px-2 py-1"
-          >
-            {seasons.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.endedAt ? " (final)" : " (current)"}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {showing && (
-        <p className="text-center text-xs text-parchment/60">
-          {isPast
-            ? `Final standings · ${new Date(showing.startedAt).toLocaleDateString()} – ${new Date(showing.endedAt!).toLocaleDateString()}`
-            : `Started ${new Date(showing.startedAt).toLocaleDateString()} · ranked games only`}
-        </p>
-      )}
+        {seasons.length > 0 && (
+          <div className="flex items-center justify-center gap-2 text-sm">
+            <label htmlFor="season">Season</label>
+            <select
+              id="season"
+              value={showing?.id ?? ""}
+              onChange={(e) => setSelected(Number(e.target.value))}
+              className="rounded-lg border border-parchment/30 bg-sea-deep px-2 py-1"
+            >
+              {seasons.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.endedAt ? " (final)" : " (current)"}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {showing && (
+          <p className="text-center text-xs text-parchment/60">
+            {isPast
+              ? `Final standings · ${new Date(showing.startedAt).toLocaleDateString()} – ${new Date(showing.endedAt!).toLocaleDateString()}`
+              : `Started ${new Date(showing.startedAt).toLocaleDateString()} · ranked games only`}
+          </p>
+        )}
 
-      {rows?.length === 0 && (
-        <p className="text-center text-parchment/60">
-          {isPast
-            ? "Nobody played ranked that season."
-            : "No ranked games yet this season. Be the first to set sail!"}
-        </p>
-      )}
-      {rows && rows.length > 0 && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-parchment/70">
-              <th className="py-1">#</th>
-              <th className="py-1">Pirate</th>
-              <th className="py-1">Tier</th>
-              <th className="py-1 text-right">Rating</th>
-              <th className="py-1 text-right">Games</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.id}
-                className={`border-t border-parchment/10 ${r.id === user?.id ? "bg-gold/10" : ""}`}
-              >
-                <td className="py-1.5 tabular-nums">
-                  {r.rank <= 3 ? (
-                    <img
-                      src={MEDALS[r.rank - 1]}
-                      alt={`${r.rank}`}
-                      className="h-7 w-auto drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]"
-                    />
-                  ) : (
-                    r.rank
-                  )}
-                </td>
-                <td className="py-1.5 font-semibold">{r.username}</td>
-                <td className="py-1.5">
-                  <TierBadge tier={r.tier} />
-                </td>
-                <td className="py-1.5 text-right tabular-nums">{r.rating}</td>
-                <td className="py-1.5 text-right tabular-nums">{r.rankedGames}</td>
+        {rows?.length === 0 && (
+          <p className="text-center text-parchment/60">
+            {isPast
+              ? "Nobody played ranked that season."
+              : "No ranked games yet this season. Be the first to set sail!"}
+          </p>
+        )}
+        {rows && rows.length > 0 && (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-parchment/70">
+                <th className="py-1">#</th>
+                <th className="py-1">Pirate</th>
+                <th className="py-1">Tier</th>
+                <th className="py-1 text-right">Rating</th>
+                <th className="py-1 text-right">Games</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </main>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr
+                  key={r.id}
+                  className={`border-t border-parchment/10 ${r.id === user?.id ? "bg-gold/10" : ""}`}
+                >
+                  <td className="py-1.5 tabular-nums">
+                    {r.rank <= 3 ? (
+                      <img
+                        src={MEDALS[r.rank - 1]}
+                        alt={`${r.rank}`}
+                        className="h-7 w-auto drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]"
+                      />
+                    ) : (
+                      r.rank
+                    )}
+                  </td>
+                  <td className="py-1.5 font-semibold">{r.username}</td>
+                  <td className="py-1.5">
+                    <TierBadge tier={r.tier} />
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">{r.rating}</td>
+                  <td className="py-1.5 text-right tabular-nums">{r.rankedGames}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </main>
+    </>
   );
 }

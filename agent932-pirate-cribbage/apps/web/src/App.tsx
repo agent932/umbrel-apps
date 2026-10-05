@@ -271,7 +271,10 @@ export function App({ botDelay }: { botDelay?: number } = {}) {
   return (
     <AuthProvider>
       <MoonlitScene />
-      <Routes botDelay={botDelay} />
+      {/* The current screen; an edge swipe drags this, leaving the backdrop in place. */}
+      <div id="screen">
+        <Routes botDelay={botDelay} />
+      </div>
       <ChallengeToast />
     </AuthProvider>
   );

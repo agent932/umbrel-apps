@@ -221,6 +221,158 @@ body .min-h-dvh {
   }
 }
 
+/* ---------- App navigation (components/NavBar.tsx, navigation.ts) ---------- */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  /* Reach up under the notch (the body pads for it) so the frosted bar fills the status area. */
+  margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  border-bottom: 1px solid transparent;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+  view-transition-name: navbar;
+}
+/* A screen under the bar fills the rest of the height, so short pages don't scroll by 44px. */
+body .nav-bar + .min-h-dvh {
+  min-height: calc(
+    100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 44px
+  );
+}
+.nav-bar.is-scrolled {
+  background: rgb(4 18 28 / 0.72);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border-bottom-color: rgb(243 229 192 / 0.12);
+}
+.nav-bar-inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  max-width: 64rem;
+  height: 44px;
+  margin: 0 auto;
+  padding: 0 12px;
+}
+.nav-back {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding-right: 12px;
+  color: var(--color-gold);
+  font-size: 17px;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-back:active {
+  opacity: 0.45;
+}
+.nav-title {
+  font-weight: 700;
+  font-size: 17px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+.is-scrolled .nav-title {
+  opacity: 1;
+  transform: none;
+}
+
+/* Screens slide like an iOS navigation stack: the new screen comes in from the right over the old
+ * one, which shifts a little left and dims; going back reverses it. Whole screens move, backdrop
+ * and all, as they do on iOS. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.38s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  mix-blend-mode: normal;
+}
+html[data-nav="push"]::view-transition-old(root) {
+  animation-name: nav-leave-left;
+}
+html[data-nav="push"]::view-transition-new(root) {
+  animation-name: nav-enter-right;
+}
+html[data-nav="pop"]::view-transition-old(root) {
+  animation-name: nav-leave-right;
+}
+html[data-nav="pop"]::view-transition-new(root) {
+  animation-name: nav-enter-left;
+}
+@keyframes nav-enter-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+html[data-nav="pop"]::view-transition-old(root) {
+  /* The screen being dismissed slides off on top. */
+  z-index: 1;
+}
+@keyframes nav-leave-left {
+  to {
+    transform: translateX(-30%);
+    filter: brightness(0.6);
+  }
+}
+/* After an edge swipe, both screens carry on from where the finger let go (--drag-from, --drag-p). */
+@keyframes nav-enter-left {
+  from {
+    transform: translateX(calc(-30% * (1 - var(--drag-p, 0))));
+    filter: brightness(calc(0.6 + 0.4 * var(--drag-p, 0)));
+  }
+}
+@keyframes nav-leave-right {
+  from {
+    transform: translateX(var(--drag-from, 0px));
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+/* The screen under your finger during an edge swipe (navigation.ts), and its spring back. */
+#screen.is-swiping {
+  box-shadow: -12px 0 28px rgb(0 0 0 / 0.45);
+  will-change: transform;
+}
+#screen.is-settling {
+  transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Touch feel: buttons give under your finger. In the app, long-presses on controls don't select
+ * text or pop up the copy menu (text you'd want to copy, and form fields, still can). */
+.btn-primary:not(:disabled):active,
+.btn-secondary:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.94);
+}
+.native-app button,
+.native-app a,
+.native-app [role="button"],
+.native-app [role="tab"],
+.native-app summary,
+.native-app img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.native-app {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ---------- The game table (screens/GameScreen.tsx) ----------
  * One fixed screen, no scrolling. Landscape: board down the left, opponent along the top, the play
  * in the middle, your hand fanned along the bottom, menu and powers down the right. Portrait stacks
