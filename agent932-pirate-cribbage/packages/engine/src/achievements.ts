@@ -20,6 +20,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   { key: "wins10", name: "Seasoned Sailor", description: "Win 10 games." },
   { key: "streak5", name: "Fair Winds", description: "Win 5 games in a row." },
   { key: "gold", name: "Gold Captain", description: "Reach Gold rank or better in ranked play." },
+  {
+    key: "sharpEye",
+    name: "Sharp Eye",
+    description: "Find the best throw in the daily discard 7 days in a row.",
+  },
   ...POWERS.map((p) => ({
     key: powerAchievement(p),
     name: `${POWER_INFO[p].name} Master`,

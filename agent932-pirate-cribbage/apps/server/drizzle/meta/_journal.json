@@ -71,6 +71,13 @@
       "when": 1791157691737,
       "tag": "0009_support",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791166944634,
+      "tag": "0010_daily",
+      "breakpoints": true
     }
   ]
 }

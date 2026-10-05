@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { POWER_ART } from "../brand/powerArt.js";
 import trophyUrl from "../assets/ui/icon-trophy.webp";
 import flagUrl from "../assets/ui/icon-flag.webp";
+import hourglassUrl from "../assets/ui/icon-hourglass.webp";
 import goldMedalUrl from "../assets/ui/medal-gold.webp";
 import silverMedalUrl from "../assets/ui/medal-silver.webp";
 import bronzeMedalUrl from "../assets/ui/medal-bronze.webp";
@@ -23,6 +24,7 @@ const ART: Record<string, string> = {
   wins10: trophyUrl,
   streak5: bronzeMedalUrl,
   gold: goldTierUrl,
+  sharpEye: hourglassUrl,
 };
 
 export const achievementArt = (key: string) =>

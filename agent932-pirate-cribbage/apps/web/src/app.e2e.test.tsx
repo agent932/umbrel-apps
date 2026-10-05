@@ -112,3 +112,35 @@ describe("signed-in play, end to end", () => {
     expect(screen.getByRole("img", { name: "Your hand scores" })).toBeInTheDocument();
   }, 120_000);
 });
+
+describe("daily discard, signed in", () => {
+  it("keeps the answer on the server, so another device shows it instead of the puzzle", async () => {
+    await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "Bonny",
+        email: "bonny@example.test",
+        password: "parrots-and-rum",
+      }),
+    });
+    window.history.replaceState(null, "", "/cribbage/daily");
+    const user = userEvent.setup();
+    const { unmount } = render(<App botDelay={0} />);
+    const cards = within(await screen.findByLabelText("Today's hand")).getAllByRole("button");
+    await user.click(cards[0]!);
+    await user.click(cards[1]!);
+    await user.click(screen.getByRole("button", { name: "Throw to the crib" }));
+    expect(await screen.findByText(/out of 100|The best throw/)).toBeInTheDocument();
+    expect(screen.getByText(/Best-throw streak/)).toBeInTheDocument();
+    // Nothing kept in this browser: it's on the server.
+    expect(localStorage.getItem("pc.daily")).toBeNull();
+    unmount();
+
+    // Another device (a fresh browser) shows the same answer, not a fresh hand.
+    localStorage.clear();
+    render(<App botDelay={0} />);
+    expect(await screen.findByText(/out of 100|The best throw/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Throw to the crib" })).toBeNull();
+  }, 60_000);
+});

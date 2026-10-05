@@ -232,6 +232,25 @@ export const achievements = pgTable(
 );
 
 /** Server settings an admin can change in the app (e.g. "email": the Resend key and sender). */
+/** Daily discard answers: one per player per day, ranked by the server. */
+export const dailyResults = pgTable(
+  "daily_results",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The puzzle's day, "2026-10-04". */
+    day: text("day").notNull(),
+    /** The two cards thrown, as card labels ("5H", "JD"). */
+    card1: text("card1").notNull(),
+    card2: text("card2").notNull(),
+    /** Whether it was the best of the 15 throws. */
+    best: boolean("best").notNull(),
+    playedAt: timestamp("played_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day] })],
+);
+
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),
