@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDismiss } from "./useDismiss.js";
 import { type Settings, updateSettings, useSettings } from "../settings.js";
 import wheelUrl from "../assets/ui/icon-wheel.webp";
 
@@ -25,7 +26,11 @@ export function SettingsButton() {
       >
         <img src={wheelUrl} alt="" className="h-7 w-7" />
       </button>
-      {at && createPortal(<SettingsPanel at={at} onClose={() => setAt(null)} />, document.body)}
+      {at &&
+        createPortal(
+          <SettingsPanel at={at} opener={button} onClose={() => setAt(null)} />,
+          document.body,
+        )}
     </span>
   );
 }
@@ -36,13 +41,18 @@ export function SettingsButton() {
  */
 function SettingsPanel({
   at,
+  opener,
   onClose,
 }: {
   at: { top: number; right: number };
+  opener: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
 }) {
+  const panel = useRef<HTMLDivElement>(null);
+  useDismiss(panel, opener, onClose);
   return (
     <div
+      ref={panel}
       role="dialog"
       aria-label="Settings"
       className="float-panel settings-panel rounded-xl border border-gold/40 bg-sea p-3 text-left text-sm text-parchment shadow-2xl"

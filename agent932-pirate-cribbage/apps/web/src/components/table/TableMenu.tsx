@@ -1,5 +1,7 @@
+import { type RefObject, useRef } from "react";
 import { Link } from "wouter";
 import { SettingsFields } from "../SettingsButton.js";
+import { useDismiss } from "../useDismiss.js";
 
 /** The table's menu: round and rules, the way out, forfeit (online) and settings. */
 export function TableMenu({
@@ -9,6 +11,7 @@ export function TableMenu({
   onExit,
   onForfeit,
   onClose,
+  opener,
 }: {
   round: number;
   pirate: boolean;
@@ -17,9 +20,14 @@ export function TableMenu({
   /** Online games that are still going. */
   onForfeit?: () => void;
   onClose: () => void;
+  /** The menu button: focus goes back to it when the menu closes. */
+  opener?: RefObject<HTMLElement | null>;
 }) {
+  const panel = useRef<HTMLDivElement>(null);
+  useDismiss(panel, opener, onClose);
   return (
     <div
+      ref={panel}
       role="dialog"
       aria-label="Menu"
       className="float-panel t-menu-panel rounded-2xl border border-gold/40 bg-sea/95 p-4 text-sm text-parchment shadow-2xl"

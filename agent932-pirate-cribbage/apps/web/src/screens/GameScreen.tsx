@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type Card as CardType, type PowerId, cardLabel, other, sameCard } from "@pirate/engine";
 import { Cinematics } from "../brand/Cinematics.js";
 import { PeggyChatter } from "../brand/PeggyChatter.js";
@@ -55,6 +55,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
   const opp = other(me);
   const oppName = label[opp];
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   /** The power whose explanation is open (tap a power to see what it does, then use it). */
   const [powerInfo, setPowerInfo] = useState<PowerId | null>(null);
   const callout = useCallout(online?.emote ?? null);
@@ -293,6 +294,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
         </div>
 
         <button
+          ref={menuButton}
           type="button"
           className="t-round t-menu"
           style={{ backgroundImage: `url("${menuUrl}")` }}
@@ -334,6 +336,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           onExit={onExit}
           onForfeit={online && view.phase !== "gameOver" ? online.forfeit : undefined}
           onClose={() => setMenuOpen(false)}
+          opener={menuButton}
         />
       )}
 
