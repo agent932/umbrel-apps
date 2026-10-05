@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.25.0"
+version: "0.26.0"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,10 +37,9 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Smoother, more app-like navigation: screens slide in and out like an iPhone
-  app, pages have a back bar that stays at the top as you scroll, and coming
-  back to a page returns you to where you were. In the iPhone app you can
-  also swipe from the left edge to go back.
+  Your daily discard answers and best-throw streak are now saved to your
+  account, so they follow you between the website and the iPhone app. Find
+  the best throw 7 days in a row to earn the new Sharp Eye achievement.
 
 
 developer: agent932
