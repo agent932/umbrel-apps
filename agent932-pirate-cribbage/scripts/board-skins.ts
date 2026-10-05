@@ -49,7 +49,7 @@ write("serpent-reef", {
     sharedGameHole: true,
     holeRadius: 0.0125,
     pegRadius: 0.02,
-    pegSprite: { me: "peg-blue.webp", opponent: "peg-red.webp", size: [72, 199], height: 0.13 },
+    pegSprite: { me: "peg-blue.webp", opponent: "peg-red.webp", size: [72, 199], height: 0.18 },
     safeBox: [0.08, 0.03, 0.92, 0.96],
   },
 });

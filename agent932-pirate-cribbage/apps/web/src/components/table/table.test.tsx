@@ -180,6 +180,33 @@ describe("PaintedBoard", () => {
     expect(container.querySelectorAll('circle[stroke="#f2b84b"]')).toHaveLength(1);
   });
 
+  it("stands pegs tall enough to see on a phone, and draws the nearer one in front", () => {
+    const skin = getBoardSkin();
+    const [artW] = skin.upright.size;
+    // A peg is about 8 art pixels to 1 screen pixel on a landscape phone: at least 6 px wide.
+    const width = (skin.upright.pegSprite!.height * artW * 72) / 199;
+    expect(width / 8).toBeGreaterThanOrEqual(6);
+    for (const upright of [true, false]) {
+      const { container, unmount } = render(
+        <PaintedBoard
+          scores={[12, 11]}
+          backPegs={[9, 8]}
+          rules={CLASSIC_RULES}
+          names={["You", "Anne"]}
+          me={0}
+          upright={upright}
+          instant
+        />,
+      );
+      const ys = [...container.querySelectorAll<SVGGElement>("[data-peg]")].map((g) =>
+        Number(/, (-?[\d.]+)px\)/.exec(g.style.transform)![1]),
+      );
+      expect(ys).toHaveLength(4);
+      expect(ys).toEqual([...ys].sort((a, b) => a - b));
+      unmount();
+    }
+  });
+
   it("still draws round pegs on the Classic Serpent board", () => {
     const { container } = render(
       <PaintedBoard

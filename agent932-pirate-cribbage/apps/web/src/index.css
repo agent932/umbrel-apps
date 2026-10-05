@@ -456,10 +456,11 @@ html[data-nav="pop"]::view-transition-old(root) {
   position: absolute;
 }
 
+/* Centred top to bottom, leaving room above for the standing pegs in its top holes. */
 .t-board {
   z-index: 2;
   left: var(--bx);
-  top: max(0px, calc(48cqh - var(--bw) * var(--bratio) / 2));
+  top: max(0px, calc(50cqh - var(--bw) * var(--bratio) / 2));
   width: var(--bw);
   height: calc(var(--bw) * var(--bratio));
 }

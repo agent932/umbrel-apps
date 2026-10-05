@@ -124,10 +124,26 @@ export function PaintedBoard({
     );
   }
 
+  /**
+   * Back pegs first, then front pegs. Standing pegs go in depth order too: the one lower on the
+   * screen is nearer, so it's drawn over a neighbour standing behind it in the next lane.
+   */
+  function pegOrder() {
+    const pegs = [true, false].flatMap((back) =>
+      LANES.map((lane) => {
+        const score = (back ? backPegs : hopping)[seatIn(lane)];
+        return { lane, back, y: at(holePoint(layout, lane, score))[1] };
+      }),
+    );
+    return sprite ? pegs.sort((a, b) => a.y - b.y) : pegs;
+  }
+
   return (
     <svg
       viewBox={upright ? `0 0 ${artW} ${artH}` : `0 0 ${artH} ${artW}`}
       preserveAspectRatio="xMidYMid meet"
+      // Standing pegs in the holes nearest the board's top edge reach above it.
+      overflow="visible"
       className="h-full w-full drop-shadow-[0_10px_14px_rgba(0,0,0,0.6)]"
       role="img"
       aria-label={`Board: ${names[0]} ${scores[0]}, ${names[1]} ${scores[1]}`}
@@ -200,8 +216,9 @@ export function PaintedBoard({
         </g>
       ))}
       {/* Pegs last, so they sit above every hole. */}
-      {LANES.map((lane) => peg(seatIn(lane), backPegs[seatIn(lane)], lane, true))}
-      {LANES.map((lane) => peg(seatIn(lane), hopping[seatIn(lane)], lane, false))}
+      {pegOrder().map(({ lane, back }) =>
+        peg(seatIn(lane), (back ? backPegs : hopping)[seatIn(lane)], lane, back),
+      )}
     </svg>
   );
 }
