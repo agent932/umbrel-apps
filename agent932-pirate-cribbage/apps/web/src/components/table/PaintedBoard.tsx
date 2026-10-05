@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { KRAKEN_HOLES, TREASURE_HOLES, type RuleSet } from "@pirate/engine";
-import boardUrl from "../../assets/table/board.webp";
+import { type HolePoint, getBoardSkin, holePoint } from "../../brand/boardSkins.js";
 import { PEG_COLORS } from "../../brand/powerArt.js";
 import { pegTick } from "../../sound.js";
 
@@ -15,7 +15,11 @@ interface PaintedBoardProps {
   upright: boolean;
   /** Jump straight to new scores instead of hopping hole by hole (tests). */
   instant?: boolean;
+  /** Which board skin to draw (an unknown one falls back to the default board). */
+  skinId?: string;
 }
+
+const LANES = [0, 1] as const;
 
 /** How long a peg takes to hop one hole. */
 const STEP_MS = 80;
@@ -34,31 +38,7 @@ function useHopping(target: number, instant: boolean) {
   return instant ? target : shown;
 }
 
-// Measured on board.webp (700 x 1400): the two carved channels and the run of holes along them.
-const ART_W = 700;
-const ART_H = 1400;
-const LANE_X = [238, 460];
-const COL_OFF = 36;
-const TOP = 210;
-const BOTTOM = 1190;
-
-/** Hole n (1..120) in board-art pixels: up one column (1-60), back down the other (61-120). */
-function holeUV(n: number, lane: number): [number, number] {
-  const row = n <= 60 ? 0 : 1;
-  const i = row === 0 ? n - 1 : 120 - n;
-  return [
-    LANE_X[lane]! + (row === 0 ? -COL_OFF : COL_OFF),
-    BOTTOM - (i * 15 + Math.floor(i / 5) * 8),
-  ];
-}
-
-function pegUV(score: number, lane: number): [number, number] {
-  if (score <= 0) return [LANE_X[lane]!, BOTTOM + 32];
-  if (score >= 121) return [LANE_X[lane]!, TOP - 30];
-  return holeUV(score, lane);
-}
-
-/** The painted cribbage board, with 121 holes per player drilled into its carved channels. */
+/** The painted cribbage board: each player's lane of holes (from the skin's hole map) and pegs. */
 export function PaintedBoard({
   scores,
   backPegs,
@@ -67,7 +47,13 @@ export function PaintedBoard({
   me,
   upright,
   instant = false,
+  skinId,
 }: PaintedBoardProps) {
+  const skin = getBoardSkin(skinId);
+  const layout = skin.upright;
+  const [artW, artH] = layout.size;
+  const holeR = layout.holeRadius * artW;
+  const pegR = layout.pegRadius * artW;
   const hopping: [number, number] = [
     useHopping(scores[0], instant),
     useHopping(scores[1], instant),
@@ -75,16 +61,19 @@ export function PaintedBoard({
   const id = useId().replace(/:/g, "");
   const ref = (name: string) => `url(#${id}-${name})`;
   // Portrait lays the board on its side, start on the right.
-  const at = ([u, v]: [number, number]): [number, number] => (upright ? [u, v] : [v, ART_W - u]);
-  const lanes = [1 - me, me]; // opponent in the left channel, you in the right
+  const at = ([u, v]: HolePoint): HolePoint => (upright ? [u, v] : [v, artW - u]);
+  // The opponent's pegs run in the left lane, yours in the right.
+  const seatIn = (lane: 0 | 1): 0 | 1 => (lane === 1 ? me : me === 0 ? 1 : 0);
   const pirate = rules.pirate;
 
-  function peg(seat: number, score: number, lane: number, back: boolean) {
-    const [x, y] = at(pegUV(score, lane));
-    const r = back ? 10 : 12.5;
+  function peg(seat: number, score: number, lane: 0 | 1, back: boolean) {
+    const [x, y] = at(holePoint(layout, lane, score));
+    const r = back ? pegR * 0.8 : pegR;
     return (
       <g
-        key={`${seat}-${back ? "back" : "front"}`}
+        // Keyed by orientation too, so turning the device moves pegs at once rather than sliding.
+        key={`${seat}-${back ? "back" : "front"}-${upright}`}
+        data-peg={`${seat === me ? "me" : "opponent"}-${back ? "back" : "front"}`}
         style={{
           transform: `translate(${x}px, ${y}px)`,
           transition: `transform ${back ? 400 : STEP_MS}ms ease-out`,
@@ -105,7 +94,7 @@ export function PaintedBoard({
 
   return (
     <svg
-      viewBox={upright ? `0 0 ${ART_W} ${ART_H}` : `0 0 ${ART_H} ${ART_W}`}
+      viewBox={upright ? `0 0 ${artW} ${artH}` : `0 0 ${artH} ${artW}`}
       preserveAspectRatio="xMidYMid meet"
       className="h-full w-full drop-shadow-[0_10px_14px_rgba(0,0,0,0.6)]"
       role="img"
@@ -129,27 +118,31 @@ export function PaintedBoard({
         </radialGradient>
       </defs>
       <image
-        href={boardUrl}
-        width={ART_W}
-        height={ART_H}
-        transform={upright ? undefined : `translate(0 ${ART_W}) rotate(-90)`}
+        href={skin.imageUrl}
+        width={artW}
+        height={artH}
+        transform={upright ? undefined : `translate(0 ${artW}) rotate(-90)`}
       />
-      {lanes.map((seat, lane) => (
-        <g key={seat}>
-          {Array.from({ length: 120 }, (_, k) => {
-            const n = k + 1;
-            const [x, y] = at(holeUV(n, lane));
+      {LANES.map((lane) => (
+        <g key={lane}>
+          {layout.lanes[lane].holes.map((_, n) => {
+            const [x, y] = at(holePoint(layout, lane, n));
             const treasure = pirate?.treasure && TREASURE_HOLES.includes(n);
             const kraken = pirate?.kraken && KRAKEN_HOLES.includes(n);
+            // The game hole is bigger, with a brass ring.
+            const r = n === 121 ? holeR * 1.6 : holeR;
             return (
               <g key={n}>
-                <circle cx={x} cy={y + 1.5} r={5.4} fill="#f0b47a" opacity={0.22} />
-                <circle cx={x} cy={y} r={5} fill={ref("drill")} />
+                <circle cx={x} cy={y + 1.5} r={r * 1.08} fill="#f0b47a" opacity={0.22} />
+                <circle cx={x} cy={y} r={r} fill={ref("drill")} />
+                {n === 121 && (
+                  <circle cx={x} cy={y} r={r + 3} fill="none" stroke="#f2b84b" strokeWidth={2} />
+                )}
                 {treasure && (
                   <text
                     x={x}
-                    y={y + 7}
-                    fontSize="20"
+                    y={y + holeR * 1.4}
+                    fontSize={holeR * 4}
                     fontWeight="900"
                     textAnchor="middle"
                     fill="#f2b84b"
@@ -158,7 +151,14 @@ export function PaintedBoard({
                   </text>
                 )}
                 {kraken && (
-                  <circle cx={x} cy={y} r={10} fill="none" stroke="#3fb6c9" strokeWidth={3} />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={holeR * 2}
+                    fill="none"
+                    stroke="#3fb6c9"
+                    strokeWidth={holeR * 0.6}
+                  />
                 )}
               </g>
             );
@@ -166,8 +166,8 @@ export function PaintedBoard({
         </g>
       ))}
       {/* Pegs last, so they sit above every hole. */}
-      {lanes.map((seat, lane) => peg(seat, backPegs[seat as 0 | 1], lane, true))}
-      {lanes.map((seat, lane) => peg(seat, hopping[seat as 0 | 1], lane, false))}
+      {LANES.map((lane) => peg(seatIn(lane), backPegs[seatIn(lane)], lane, true))}
+      {LANES.map((lane) => peg(seatIn(lane), hopping[seatIn(lane)], lane, false))}
     </svg>
   );
 }

@@ -1,7 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { type GameEvent, parseCard } from "@pirate/engine";
+import {
+  CLASSIC_RULES,
+  KRAKEN_HOLES,
+  PIRATE_RULES,
+  TREASURE_HOLES,
+  type GameEvent,
+  parseCard,
+} from "@pirate/engine";
+import { getBoardSkin, holePoint } from "../../brand/boardSkins.js";
 import { HandSlot } from "./HandSlot.js";
+import { PaintedBoard } from "./PaintedBoard.js";
 import { ScorePops } from "./ScorePops.js";
 
 describe("ScorePops", () => {
@@ -97,5 +106,77 @@ describe("HandSlot", () => {
       slot.dispatchEvent(pointer("pointerdown", 300));
     });
     expect(container.querySelector(".t-shake")).not.toBeNull();
+  });
+});
+
+describe("PaintedBoard", () => {
+  const { upright: layout } = getBoardSkin();
+  const pegAt = (container: HTMLElement, peg: string) =>
+    (container.querySelector(`[data-peg="${peg}"]`) as SVGGElement).style.transform;
+  const translate = ([x, y]: [number, number]) => `translate(${x}px, ${y}px)`;
+
+  it.each([0, 1, 5, 6, 60, 61, 120, 121])("puts both pegs at %i in the hole map's holes", (n) => {
+    const { container } = render(
+      <PaintedBoard
+        scores={[n, n]}
+        backPegs={[0, 0]}
+        rules={CLASSIC_RULES}
+        names={["You", "Anne"]}
+        me={0}
+        upright
+        instant
+      />,
+    );
+    // You run in the right lane, the opponent in the left.
+    expect(pegAt(container, "me-front")).toBe(translate(holePoint(layout, 1, n)));
+    expect(pegAt(container, "opponent-front")).toBe(translate(holePoint(layout, 0, n)));
+    expect(pegAt(container, "me-back")).toBe(translate(holePoint(layout, 1, 0)));
+  });
+
+  it("keeps you in the right lane from seat 1, and lays the board on its side in portrait", () => {
+    const { container } = render(
+      <PaintedBoard
+        scores={[10, 61]}
+        backPegs={[4, 50]}
+        rules={CLASSIC_RULES}
+        names={["Anne", "You"]}
+        me={1}
+        upright={false}
+        instant
+      />,
+    );
+    const side = ([u, v]: [number, number]): [number, number] => [v, layout.size[0] - u];
+    expect(pegAt(container, "me-front")).toBe(translate(side(holePoint(layout, 1, 61))));
+    expect(pegAt(container, "me-back")).toBe(translate(side(holePoint(layout, 1, 50))));
+    expect(pegAt(container, "opponent-front")).toBe(translate(side(holePoint(layout, 0, 10))));
+    expect(container.querySelector("svg")!.getAttribute("viewBox")).toBe(
+      `0 0 ${layout.size[1]} ${layout.size[0]}`,
+    );
+  });
+
+  it("marks the treasure and Kraken holes on both lanes under pirate rules", () => {
+    const { container } = render(
+      <PaintedBoard
+        scores={[0, 0]}
+        backPegs={[0, 0]}
+        rules={PIRATE_RULES}
+        names={["You", "Anne"]}
+        me={0}
+        upright
+        instant
+      />,
+    );
+    const xs = [...container.querySelectorAll("text")].map((t) => Number(t.getAttribute("x")));
+    const want = [0, 1].flatMap((lane) =>
+      TREASURE_HOLES.map((n) => holePoint(layout, lane as 0 | 1, n)[0]),
+    );
+    expect(xs).toEqual(want);
+    const rings = [...container.querySelectorAll('circle[stroke="#3fb6c9"]')].map((c) => [
+      Number(c.getAttribute("cx")),
+      Number(c.getAttribute("cy")),
+    ]);
+    expect(rings).toEqual(
+      [0, 1].flatMap((lane) => KRAKEN_HOLES.map((n) => holePoint(layout, lane as 0 | 1, n))),
+    );
   });
 });
