@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.28.1"
+version: "0.28.2"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,9 +37,9 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Updates now always download the new version of the game. (0.28.0 could
-  restart with the previous version.) Includes the new-look table, the
-  Serpent Reef board and the easier-to-follow pacing from 0.28.0.
+  Fixes an update that couldn't start. Brings the new-look table, the Serpent
+  Reef board and the easier-to-follow pacing, and from now on every update
+  downloads the new version of the game.
 
 
 developer: agent932

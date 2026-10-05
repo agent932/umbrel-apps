@@ -10,7 +10,7 @@ services:
       PROXY_AUTH_ADD: "false"
 
   web:
-    image: ghcr.io/agent932/pirate-cribbage:0.28.1
+    image: ghcr.io/agent932/pirate-cribbage:sha-9bab812a8c71cadc415c73997f7f5f65be836bf3
     restart: on-failure
     stop_grace_period: 1m
     depends_on:

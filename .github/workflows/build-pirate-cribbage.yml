@@ -30,13 +30,13 @@ jobs:
           node-version-file: agent932-pirate-cribbage/.nvmrc
           cache: npm
           cache-dependency-path: agent932-pirate-cribbage/package-lock.json
-      # Umbrel only pulls a new image when docker-compose.yml changes, so the compose file pins the
-      # exact release tag; it must match umbrel-app.yml's version.
+      # Umbrel only pulls a new image when docker-compose.yml changes, so the compose file pins an exact
+      # image: the release's version tag, or (e.g. to ship an already-built image) its sha- tag.
       - name: Compose image tag matches the app version
         run: |
           version=$(sed -n 's/^version: "\(.*\)"/\1/p' umbrel-app.yml)
-          grep -q "image: ghcr.io/agent932/pirate-cribbage:$version$" docker-compose.yml \
-            || { echo "docker-compose.yml must use pirate-cribbage:$version"; exit 1; }
+          grep -qE "image: ghcr.io/agent932/pirate-cribbage:($version|sha-[0-9a-f]{40})$" docker-compose.yml \
+            || { echo "docker-compose.yml must pin pirate-cribbage:$version (or an exact sha- build), never :latest"; exit 1; }
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
