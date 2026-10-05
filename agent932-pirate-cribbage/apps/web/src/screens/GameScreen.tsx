@@ -343,7 +343,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
       {tutorial && <TutorialTips phase={view.phase} />}
       <CutReveal events={p.lastEvents} names={label} me={me} />
       {!instant && <ScorePops events={events} me={me} names={label} />}
-      {!instant && <Cinematics events={events} names={label} me={me} />}
+      {!instant && <Cinematics events={events} names={label} me={me} hold={!!lastPlay} />}
 
       {view.phase === "roundEnd" && !lastPlay && (
         <RoundSummary

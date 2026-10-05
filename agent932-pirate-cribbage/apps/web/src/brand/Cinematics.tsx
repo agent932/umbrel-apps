@@ -110,15 +110,19 @@ export function sceneFor(
 /**
  * Plays the pirate scene for the latest game events: a few seconds, tap to skip.
  * With animations off in Settings, or for people who prefer reduced motion, a still frame shows.
+ * While `hold` is on (the last card of pegging is still on the table), scenes wait their turn
+ * and play, one after another, once it's lifted.
  */
 export function Cinematics({
   events,
   names,
   me,
+  hold = false,
 }: {
   events: GameEvent[];
   names: [string, string];
   me: Seat;
+  hold?: boolean;
 }) {
   const { animations } = useSettings();
   const reduceMotion =
@@ -126,23 +130,24 @@ export function Cinematics({
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const still = !animations || reduceMotion;
   useEffect(() => prefetchScenes(still), [still]);
-  const [playing, setPlaying] = useState<{
-    scene: Scene;
-    caption: string;
-    effect?: SceneEffect;
-    key: number;
-  } | null>(null);
+  // The scene on screen first, then any waiting behind it.
+  const [queue, setQueue] = useState<
+    { scene: Scene; caption: string; effect?: SceneEffect; key: number }[]
+  >([]);
 
   useEffect(() => {
     const next = sceneFor(events, names, me);
     if (!next) return;
+    const scene = { ...next, key: Date.now() };
+    // In normal play the newest scene takes over; during the hold they line up.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPlaying({ ...next, key: Date.now() });
+    setQueue((q) => (hold ? [...q, scene] : [scene]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events]);
+  const playing = hold ? null : (queue[0] ?? null);
   useEffect(() => {
     if (!playing) return;
-    const t = setTimeout(() => setPlaying(null), SCENE_MS);
+    const t = setTimeout(() => setQueue((q) => q.slice(1)), SCENE_MS);
     return () => clearTimeout(t);
   }, [playing]);
 
@@ -151,7 +156,7 @@ export function Cinematics({
     <div
       key={playing.key}
       className="fixed inset-0 z-40 grid place-items-center bg-night/60 p-4 backdrop-blur-[2px]"
-      onClick={() => setPlaying(null)}
+      onClick={() => setQueue((q) => q.slice(1))}
       role="status"
       aria-label={playing.effect ? `${playing.caption} ${playing.effect.text}` : playing.caption}
       style={{ animation: `cin-fade ${SCENE_MS}ms ease-in-out forwards` }}
