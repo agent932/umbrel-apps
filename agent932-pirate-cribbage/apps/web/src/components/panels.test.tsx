@@ -61,6 +61,15 @@ describe("menus and dialogs stay on screen", () => {
     expect(cssRule(".t-menu-panel")).toContain("safe-area-inset-top");
   });
 
+  it("perches Peggy up top in portrait, clear of the deck, the pile and your hand", () => {
+    const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
+    const portrait = css.slice(css.indexOf("@container table (orientation: portrait) {"));
+    const start = portrait.indexOf(".t-peggy {");
+    const rule = portrait.slice(start, portrait.indexOf("}", start));
+    expect(rule).toMatch(/top: 1cqh/);
+    expect(rule).not.toContain("--play-top");
+  });
+
   it("keeps the landscape board off the screen's left edge, right of the menu button", () => {
     const board = cssRule(".t-board");
     expect(board).toContain("left: var(--bx)");

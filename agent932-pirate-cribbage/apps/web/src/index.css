@@ -1183,13 +1183,14 @@ html[data-nav="pop"]::view-transition-old(root) {
     top: 0.5cqh;
     left: 1cqw;
   }
-  /* In the strip between the play and your hand, bubble to her right. */
+  /* Up top over the opponent's face-down cards, as in landscape: clear of the deck, the cut,
+     the pile and your hand. Bubble to her right, short of the opponent's porthole. */
   .t-peggy {
-    top: calc(var(--play-top) + var(--pch) - 4.5cqh);
-    left: 2cqw;
+    top: 1cqh;
+    left: 14cqw;
   }
   .t-peggy > div {
-    max-width: 70cqw;
+    max-width: calc(86cqw - var(--oppw) - 4cqw - 52px * var(--ui, 1));
   }
   .t-hand {
     --deal-x: 20cqw;
