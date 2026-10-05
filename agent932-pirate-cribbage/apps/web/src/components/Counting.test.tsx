@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import { parseCard, parseCards, scoreHand } from "@pirate/engine";
-import { CountingShow, countingSteps } from "./Counting.js";
+import { CountingShow, HAND_PAUSE_MS, countingSteps } from "./Counting.js";
 
 const score = (hand: string, cut: string, crib = false) =>
   scoreHand(parseCards(hand), parseCard(cut), crib);
@@ -70,14 +70,14 @@ describe("CountingShow", () => {
     expect(screen.getByLabelText("Counting the hands")).toHaveTextContent(
       /Fifteen two, fifteen four, a pair is six, a run of three is nine, another run is twelve/,
     );
-    tick(900 + 100);
+    tick(HAND_PAUSE_MS + 100);
     expect(screen.getByText("Your crib")).toBeInTheDocument();
     // An empty crib has nothing to call; it says so and moves on after the usual pause.
     expect(screen.getByLabelText("Counting the hands")).toHaveTextContent(
       /Nineteen! Nothing at all/,
     );
     expect(onDone).not.toHaveBeenCalled();
-    tick(1000);
+    tick(HAND_PAUSE_MS + 100);
     expect(onDone).toHaveBeenCalled();
   });
 
@@ -88,5 +88,45 @@ describe("CountingShow", () => {
     );
     act(() => screen.getByRole("button", { name: /Skip/ }).click());
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it("says when each hand's total is up, so its peg can move", () => {
+    vi.useFakeTimers();
+    const onReveal = vi.fn();
+    render(
+      <CountingShow
+        show={show}
+        cut={parseCard("KS")}
+        names={["You", "Bosun"]}
+        onDone={() => {}}
+        onReveal={onReveal}
+      />,
+    );
+    tick(500 + 550 * 3);
+    expect(onReveal).not.toHaveBeenCalled();
+    tick(550);
+    expect(onReveal).toHaveBeenLastCalledWith(1);
+    tick(HAND_PAUSE_MS + 100);
+    // The empty crib has nothing to call, so its total is up straight away.
+    expect(onReveal).toHaveBeenLastCalledWith(2);
+  });
+
+  it("hurries to the next total with a tap", () => {
+    const onReveal = vi.fn();
+    render(
+      <CountingShow
+        show={show}
+        cut={parseCard("KS")}
+        names={["You", "Bosun"]}
+        onDone={() => {}}
+        onReveal={onReveal}
+      />,
+    );
+    const panel = screen.getByLabelText("Counting the hands");
+    act(() => panel.click());
+    expect(panel).toHaveTextContent(/another run is twelve/);
+    expect(onReveal).toHaveBeenLastCalledWith(1);
+    act(() => screen.getByRole("button", { name: /Next/ }).click());
+    expect(screen.getByText("Your crib")).toBeInTheDocument();
   });
 });

@@ -25,6 +25,19 @@ export interface FeedItem {
 
 export type ShowEvent = Extract<GameEvent, { type: "hand" | "crib" }>;
 
+/**
+ * One stage of a step that ends with the show: the pegging that ended the round, then each hand or
+ * crib counted (with any treasure, Kraken or win it caused). The table moves the pegs, plays the
+ * sounds and adds the log lines for a stage only when the count reaches it.
+ */
+export interface RevealStage {
+  scores: [number, number];
+  backPegs: [number, number];
+  events: GameEvent[];
+  /** How many of the newest log lines belong to this stage. */
+  feed: number;
+}
+
 /** What the table displays; built up from views and events. */
 export interface Presentation {
   view: PlayerView;
@@ -35,6 +48,11 @@ export interface Presentation {
   nextId: number;
   /** Events from the latest step, for sounds. */
   lastEvents: GameEvent[];
+  /**
+   * When the latest show was counted: the pegging stage, then one stage per entry in `show`.
+   * Empty otherwise. (Optional: games saved before it existed don't have it.)
+   */
+  reveal?: RevealStage[];
 }
 
 export interface OnlineInfo {

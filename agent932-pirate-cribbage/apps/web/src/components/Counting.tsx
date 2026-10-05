@@ -84,28 +84,47 @@ export function countingSteps(score: HandScore): CountStep[] {
 const whose = (name: string) => (name === "You" ? "Your" : `${name}'s`);
 
 const STEP_MS = 550;
-const HAND_PAUSE_MS = 900;
+/** How long each hand's total stays up (while its peg moves on the board) before the next hand. */
+export const HAND_PAUSE_MS = 1500;
 
 /**
  * Counts each hand out in order (pone's hand, dealer's hand, then the crib): the cards in each
- * score light up and the running count builds, with a doubloon and a chime per score.
- * Tap Skip to jump to the totals.
+ * score light up and the running count builds, with a doubloon and a chime per score. Once a
+ * hand's total is up, `onReveal` says how many hands are counted, so the board can move that peg.
+ * Tap the panel to hurry to the next total, or Skip to jump to the totals.
  */
 export function CountingShow({
   show,
   cut,
   names,
   onDone,
+  onReveal,
 }: {
   show: ShowEvent[];
   cut: CardType | null;
   names: [string, string];
   onDone: () => void;
+  onReveal?: (counted: number) => void;
 }) {
   const [hand, setHand] = useState(0);
   const [step, setStep] = useState(0);
   const current = show[hand];
   const steps = current ? countingSteps(current.score) : [];
+  const finished = step >= steps.length;
+
+  useEffect(() => {
+    if (current && finished) onReveal?.(hand + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hand, finished, current]);
+
+  /** A tap: finish this hand's count at once, or if it's done, move on to the next hand. */
+  function hurry() {
+    if (!finished) setStep(steps.length);
+    else {
+      setHand(hand + 1);
+      setStep(0);
+    }
+  }
 
   useEffect(() => {
     if (!current) {
@@ -135,13 +154,14 @@ export function CountingShow({
   const lit = step > 0 ? steps[step - 1]!.cards : [];
   const isLit = (c: CardType) => lit.some((l) => sameCard(l, c));
   const said = steps.slice(0, step).map((s) => s.phrase);
-  const finished = step >= steps.length;
 
   return (
+    // Tapping anywhere on the count hurries it along; the buttons below do the same for keyboards.
     <section
-      className="flex flex-col items-center gap-3"
+      className="flex cursor-pointer flex-col items-center gap-3"
       aria-label="Counting the hands"
       aria-live="polite"
+      onClick={hurry}
     >
       <p className="text-sm text-parchment/70">
         {hand + 1} of {show.length}
@@ -196,9 +216,28 @@ export function CountingShow({
         )}
       </div>
 
-      <button type="button" className="text-sm text-parchment/60 hover:text-gold" onClick={onDone}>
-        Skip ⏭
-      </button>
+      <div className="flex gap-6">
+        <button
+          type="button"
+          className="text-sm text-parchment/60 hover:text-gold"
+          onClick={(e) => {
+            e.stopPropagation();
+            hurry();
+          }}
+        >
+          Next ›
+        </button>
+        <button
+          type="button"
+          className="text-sm text-parchment/60 hover:text-gold"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDone();
+          }}
+        >
+          Skip ⏭
+        </button>
+      </div>
     </section>
   );
 }
@@ -209,19 +248,35 @@ export function CountThenShow({
   cut,
   names,
   instant,
+  onReveal,
   children,
 }: {
   show: ShowEvent[];
   cut: CardType | null;
   names: [string, string];
   instant?: boolean;
+  /** How many hands have been counted out so far (all of them once the totals show). */
+  onReveal?: (counted: number) => void;
   children: React.ReactNode;
 }) {
   const reduceMotion =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // Reduced motion skips the counting animation, not the totals: they show (and the pegs move) at once.
   const [counted, setCounted] = useState(instant || reduceMotion || show.length === 0);
+  useEffect(() => {
+    if (counted) onReveal?.(show.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [counted, show.length]);
   if (!counted)
-    return <CountingShow show={show} cut={cut} names={names} onDone={() => setCounted(true)} />;
+    return (
+      <CountingShow
+        show={show}
+        cut={cut}
+        names={names}
+        onDone={() => setCounted(true)}
+        onReveal={onReveal}
+      />
+    );
   return <>{children}</>;
 }

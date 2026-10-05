@@ -24,6 +24,8 @@ interface Props {
   isDealer?: boolean;
   /** Skip the counting animation (tests). */
   instant?: boolean;
+  /** How many hands have been counted out, so the board can move their pegs. */
+  onReveal?: (counted: number) => void;
 }
 
 /** How your throw compared with the best one, by expected points (hand over every cut ± crib). */
@@ -63,7 +65,7 @@ export function DiscardReview({
   );
 }
 
-export function ShowList({ show, cut, names }: Omit<Props, "onNext">) {
+export function ShowList({ show, cut, names }: Pick<Props, "show" | "cut" | "names">) {
   return (
     <ul className="flex flex-col gap-3">
       {show.map((e, i) => (
@@ -106,11 +108,12 @@ export function RoundSummary({
   decision,
   isDealer = false,
   instant,
+  onReveal,
 }: Props) {
   return (
-    <Modal title="The Show">
+    <Modal title="The Show" seeBoard>
       {/* Count each hand out in order first, then the totals and the next-round button. */}
-      <CountThenShow show={show} cut={cut} names={names} instant={instant}>
+      <CountThenShow show={show} cut={cut} names={names} instant={instant} onReveal={onReveal}>
         {decision && <DiscardReview decision={decision} isDealer={isDealer} />}
         <ShowList show={show} cut={cut} names={names} />
         {onNext && (
@@ -124,10 +127,19 @@ export function RoundSummary({
   );
 }
 
-export function Modal({ title, children }: { title: string; children: React.ReactNode }) {
+export function Modal({
+  title,
+  children,
+  seeBoard,
+}: {
+  title: string;
+  children: React.ReactNode;
+  /** A lighter shade, so the pegs can be seen moving on the board behind while hands are counted. */
+  seeBoard?: boolean;
+}) {
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center bg-black/60 p-4"
+      className={`fixed inset-0 z-20 grid place-items-center p-4 ${seeBoard ? "bg-black/25" : "bg-black/60"}`}
       role="dialog"
       aria-label={title}
     >

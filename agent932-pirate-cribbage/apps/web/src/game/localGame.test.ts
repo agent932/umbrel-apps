@@ -29,8 +29,12 @@ describe("local game", () => {
           ? ({ type: "nextRound" } as const)
           : (botAction(state, YOU, "medium") ?? botAction(state, BOT, "medium"))!);
       game = step(game, action);
+      // After the show, a back peg sits where its peg was before its last count.
+      const reveal = game.p.lastEvents.some((e) => e.type === "hand") ? game.p.reveal! : [];
+      if (reveal.length) expect(reveal.at(-1)!.scores).toEqual(game.state.scores);
       for (const seat of [YOU, BOT]) {
-        if (game.state.scores[seat] !== before[seat])
+        if (reveal.length) expect(game.p.backPegs[seat]).toBe(reveal.at(-1)!.backPegs[seat]);
+        else if (game.state.scores[seat] !== before[seat])
           expect(game.p.backPegs[seat]).toBe(before[seat]);
       }
     }

@@ -19,11 +19,17 @@ import { PowerPanel, PowersRail, readyPowers } from "../components/table/PowersR
 import { ScorePops } from "../components/table/ScorePops.js";
 import { TableBoard } from "../components/table/TableBoard.js";
 import { TableMenu } from "../components/table/TableMenu.js";
-import { useCallout, useLastPlay } from "../components/table/tableHooks.js";
+import {
+  LAST_PLAY_MS,
+  useCallout,
+  useLastPlay,
+  useShowReveal,
+} from "../components/table/tableHooks.js";
 import type { GameController } from "../game/types.js";
 import { buzz } from "../haptics.js";
 import { EMOTES } from "../online/protocol.js";
 import { playEvents } from "../sound.js";
+import { SPEED_FACTOR, useSettings } from "../settings.js";
 import menuUrl from "../assets/table/btn-menu.webp";
 
 // The hook lives with the table's other parts; re-exported for its tests.
@@ -52,11 +58,15 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
   /** The power whose explanation is open (tap a power to see what it does, then use it). */
   const [powerInfo, setPowerInfo] = useState<PowerId | null>(null);
   const callout = useCallout(online?.emote ?? null);
+  // During the show the pegs, sounds and log wait for each hand to be counted out.
+  const shown = useShowReveal(p, !!instant);
+  const events = shown.events;
+  const { speed } = useSettings();
 
   // Sound effects for each new step.
   useEffect(() => {
-    if (p.lastEvents.length) playEvents(p.lastEvents, me);
-  }, [p.lastEvents, me]);
+    if (events.length) playEvents(events, me);
+  }, [events, me]);
   const pirate = view.rules.pirate;
   // The selection belongs to one situation; when the phase or hand changes it's dropped.
   const situation = `${view.round}:${view.phase}:${view.hand.map(cardLabel).join()}`;
@@ -131,7 +141,11 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
     ? view.pegging.played.slice(view.pegging.played.length - view.pegging.pile.length)
     : [];
   // When pegging ends, the last cards stay on the table for a moment so both players see them.
-  const lastPlay = useLastPlay(livePile, count, !!view.pegging, p.lastEvents, !!instant);
+  // Bot games follow the speed setting (never shorter than two seconds); online it's the same for both.
+  const holdMs = online
+    ? LAST_PLAY_MS
+    : Math.max(2000, Math.round(LAST_PLAY_MS * SPEED_FACTOR[speed]));
+  const lastPlay = useLastPlay(livePile, count, !!view.pegging, p.lastEvents, !!instant, holdMs);
   const pile = lastPlay?.pile ?? livePile;
   const shownCount = lastPlay?.count ?? count;
   const cribLabel =
@@ -197,8 +211,8 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
     <main className="table-stage">
       <div className={`table-grid ${rail}`}>
         <TableBoard
-          scores={view.scores}
-          backPegs={p.backPegs}
+          scores={shown.scores}
+          backPegs={shown.backPegs}
           rules={view.rules}
           names={label}
           me={me}
@@ -215,7 +229,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           className="t-opp"
           porthole
           name={oppName}
-          score={view.scores[opp]}
+          score={shown.scores[opp]}
           dealer={view.dealer === opp}
           image={online ? avatarUrl(online.avatars[opp]) : BOT_CREW[game.level ?? "hard"].portrait}
           powersLeft={pirate ? view.opponentPowersLeft : undefined}
@@ -234,7 +248,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
               {prompt}
             </p>
           )}
-          <Feed items={p.feed.slice(0, 1)} />
+          <Feed items={shown.feed.slice(0, 1)} />
           {error && (
             <p role="alert" className="rounded-full bg-night/80 px-3 text-sm text-red-300">
               {error}
@@ -268,7 +282,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
             className="t-you-chip"
             callout={callout?.seat === me ? EMOTES[callout.emote] : null}
             name={label[me]}
-            score={view.scores[me]}
+            score={shown.scores[me]}
             dealer={view.dealer === me}
             image={avatarUrl(online ? online.avatars[me] : myAvatar)}
             you
@@ -286,7 +300,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
         />
-        <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
+        <PeggyChatter events={events} me={me} className="t-peggy" />
         {pirate && (
           <PowersRail
             powers={pirate.powers}
@@ -325,8 +339,8 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
 
       {tutorial && <TutorialTips phase={view.phase} />}
       <CutReveal events={p.lastEvents} names={label} me={me} />
-      {!instant && <ScorePops events={p.lastEvents} me={me} names={label} />}
-      {!instant && <Cinematics events={p.lastEvents} names={label} me={me} />}
+      {!instant && <ScorePops events={events} me={me} names={label} />}
+      {!instant && <Cinematics events={events} names={label} me={me} />}
 
       {view.phase === "roundEnd" && !lastPlay && (
         <RoundSummary
@@ -336,6 +350,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           onNext={online && !waitingForMe ? undefined : () => act({ type: "nextRound" })}
           waitingNote={online && !waitingForMe ? `Waiting for ${oppName}…` : undefined}
           instant={instant}
+          onReveal={shown.reveal}
           decision={view.myDiscardDecision}
           isDealer={view.dealer === me}
         />
@@ -353,6 +368,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           online={online}
           ranked={game.ranked}
           instant={instant}
+          onReveal={shown.reveal}
           onPlayAgain={onPlayAgain}
           onExit={onExit}
         />

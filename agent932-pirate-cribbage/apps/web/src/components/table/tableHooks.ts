@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Card as CardType, GameEvent, Seat } from "@pirate/engine";
+import type { Presentation, RevealStage } from "../../game/types.js";
 import type { Emote } from "../../online/protocol.js";
 
 /** True when the screen (and so the table, which fills it) is wider than tall: the board then
@@ -18,14 +19,15 @@ export function useUpright() {
   return upright;
 }
 
-/** How long the last cards of a round stay on the table before the hands are counted. */
-const LAST_PLAY_MS = 3500;
+/** How long the last cards of a round stay on the table before the hands are counted (normal speed). */
+export const LAST_PLAY_MS = 3500;
 
 export type PilePlay = { card: CardType; seat: Seat };
 
 /**
  * The cards and count from the end of pegging, held for a few seconds after the round moves on
  * (the engine goes straight to counting hands, so the last card would otherwise vanish at once).
+ * The hold runs its full time even if more news arrives meanwhile (an online resync, a call-out).
  */
 export function useLastPlay(
   livePile: PilePlay[],
@@ -33,12 +35,16 @@ export function useLastPlay(
   pegging: boolean,
   events: GameEvent[],
   instant: boolean,
+  holdMs = LAST_PLAY_MS,
 ) {
   const last = useRef<{ pile: PilePlay[]; count: number }>({ pile: [], count: 0 });
   const [held, setHeld] = useState<{ pile: PilePlay[]; count: number } | null>(null);
   useEffect(() => {
     if (pegging) {
       last.current = { pile: livePile, count };
+      // Play has started again (a new round), so nothing from the last one is held.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHeld(null);
       return;
     }
     if (instant || !events.some((e) => e.type === "played")) return;
@@ -56,12 +62,55 @@ export function useLastPlay(
       }
     }
     setHeld({ pile, count: shown });
-    const t = setTimeout(() => setHeld(null), LAST_PLAY_MS);
-    return () => clearTimeout(t);
     // Re-run only when the game moves on, not for every re-render of the same step.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pegging, events]);
+  // The timer belongs to the hold itself, so new events can't cancel it and leave the cards stuck.
+  useEffect(() => {
+    if (!held) return;
+    const t = setTimeout(() => setHeld(null), holdMs);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [held]);
   return held;
+}
+
+const NO_STAGES: RevealStage[] = [];
+
+/**
+ * The table during the show: scores, pegs, sounds and log lines catch up one count at a time, so a
+ * peg moves only once its hand (or crib) has been counted out. `reveal(n)` is called by the
+ * counting panel when the first n hands have been shown. Pegging points peg straight away.
+ */
+export function useShowReveal(p: Presentation, instant: boolean) {
+  const stages = p.reveal ?? NO_STAGES;
+  const [state, setState] = useState({ stages, n: 0, events: stages[0]?.events ?? [] });
+  // A new show starts at its pegging stage.
+  const at = state.stages === stages ? state : { stages, n: 0, events: stages[0]?.events ?? [] };
+  const counting = at.stages.length > 0 && !instant && at.n < stages.length - 1;
+  const stage = counting ? stages[at.n]! : null;
+  const hiddenFeed = stage ? stages.slice(at.n + 1).reduce((t, s) => t + s.feed, 0) : 0;
+  const reveal = useCallback(
+    (n: number) =>
+      setState((prev) => {
+        const base =
+          prev.stages === stages ? prev : { stages, n: 0, events: stages[0]?.events ?? [] };
+        const from = base.n;
+        if (n <= from) return base;
+        // Everything counted since last time (several hands at once after Skip).
+        const events = stages.slice(from + 1, n + 1).flatMap((s) => s.events);
+        return { stages, n, events };
+      }),
+    [stages],
+  );
+  return {
+    scores: stage?.scores ?? p.view.scores,
+    backPegs: stage?.backPegs ?? p.backPegs,
+    /** The events to play sounds and scenes for: the latest step, or the latest counts. */
+    events: stages.length && !instant ? at.events : p.lastEvents,
+    feed: p.feed.slice(hiddenFeed),
+    reveal,
+  };
 }
 
 /** The latest call-out, for a couple of seconds. */

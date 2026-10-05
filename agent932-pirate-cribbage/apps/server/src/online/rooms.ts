@@ -41,7 +41,8 @@ export interface Timing {
 
 export const DEFAULT_TIMING: Timing = {
   turnMs: 60_000,
-  nextRoundMs: 30_000,
+  // Room for the last card's pause and every hand counted out (up to ~25 s) before Next round.
+  nextRoundMs: 45_000,
   disconnectMs: 5 * 60_000,
 };
 

@@ -18,8 +18,11 @@ import {
 } from "./localGame.js";
 import type { GameController, UiAction } from "./types.js";
 
-/** How long the bot "thinks" before each move, so the player can follow along. */
-export const BOT_DELAY_MS = 750;
+/**
+ * How long the bot "thinks" before each move (at normal speed), so the player can follow along:
+ * each card played, with its count and points, stays readable for at least this long.
+ */
+export const BOT_DELAY_MS = 1200;
 /** Extra time to reach for Belay That! before the bot plays over your card. */
 export const BELAY_WINDOW_MS = 2500;
 const DEAL_DELAY_MS = 350;
