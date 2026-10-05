@@ -2,14 +2,20 @@ import { useEffect, useState } from "react";
 import type { PowerId } from "@pirate/engine";
 import { PEG_COLORS, POWER_ART } from "../../brand/powerArt.js";
 import hourglassUrl from "../../assets/ui/icon-hourglass.webp";
+import wheelUrl from "../../assets/ui/icon-wheel.webp";
 
-/** A player's plaque: portrait, name, dealer tag, score, powers left and any call-out. */
+/**
+ * A player's seat: portrait, then a plaque with name, dealer tag, score, powers left and any
+ * call-out. The opponent's portrait sits in the big brass porthole; yours is a small one.
+ * The dealer has a ship's-wheel pin on the portrait's rim.
+ */
 export function PlayerChip({
   className,
   name,
   score,
   dealer,
   you,
+  porthole,
   image,
   powersLeft,
   offline,
@@ -22,6 +28,8 @@ export function PlayerChip({
   score: number;
   dealer: boolean;
   you?: boolean;
+  /** The big porthole portrait (the opponent's, top right) rather than a small one. */
+  porthole?: boolean;
   /** A painted portrait instead of an initial. */
   image?: string | null;
   powersLeft?: PowerId[];
@@ -33,31 +41,37 @@ export function PlayerChip({
   children?: React.ReactNode;
 }) {
   return (
-    <section className={`t-chip relative ${className}`} aria-label={name}>
+    <section
+      className={`t-seat relative ${porthole ? "t-seat-port" : "t-chip"} ${className}`}
+      aria-label={name}
+    >
       {callout && (
         <span className="t-callout" role="status">
           {callout}
         </span>
       )}
-      <span
-        className="t-avatar"
-        style={image ? { background: `url("${image}") center / 118% no-repeat` } : undefined}
-        aria-hidden
-      >
-        {image ? "" : name.slice(0, 1).toUpperCase()}
+      <span className={porthole ? "t-porthole" : "t-avatar"} aria-hidden>
+        <span
+          className="t-portrait"
+          style={image ? { backgroundImage: `url("${image}")` } : undefined}
+        >
+          {image ? "" : name.slice(0, 1).toUpperCase()}
+        </span>
+        {dealer && (
+          <img src={wheelUrl} alt="" className="t-dealer-pin" title="Dealer" draggable={false} />
+        )}
       </span>
-      <span className="min-w-0">
+      <span className="t-plaque min-w-0">
         <span className="flex items-center gap-1.5 text-sm leading-tight font-bold">
           <span
             className="h-2 w-2 shrink-0 rounded-full"
             style={{ background: you ? PEG_COLORS.me : PEG_COLORS.opponent }}
           />
           <span className="truncate">{name}</span>
-          {dealer && (
-            <span className="rounded bg-rum px-1 text-[9px] tracking-wide uppercase">dealer</span>
-          )}
+          {/* The pin on the portrait shows it; this says it to screen readers. */}
+          {dealer && <span className="sr-only">dealer</span>}
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center justify-center gap-x-2">
           <span className="num text-xl leading-none text-gold" aria-label={`${name} score`}>
             {score}
           </span>

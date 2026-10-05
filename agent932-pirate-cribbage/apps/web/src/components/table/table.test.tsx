@@ -11,6 +11,7 @@ import {
 import { getBoardSkin, holePoint } from "../../brand/boardSkins.js";
 import { HandSlot } from "./HandSlot.js";
 import { PaintedBoard } from "./PaintedBoard.js";
+import { pileTilt } from "./PlayArea.js";
 import { ScorePops } from "./ScorePops.js";
 
 describe("ScorePops", () => {
@@ -178,5 +179,14 @@ describe("PaintedBoard", () => {
     expect(rings).toEqual(
       [0, 1].flatMap((lane) => KRAKEN_HOLES.map((n) => holePoint(layout, lane as 0 | 1, n))),
     );
+  });
+});
+
+describe("pileTilt", () => {
+  it("leans each card a little, the same way every time", () => {
+    const tilts = ["AS", "5H", "10D", "KC", "7S"].map((c) => pileTilt(parseCard(c)));
+    for (const t of tilts) expect(Math.abs(t)).toBeLessThanOrEqual(5);
+    expect(new Set(tilts).size).toBeGreaterThan(1);
+    expect(pileTilt(parseCard("5H"))).toBe(tilts[1]);
   });
 });

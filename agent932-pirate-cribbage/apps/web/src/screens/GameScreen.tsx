@@ -189,9 +189,13 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
     </button>
   ) : null;
 
+  // The powers stand in one column down the right edge, or two when there are more than three.
+  const powerCount = pirate?.powers.length ?? 0;
+  const rail = powerCount === 0 ? "rail-none" : powerCount > 3 ? "rail-two" : "rail-one";
+
   return (
     <main className="table-stage">
-      <div className="table-grid">
+      <div className={`table-grid ${rail}`}>
         <TableBoard
           scores={view.scores}
           backPegs={p.backPegs}
@@ -201,14 +205,15 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           instant={instant}
         />
 
-        {/* Opponent: cards along the top edge, portrait and score beside them. */}
+        {/* Opponent: cards fanned along the top edge, their portrait in the porthole top right. */}
         <OpponentFan
           spied={view.spied && view.phase === "discard" ? view.spied : null}
           count={view.opponentCardCount}
           round={view.round}
         />
         <PlayerChip
-          className="t-opp-chip"
+          className="t-opp"
+          porthole
           name={oppName}
           score={view.scores[opp]}
           dealer={view.dealer === opp}
@@ -220,10 +225,10 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
         />
 
         {/* What's happening now, and the last thing that happened. */}
-        <div className="t-status flex max-w-[60cqw] flex-col items-center gap-1 text-center">
+        <div className="t-status flex flex-col items-center gap-0.5 text-center">
           {prompt && (
             <p
-              className="rounded-full border border-gold/35 bg-night/80 px-4 py-1 text-sm font-bold"
+              className="rounded-full border border-gold/35 bg-night/80 px-4 py-0.5 text-sm font-bold"
               aria-live="polite"
             >
               {prompt}
@@ -236,7 +241,8 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
             </p>
           )}
         </div>
-        {action}
+        {/* The action plank has a fixed home bottom right, so nothing jumps when it comes and goes. */}
+        <div className="t-act-home">{action}</div>
 
         <PlayArea
           view={view}
@@ -257,17 +263,20 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           choosing={mustDiscard || inPreplay}
           onCard={onCardClick}
         />
-        <PlayerChip
-          className="t-you-chip"
-          callout={callout?.seat === me ? EMOTES[callout.emote] : null}
-          name={label[me]}
-          score={view.scores[me]}
-          dealer={view.dealer === me}
-          image={avatarUrl(online ? online.avatars[me] : myAvatar)}
-          you
-        >
-          {online && myMove && <Countdown deadline={online.deadline} />}
-        </PlayerChip>
+        <div className="t-you">
+          <PlayerChip
+            className="t-you-chip"
+            callout={callout?.seat === me ? EMOTES[callout.emote] : null}
+            name={label[me]}
+            score={view.scores[me]}
+            dealer={view.dealer === me}
+            image={avatarUrl(online ? online.avatars[me] : myAvatar)}
+            you
+          >
+            {online && myMove && <Countdown deadline={online.deadline} />}
+          </PlayerChip>
+          {online && view.phase !== "gameOver" && <EmoteButton onSend={online.sendEmote} />}
+        </div>
 
         <button
           type="button"
@@ -277,6 +286,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
         />
+        <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
         {pirate && (
           <PowersRail
             powers={pirate.powers}
@@ -286,8 +296,6 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           />
         )}
       </div>
-
-      {online && view.phase !== "gameOver" && <EmoteButton onSend={online.sendEmote} />}
 
       {powerInfo && pirate && (
         <PowerPanel
@@ -315,7 +323,6 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
         />
       )}
 
-      <PeggyChatter events={p.lastEvents} me={me} className="t-peggy" />
       {tutorial && <TutorialTips phase={view.phase} />}
       <CutReveal events={p.lastEvents} names={label} me={me} />
       {!instant && <ScorePops events={p.lastEvents} me={me} names={label} />}
