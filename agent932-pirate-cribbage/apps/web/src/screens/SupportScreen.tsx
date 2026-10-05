@@ -3,6 +3,7 @@ import { NavBar } from "../components/NavBar.js";
 import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
+import { useEmailEnabled } from "../email.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 
 /** Same keys as the server's SUPPORT_TOPICS. */
@@ -52,12 +53,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "I forgot my password.",
-    a: (
-      <>
-        Use <Link href="/forgot">Forgot your password?</Link> on the sign-in page to get a reset
-        link by email. If that doesn't arrive, send us a message below.
-      </>
-    ),
+    a: <ForgotPasswordAnswer />,
   },
   {
     q: "How do I delete my account?",
@@ -70,6 +66,22 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     ),
   },
 ];
+
+/** The reset link only exists when this server can send email; otherwise we reset it by hand. */
+function ForgotPasswordAnswer() {
+  const emailEnabled = useEmailEnabled();
+  return emailEnabled ? (
+    <>
+      Use <Link href="/forgot">Forgot your password?</Link> on the sign-in page to get a reset link
+      by email. If that doesn't arrive, send us a message below.
+    </>
+  ) : (
+    <>
+      Send us a message using the form below, with your username and the email on your account, and
+      we'll help you get back in.
+    </>
+  );
+}
 
 /** deckhand.games/support: quick answers, then a contact form that lands in the Admin inbox. */
 export function SupportScreen() {
