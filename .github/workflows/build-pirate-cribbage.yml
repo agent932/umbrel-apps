@@ -30,6 +30,13 @@ jobs:
           node-version-file: agent932-pirate-cribbage/.nvmrc
           cache: npm
           cache-dependency-path: agent932-pirate-cribbage/package-lock.json
+      # Umbrel only pulls a new image when docker-compose.yml changes, so the compose file pins the
+      # exact release tag; it must match umbrel-app.yml's version.
+      - name: Compose image tag matches the app version
+        run: |
+          version=$(sed -n 's/^version: "\(.*\)"/\1/p' umbrel-app.yml)
+          grep -q "image: ghcr.io/agent932/pirate-cribbage:$version$" docker-compose.yml \
+            || { echo "docker-compose.yml must use pirate-cribbage:$version"; exit 1; }
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -56,6 +63,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Read the app version
+        id: version
+        run: echo "version=$(sed -n 's/^version: "\(.*\)"/\1/p' umbrel-app.yml)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
@@ -65,6 +76,7 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
           # Links the package to this repo so it shows up here and can inherit its visibility.
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           build-args: APP_VERSION=${{ github.sha }}
