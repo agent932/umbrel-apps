@@ -65,7 +65,8 @@ jobs:
 
       - name: Read the app version
         id: version
-        run: echo "version=$(sed -n 's/^version: "\(.*\)"/\1/p' umbrel-app.yml)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(sed -n 's/^version: "\(.*\)"/\1/p' umbrel-app.yml)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
         uses: docker/build-push-action@v7
