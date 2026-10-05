@@ -155,6 +155,48 @@ describe("PaintedBoard", () => {
     );
   });
 
+  it("stands the default board's pegs up as art, tip in the hole, and draws the game hole once", () => {
+    const skin = getBoardSkin();
+    const { container } = render(
+      <PaintedBoard
+        scores={[121, 40]}
+        backPegs={[100, 30]}
+        rules={CLASSIC_RULES}
+        names={["You", "Anne"]}
+        me={0}
+        upright
+        instant
+      />,
+    );
+    const art = (peg: string) =>
+      container.querySelector(`[data-peg="${peg}"] image`)!.getAttribute("href");
+    expect(art("me-front")).toBe(skin.pegUrls!.me);
+    expect(art("opponent-back")).toBe(skin.pegUrls!.opponent);
+    // The sprite stands above its hole: it ends just below the hole's centre.
+    const img = container.querySelector('[data-peg="me-front"] image')!;
+    expect(Number(img.getAttribute("y")) + Number(img.getAttribute("height"))).toBeGreaterThan(0);
+    expect(Number(img.getAttribute("y"))).toBeLessThan(0);
+    // Both lanes share the one game hole, so there is a single brass ring.
+    expect(container.querySelectorAll('circle[stroke="#f2b84b"]')).toHaveLength(1);
+  });
+
+  it("still draws round pegs on the Classic Serpent board", () => {
+    const { container } = render(
+      <PaintedBoard
+        scores={[3, 4]}
+        backPegs={[0, 0]}
+        rules={CLASSIC_RULES}
+        names={["You", "Anne"]}
+        me={0}
+        upright
+        instant
+        skinId="classic-serpent"
+      />,
+    );
+    expect(container.querySelector("[data-peg] image")).toBeNull();
+    expect(container.querySelectorAll('circle[stroke="#f2b84b"]')).toHaveLength(2);
+  });
+
   it("marks the treasure and Kraken holes on both lanes under pirate rules", () => {
     const { container } = render(
       <PaintedBoard

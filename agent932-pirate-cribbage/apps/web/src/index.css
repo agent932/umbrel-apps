@@ -411,17 +411,21 @@ html[data-nav="pop"]::view-transition-old(root) {
 .table-grid {
   /* The action plank's width: your hand fans between the board and the plank. */
   --plank: calc(136px * var(--ui, 1));
+  /* Room left of your hand for your plaque, which sits beside the board's foot. */
+  --you: calc(70px * var(--ui, 1));
   /* Card heights: your hand (six cards must fit between the board and the plank: a fan is about
      2.95 card heights wide), the opponent's fan, the pile, and the deck and crib. */
-  --ch: min(38cqh, (100cqw - var(--left) - var(--plank) - 3cqw) / 2.95, 300px);
+  --ch: min(38cqh, (100cqw - var(--left) - var(--you) - var(--plank) - 3cqw) / 2.95, 300px);
   --och: min(21cqh, 150px);
   --pch: min(23cqh, 190px);
   --sch: min(20cqh, 150px);
   /* How much of each card in your hand shows (of its height), and the fan's tilt per card. */
   --spread: 0.38;
   --tilt: 2.5deg;
-  /* The board's width (its art is twice as tall as wide), the porthole and the power medallions. */
-  --bw: min(46cqh, 23cqw);
+  /* The board art's height over its width (Serpent Reef), the board's width (nearly the table's
+     full height), the porthole and the power medallions. */
+  --bratio: 2.917;
+  --bw: min(94cqh / var(--bratio), 23cqw);
   --port: min(25cqh, 13cqw);
   --pw: clamp(44px, 14.5cqh, 64px);
   --med: clamp(48px, 15cqh, 72px);
@@ -449,20 +453,21 @@ html[data-nav="pop"]::view-transition-old(root) {
 .t-board {
   z-index: 2;
   left: 0;
-  top: max(0px, calc(46cqh - var(--bw)));
+  top: max(0px, calc(48cqh - var(--bw) * var(--bratio) / 2));
   width: var(--bw);
-  height: calc(var(--bw) * 2);
+  height: calc(var(--bw) * var(--bratio));
 }
-/* Over the board's top corner, as on a real table. */
+/* Beside the board's top corner (the board's track runs right up into its corners). */
 .t-menu {
   z-index: 6;
-  left: 0;
+  /* (Divided by the zoom below, which scales its offsets too.) */
+  left: calc((var(--bw) + 0.5cqw) / var(--ui, 1));
   top: 0;
 }
-/* Your plaque at the board's foot (over its carved frame, below the last holes). */
+/* Your plaque beside the board's foot, clear of the start holes. */
 .t-you {
   z-index: 6;
-  left: 0;
+  left: calc(var(--bw) + 0.5cqw);
   bottom: 1cqh;
   display: flex;
   align-items: flex-end;
@@ -472,7 +477,8 @@ html[data-nav="pop"]::view-transition-old(root) {
 .t-opp-fan {
   z-index: 3;
   top: 0;
-  left: var(--left);
+  /* Clear of the menu button beside the board's top. */
+  left: calc(var(--left) + 48px * var(--ui, 1));
   right: calc(var(--right) + var(--oppw) + 3cqw);
   height: var(--och);
 }
@@ -548,7 +554,7 @@ html[data-nav="pop"]::view-transition-old(root) {
 }
 .t-hand {
   z-index: 5;
-  left: var(--left);
+  left: calc(var(--left) + var(--you));
   right: calc(var(--plank) + 2cqw);
   bottom: 0;
   height: var(--ch);
@@ -1051,7 +1057,7 @@ html[data-nav="pop"]::view-transition-old(root) {
     --ui: 1.45;
     --och: min(21cqh, 220px);
     --sch: min(17cqh, 180px);
-    --bw: min(46cqh, 26cqw);
+    --bw: min(94cqh / var(--bratio), 26cqw);
     --pw: clamp(44px, 9cqh, 88px);
     --med: clamp(48px, 9cqh, 96px);
     --port: min(22cqh, 14cqw);
@@ -1072,8 +1078,8 @@ html[data-nav="pop"]::view-transition-old(root) {
     --port: min(12cqh, 24cqw);
     --pw: min(48px, 12.5cqw);
     --med: min(56px, 7.5cqh);
-    /* The board lies across: its height (it is twice as wide as tall). */
-    --bh: min(22cqh, 47cqw);
+    /* The board lies across: its height (its width is that times --bratio). */
+    --bh: min(22cqh, 96cqw / var(--bratio));
     --left: 2cqw;
     --right: 2cqw;
     /* Under the board and the two status lines. */
@@ -1081,8 +1087,8 @@ html[data-nav="pop"]::view-transition-old(root) {
   }
   .t-board {
     top: calc(var(--port) + 5cqh);
-    left: calc(50cqw - var(--bh));
-    width: calc(var(--bh) * 2);
+    left: calc(50cqw - var(--bh) * var(--bratio) / 2);
+    width: calc(var(--bh) * var(--bratio));
     height: var(--bh);
   }
   .t-opp-fan {

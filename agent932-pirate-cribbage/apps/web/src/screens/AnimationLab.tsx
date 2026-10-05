@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { parseCard, parseCards, scoreHand } from "@pirate/engine";
+import { PIRATE_RULES, parseCard, parseCards, scoreHand } from "@pirate/engine";
 import { ALL_SCENES, SceneOnce } from "../brand/Cinematics.js";
 import { Card } from "../components/Card.js";
 import { CountingShow } from "../components/Counting.js";
+import { PaintedBoard } from "../components/table/PaintedBoard.js";
 
 const CAPTIONS: Record<string, string> = {
   spyglass: "deckhand spies from the crow's nest!",
@@ -22,6 +23,9 @@ export function AnimationLab() {
   const [scene, setScene] = useState<string | null>(null);
   const [run, setRun] = useState(0);
   const [counting, setCounting] = useState(false);
+  const [pegs, setPegs] = useState<[number, number]>([60, 85]);
+  const [skinId, setSkinId] = useState("serpent-reef");
+  const [upright, setUpright] = useState(true);
   const cut = parseCard("5S");
   const show = [
     {
@@ -76,6 +80,49 @@ export function AnimationLab() {
           />
         )}
       </div>
+      {/* The board with pegs anywhere, to check a skin's hole map and the hop. */}
+      <section className="panel flex flex-col gap-3 p-4" aria-label="Board">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          {(["You", "Opponent"] as const).map((who, i) => (
+            <label key={who} className="flex items-center gap-2">
+              {who}
+              <input
+                type="range"
+                min={0}
+                max={121}
+                value={pegs[i]}
+                onChange={(e) =>
+                  setPegs((p) => (i === 0 ? [+e.target.value, p[1]] : [p[0], +e.target.value]))
+                }
+              />
+              {pegs[i]}
+            </label>
+          ))}
+          <select value={skinId} onChange={(e) => setSkinId(e.target.value)}>
+            <option value="serpent-reef">Serpent Reef</option>
+            <option value="classic-serpent">Classic Serpent</option>
+          </select>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={upright}
+              onChange={(e) => setUpright(e.target.checked)}
+            />
+            upright
+          </label>
+        </div>
+        <div className={upright ? "mx-auto h-[640px] w-[230px]" : "h-[230px] w-full"}>
+          <PaintedBoard
+            scores={pegs}
+            backPegs={[Math.max(0, pegs[0] - 6), Math.max(0, pegs[1] - 4)]}
+            rules={PIRATE_RULES}
+            names={["You", "Opponent"]}
+            me={0}
+            upright={upright}
+            skinId={skinId}
+          />
+        </div>
+      </section>
       {/* Every court card at every size the game uses, to check the corners stay readable. */}
       <section className="panel flex flex-col gap-4 p-4" aria-label="Court cards">
         {(["small", "normal", "fluid"] as const).map((size) => (

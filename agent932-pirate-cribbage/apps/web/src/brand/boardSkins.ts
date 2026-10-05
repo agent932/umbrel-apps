@@ -4,7 +4,11 @@
 // A skin that fails validation falls back to the default board.
 import type { HolePoint } from "./boardTrack.js";
 import classicSerpent from "./boards/classic-serpent.json";
+import serpentReef from "./boards/serpent-reef.json";
 import classicSerpentBoardUrl from "../assets/table/board.webp";
+import serpentReefBoardUrl from "../assets/table/board-serpent.webp";
+import pegBlueUrl from "../assets/table/peg-blue.webp";
+import pegRedUrl from "../assets/table/peg-red.webp";
 
 export type { HolePoint };
 
@@ -27,6 +31,20 @@ export interface BoardLayout {
   pegRadius: number;
   /** Every hole must sit inside this box: [left, top, right, bottom] fractions. */
   safeBox?: [number, number, number, number];
+  /** Both lanes end in the same game hole (121), as on a real board. */
+  sharedGameHole?: boolean;
+  /** Standing pegs drawn from art (side view, tip at the bottom) instead of round pegs. */
+  pegSprite?: PegSprite;
+}
+
+export interface PegSprite {
+  /** The art's file names inside the skin: your peg and the opponent's. */
+  me: string;
+  opponent: string;
+  /** The sprite's size in pixels (only its shape matters). */
+  size: [number, number];
+  /** How tall a peg stands, as a fraction of the board image's width. */
+  height: number;
 }
 
 export interface BoardSkin {
@@ -38,16 +56,26 @@ export interface BoardSkin {
   upright: BoardLayout;
 }
 
-/** A skin ready to draw: the map plus the URL of its art. */
+/** A skin ready to draw: the map plus the URLs of its art. */
 export interface ResolvedBoardSkin extends BoardSkin {
   imageUrl: string;
+  /** The standing peg art, when the skin has it. */
+  pegUrls?: { me: string; opponent: string };
 }
 
 export const HOLES_PER_LANE = 122;
-export const DEFAULT_BOARD_SKIN = "classic-serpent";
+export const DEFAULT_BOARD_SKIN = "serpent-reef";
 
 /** Every board the app ships: the JSON map and the bundled art it names. */
 const REGISTRY: Record<string, { json: unknown; images: Record<string, string> }> = {
+  "serpent-reef": {
+    json: serpentReef,
+    images: {
+      "board-serpent.webp": serpentReefBoardUrl,
+      "peg-blue.webp": pegBlueUrl,
+      "peg-red.webp": pegRedUrl,
+    },
+  },
   "classic-serpent": { json: classicSerpent, images: { "board.webp": classicSerpentBoardUrl } },
 };
 
@@ -89,13 +117,35 @@ function layoutErrors(raw: unknown, where: string): string[] {
         errors.push(`${where}.lanes[${i}] hole ${n} is outside the board`);
     });
   });
+  const sprite = l.pegSprite as Record<string, unknown> | undefined;
+  if (
+    sprite !== undefined &&
+    (typeof sprite?.me !== "string" ||
+      typeof sprite.opponent !== "string" ||
+      !isPair(sprite.size) ||
+      !isNum(sprite.height) ||
+      sprite.height <= 0 ||
+      sprite.height > 0.5)
+  )
+    errors.push(`${where}.pegSprite needs me, opponent, size and a height up to 0.5`);
   if (errors.length) return errors;
+
+  // A shared game hole must really be one point in both lanes.
+  const lanes = l.lanes as BoardLane[];
+  const shared = l.sharedGameHole === true;
+  const game = HOLES_PER_LANE - 1;
+  const [g0, g1] = [lanes[0]!.holes[game]!, lanes[1]!.holes[game]!];
+  if (shared && (g0[0] !== g1[0] || g0[1] !== g1[1]))
+    errors.push(`${where}: the shared game hole must be the same point in both lanes`);
 
   // No two holes so close that their pegs would sit on top of each other.
   const [w, h] = l.size as [number, number];
   const minGap = 1.5 * (l.holeRadius as number) * w;
-  const all = (l.lanes as BoardLane[]).flatMap((lane, i) =>
-    lane.holes.map(([x, y], n) => ({ x: x * w, y: y * h, name: `lanes[${i}] hole ${n}` })),
+  // (The second lane's copy of a shared game hole is skipped: it is the same hole.)
+  const all = lanes.flatMap((lane, i) =>
+    lane.holes
+      .map(([x, y], n) => ({ x: x * w, y: y * h, name: `lanes[${i}] hole ${n}`, n }))
+      .filter(({ n }) => !(shared && i === 1 && n === game)),
   );
   for (let a = 0; a < all.length; a++) {
     for (let b = a + 1; b < all.length; b++) {
@@ -129,7 +179,12 @@ export function resolveBoardSkin(
   const skin = raw as BoardSkin;
   const imageUrl = images[skin.upright.image];
   if (!imageUrl) return { skin: null, errors: [`image ${skin.upright.image} is not bundled`] };
-  return { skin: { ...skin, imageUrl }, errors: [] };
+  const sprite = skin.upright.pegSprite;
+  if (!sprite) return { skin: { ...skin, imageUrl }, errors: [] };
+  const me = images[sprite.me];
+  const opponent = images[sprite.opponent];
+  if (!me || !opponent) return { skin: null, errors: ["the peg art is not bundled"] };
+  return { skin: { ...skin, imageUrl, pegUrls: { me, opponent } }, errors: [] };
 }
 
 const cache = new Map<string, ResolvedBoardSkin>();

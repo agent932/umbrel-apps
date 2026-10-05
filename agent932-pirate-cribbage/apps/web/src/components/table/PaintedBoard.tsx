@@ -66,14 +66,51 @@ export function PaintedBoard({
   const seatIn = (lane: 0 | 1): 0 | 1 => (lane === 1 ? me : me === 0 ? 1 : 0);
   const pirate = rules.pirate;
 
+  const sprite = layout.pegSprite;
+
   function peg(seat: number, score: number, lane: 0 | 1, back: boolean) {
     const [x, y] = at(holePoint(layout, lane, score));
     const r = back ? pegR * 0.8 : pegR;
+    const mine = seat === me;
+    if (sprite && skin.pegUrls) {
+      // A standing peg, upright on screen whichever way the board lies, its tip in the hole.
+      const h = sprite.height * artW * (back ? 0.8 : 1);
+      const w = (h * sprite.size[0]) / sprite.size[1];
+      return (
+        <g
+          key={`${seat}-${back ? "back" : "front"}-${upright}`}
+          data-peg={`${mine ? "me" : "opponent"}-${back ? "back" : "front"}`}
+          style={{
+            transform: `translate(${x}px, ${y}px)`,
+            transition: `transform ${back ? 400 : STEP_MS}ms ease-out`,
+          }}
+          opacity={back ? 0.8 : 1}
+        >
+          {/* Its shadow falls down and to the right, across the board. */}
+          <ellipse
+            cx={w * 0.35}
+            cy={holeR * 0.3}
+            rx={w * 0.55}
+            ry={holeR * 0.75}
+            fill="#000"
+            opacity={0.45}
+          />
+          <image
+            href={mine ? skin.pegUrls.me : skin.pegUrls.opponent}
+            x={-w / 2}
+            y={-h + holeR * 0.4}
+            width={w}
+            height={h}
+            style={back ? { filter: "brightness(0.65)" } : undefined}
+          />
+        </g>
+      );
+    }
     return (
       <g
         // Keyed by orientation too, so turning the device moves pegs at once rather than sliding.
         key={`${seat}-${back ? "back" : "front"}-${upright}`}
-        data-peg={`${seat === me ? "me" : "opponent"}-${back ? "back" : "front"}`}
+        data-peg={`${mine ? "me" : "opponent"}-${back ? "back" : "front"}`}
         style={{
           transform: `translate(${x}px, ${y}px)`,
           transition: `transform ${back ? 400 : STEP_MS}ms ease-out`,
@@ -81,12 +118,7 @@ export function PaintedBoard({
         opacity={back ? 0.6 : 1}
       >
         <circle cx={3.5} cy={5} r={r} fill="#000" opacity={0.45} />
-        <circle
-          r={r}
-          fill={seat === me ? ref("blue") : ref("red")}
-          stroke="#1e0d04"
-          strokeWidth={1.3}
-        />
+        <circle r={r} fill={mine ? ref("blue") : ref("red")} stroke="#1e0d04" strokeWidth={1.3} />
         <circle cx={-r * 0.35} cy={-r * 0.4} r={r * 0.32} fill="#fff" opacity={0.7} />
       </g>
     );
@@ -126,6 +158,8 @@ export function PaintedBoard({
       {LANES.map((lane) => (
         <g key={lane}>
           {layout.lanes[lane].holes.map((_, n) => {
+            // A shared game hole is drawn once.
+            if (n === 121 && lane === 1 && layout.sharedGameHole) return null;
             const [x, y] = at(holePoint(layout, lane, n));
             const treasure = pirate?.treasure && TREASURE_HOLES.includes(n);
             const kraken = pirate?.kraken && KRAKEN_HOLES.includes(n);
