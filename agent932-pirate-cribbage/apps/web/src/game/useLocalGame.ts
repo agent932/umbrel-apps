@@ -17,6 +17,7 @@ import {
   toEngineAction,
 } from "./localGame.js";
 import type { GameController, UiAction } from "./types.js";
+import { RESET_HOLD_MS } from "../components/table/tableHooks.js";
 
 /**
  * How long the bot "thinks" before each move (at normal speed), so the player can follow along:
@@ -65,7 +66,10 @@ export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameC
     const move = botAction(state, BOT, options.level, cryptoRandom);
     if (!move) return;
     const canBelay = move.type === "play" && powerBlocker(state, YOU, "belay") === null;
-    const delay = canBelay && botDelay > 0 ? botDelay + BELAY_WINDOW_MS : botDelay;
+    let delay = canBelay && botDelay > 0 ? botDelay + BELAY_WINDOW_MS : botDelay;
+    // After a run ends (31 or a Go), let its last card be seen before the bot leads again.
+    if (game.p.lastEvents.some((e) => e.type === "reset"))
+      delay = Math.max(delay, Math.round(RESET_HOLD_MS * (botDelay / BOT_DELAY_MS)));
     const t = setTimeout(() => apply(move), delay);
     return () => clearTimeout(t);
   }, [game, apply, botDelay]);

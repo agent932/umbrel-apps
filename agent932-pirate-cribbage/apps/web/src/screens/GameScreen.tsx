@@ -22,8 +22,10 @@ import { TableMenu } from "../components/table/TableMenu.js";
 import { PlayerSheet } from "../components/PlayerSheet.js";
 import {
   LAST_PLAY_MS,
+  RESET_HOLD_MS,
   useCallout,
   useLastPlay,
+  useResetHold,
   useShowReveal,
 } from "../components/table/tableHooks.js";
 import type { GameController } from "../game/types.js";
@@ -34,7 +36,7 @@ import { SPEED_FACTOR, useSettings } from "../settings.js";
 import menuUrl from "../assets/table/btn-menu.webp";
 
 // The hook lives with the table's other parts; re-exported for its tests.
-export { useLastPlay };
+export { useLastPlay, useResetHold };
 
 interface Props {
   game: GameController;
@@ -149,8 +151,12 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
     ? LAST_PLAY_MS
     : Math.max(2000, Math.round(LAST_PLAY_MS * SPEED_FACTOR[speed]));
   const lastPlay = useLastPlay(livePile, count, !!view.pegging, p.lastEvents, !!instant, holdMs);
-  const pile = lastPlay?.pile ?? livePile;
-  const shownCount = lastPlay?.count ?? count;
+  // A run that ended on 31 or a Go stays up for a moment too, so its last card is seen.
+  const resetMs = online ? RESET_HOLD_MS : Math.round(RESET_HOLD_MS * SPEED_FACTOR[speed]);
+  const runOver = useResetHold(livePile, count, !!view.pegging, p.lastEvents, !!instant, resetMs);
+  const pile = lastPlay?.pile ?? runOver?.pile ?? livePile;
+  const shownCount = lastPlay?.count ?? runOver?.count ?? count;
+  const shownPrompt = runOver && myTurnToPeg ? "Your play — the count starts again" : prompt;
   const cribLabel =
     view.cribOwner === me || (view.cribOwner === null && view.dealer === me)
       ? "Your crib"
@@ -243,9 +249,9 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
 
         {/* What's happening now, and the last thing that happened. */}
         <div className="t-status flex flex-col items-center gap-0.5 text-center">
-          {prompt && (
+          {shownPrompt && (
             <p className="t-prompt" aria-live="polite">
-              {prompt}
+              {shownPrompt}
             </p>
           )}
           <Feed className="t-log" items={shown.feed.slice(0, 1)} />
@@ -353,7 +359,9 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
       {tutorial && <TutorialTips phase={view.phase} />}
       <CutReveal events={p.lastEvents} names={label} me={me} />
       {!instant && <ScorePops events={events} me={me} names={label} />}
-      {!instant && <Cinematics events={events} names={label} me={me} hold={!!lastPlay} />}
+      {!instant && (
+        <Cinematics events={events} names={label} me={me} hold={!!lastPlay || !!runOver} />
+      )}
 
       {view.phase === "roundEnd" && !lastPlay && (
         <RoundSummary

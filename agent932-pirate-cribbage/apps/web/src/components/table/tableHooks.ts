@@ -75,6 +75,62 @@ export function useLastPlay(
   return held;
 }
 
+/** How long a finished run of play (31, or a Go) stays on the table before the pile clears (normal speed). */
+export const RESET_HOLD_MS = 2500;
+
+/**
+ * The cards and count of a run of play that just ended on 31 or a Go. The engine clears the pile in
+ * the same step as the card that ended it (often the opponent's), so without this that card would
+ * never be seen. Held until its time is up or the next card starts a new pile.
+ */
+export function useResetHold(
+  livePile: PilePlay[],
+  count: number,
+  pegging: boolean,
+  events: GameEvent[],
+  instant: boolean,
+  holdMs = RESET_HOLD_MS,
+) {
+  // The table as it was before the latest step.
+  const before = useRef<{ pile: PilePlay[]; count: number }>({ pile: [], count: 0 });
+  const [held, setHeld] = useState<{ pile: PilePlay[]; count: number } | null>(null);
+  useEffect(() => {
+    const prev = before.current;
+    before.current = { pile: livePile, count };
+    if (!pegging || instant) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHeld(null);
+      return;
+    }
+    let pile = [...prev.pile];
+    let shown = prev.count;
+    let finished: { pile: PilePlay[]; count: number } | null = null;
+    for (const e of events) {
+      if (e.type === "played") {
+        pile.push({ card: e.card, seat: e.seat });
+        shown = e.count;
+      }
+      if (e.type === "reset") {
+        finished = { pile, count: shown };
+        pile = [];
+        shown = 0;
+      }
+    }
+    // Only while the new pile is still empty (a card led in the same step shows instead).
+    setHeld(finished && pile.length === 0 && finished.pile.length > 0 ? finished : null);
+    // Re-run only when the game moves on, not for every re-render of the same step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pegging, events]);
+  useEffect(() => {
+    if (!held) return;
+    const t = setTimeout(() => setHeld(null), holdMs);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [held]);
+  // The next card played starts the new pile, so the old one goes.
+  return held && livePile.length === 0 ? held : null;
+}
+
 const NO_STAGES: RevealStage[] = [];
 
 /**

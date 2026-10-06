@@ -1120,11 +1120,26 @@ html[data-nav="pop"]::view-transition-old(root) {
     --bh: min(22cqh, 96cqw / var(--bratio));
     --left: 2cqw;
     --right: 2cqw;
+    /* From the bottom up: your hand, then your plaque and the plank just above it (clear of a
+       lifted card). From the top down: the opponent's porthole and plaque. The board, the two
+       status lines and the deck/pile/crib row sit centred in the room between, so the
+       opponent's plaque never covers the board. */
+    --you-bottom: min(
+      calc(var(--pw) + 1.5cqh + var(--ch) * 1.2 + 24px),
+      /* Short phones: only as low as it must go to clear the pile. */
+        calc(100cqh - var(--opp-bottom) - 10px - var(--block-h) - 50px * var(--ui, 1))
+    );
+    --you-top: calc(100cqh - var(--you-bottom) - 50px * var(--ui, 1));
+    --opp-bottom: calc(0.5cqh + var(--port) + 42px * var(--ui, 1));
+    --block-h: calc(var(--bh) + 62px * var(--ui, 1) + var(--pch) + 2cqh);
+    --board-top: calc(
+      var(--opp-bottom) + max(6px, (var(--you-top) - var(--opp-bottom) - var(--block-h)) / 2)
+    );
     /* Under the board and the two status lines. */
-    --play-top: calc(var(--port) + 5cqh + var(--bh) + 62px * var(--ui, 1));
+    --play-top: calc(var(--board-top) + var(--bh) + 62px * var(--ui, 1));
   }
   .t-board {
-    top: calc(var(--port) + 5cqh);
+    top: var(--board-top);
     left: calc(50cqw - var(--bh) * var(--bratio) / 2);
     width: calc(var(--bh) * var(--bratio));
     height: var(--bh);
@@ -1142,7 +1157,7 @@ html[data-nav="pop"]::view-transition-old(root) {
       rotate(calc((var(--i) - (var(--n) - 1) / 2) * -4deg));
   }
   .t-status {
-    top: calc(var(--port) + 5.5cqh + var(--bh));
+    top: calc(var(--board-top) + 0.5cqh + var(--bh));
     left: 2cqw;
     right: 2cqw;
     --status-w: 96cqw;
@@ -1182,15 +1197,15 @@ html[data-nav="pop"]::view-transition-old(root) {
     translate: 0 -2cqh;
   }
   .t-you {
-    top: calc(var(--play-top) + var(--pch) + 2.5cqh);
-    bottom: auto;
+    top: auto;
+    bottom: var(--you-bottom);
     left: 2cqw;
     align-items: center;
     max-width: 60cqw;
   }
   .t-act-home {
-    top: calc(var(--play-top) + var(--pch) + 2.5cqh);
-    bottom: auto;
+    top: auto;
+    bottom: var(--you-bottom);
     right: 2cqw;
   }
   .t-hand {

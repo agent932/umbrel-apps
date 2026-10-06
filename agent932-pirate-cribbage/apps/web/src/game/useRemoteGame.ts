@@ -4,6 +4,7 @@ import { names as botNames } from "./localGame.js";
 import { initialPresentation, present } from "./present.js";
 import { BELAY_WINDOW_MS, BOT_DELAY_MS } from "./useLocalGame.js";
 import type { GameController, UiAction } from "./types.js";
+import { RESET_HOLD_MS } from "../components/table/tableHooks.js";
 
 /**
  * A game vs the computer run by the server (so it counts toward stats). The server answers each
@@ -55,13 +56,17 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
     const [next, ...rest] = queue;
     if (!next) return;
     const quick = next.events.some((e) => e.type === "dealt");
-    const t = setTimeout(
-      () => {
-        setP((prev) => present(prev, next.events, next.view, label));
-        setQueue(rest);
-      },
-      quick ? Math.min(botDelay, 350) : botDelay,
-    );
+    // After a run ends (31 or a Go), let its last card be seen before the bot leads again.
+    const afterReset = p.lastEvents.some((e) => e.type === "reset");
+    const wait = quick
+      ? Math.min(botDelay, 350)
+      : afterReset
+        ? Math.max(botDelay, Math.round(RESET_HOLD_MS * (botDelay / BOT_DELAY_MS)))
+        : botDelay;
+    const t = setTimeout(() => {
+      setP((prev) => present(prev, next.events, next.view, label));
+      setQueue(rest);
+    }, wait);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue, botDelay]);
