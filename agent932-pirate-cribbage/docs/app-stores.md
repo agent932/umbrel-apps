@@ -56,13 +56,29 @@ npx cap open ios
 ## App Store listing
 
 - **Category:** Games → Card (secondary: Board).
-- **Subtitle:** Cribbage on the high seas
-- **Description:** Deckhand Games is a home for classic card games with a pirate twist. The first
-  game aboard is Pirate Cribbage: play the computer crew at three difficulties or friends online,
-  switch on Pirate Rules for buried treasure, the Kraken and six sneaky powers, and track every
-  match in the Ship's Log with detailed stats, ranks and achievements. Learn to play with Peggy the
-  parrot, and test your discards with the daily puzzle.
-- **Keywords:** cribbage,card game,pirate,crib,peg,board,multiplayer,friends,classic
+- **Name:** Deckhand Games
+- **Subtitle:** Pirate Cribbage: Crib & Peg
+- **Keywords:**
+  card,pegging,multiplayer,online,friends,two player,classic,puzzle,daily,board,offline,family,learn
+  (no word repeats the name or subtitle, which already cover deckhand, games, pirate, cribbage, crib
+  and peg)
+- **Promotional text** (can change any time without a new version): Pirate Cribbage is free, with
+  no ads. Peg against the computer crew or sail online with friends. Add Pirate Rules for buried
+  treasure, the Kraken and six sneaky powers.
+- **Description** (three paragraphs; drop the "free, no ads and no purchases" wording if a build
+  ever ships with purchases):
+
+  > Deckhand Games is a home for classic card games with a pirate twist. The first game aboard is
+  > Pirate Cribbage, free to play with no ads and no purchases.
+  >
+  > Play the computer crew at three difficulties, or play friends online. Switch on Pirate Rules
+  > for buried treasure, the Kraken and six sneaky powers, or keep it classic. Track every match in
+  > the Ship's Log with detailed stats, ranks and achievements. Learn to play with Peggy the parrot,
+  > and test your discards with the daily puzzle.
+  >
+  > Playing the computer as a guest works with no connection and needs no account. An account is
+  > only needed for online play with friends, the Ship's Log and the leaderboard.
+
 - **Support URL:** https://deckhand.games/support
 - **Privacy policy URL:** https://deckhand.games/privacy
 - **Age rating:** answer _None_ to everything (no gambling for money, no user-generated text: emotes
