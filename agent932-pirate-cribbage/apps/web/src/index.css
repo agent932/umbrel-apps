@@ -1116,27 +1116,42 @@ html[data-nav="pop"]::view-transition-old(root) {
     --port: min(12cqh, 24cqw);
     --pw: min(48px, 12.5cqw);
     --med: min(56px, 7.5cqh);
-    /* The board lies across: its height (its width is that times --bratio). */
-    --bh: min(22cqh, 96cqw / var(--bratio));
     --left: 2cqw;
     --right: 2cqw;
     /* From the bottom up: your hand, then your plaque and the plank just above it (clear of a
        lifted card). From the top down: the opponent's porthole and plaque. The board, the two
        status lines and the deck/pile/crib row sit centred in the room between, so the
        opponent's plaque never covers the board. */
+    --you-ideal: calc(var(--pw) + 1.5cqh + var(--ch) * 1.2 + 24px);
+    /* The board lies across: its height (its width is that times --bratio). On short phones it
+       gives up a little height (down to 15.5cqh) so everything still fits. */
+    --bh: min(
+      22cqh,
+      96cqw / var(--bratio),
+      max(
+        15.5cqh,
+        100cqh - var(--opp-bottom) - 16px - 112px * var(--ui, 1) - var(--pch) - 2cqh -
+          var(--you-ideal)
+      )
+    );
     --you-bottom: min(
-      calc(var(--pw) + 1.5cqh + var(--ch) * 1.2 + 24px),
+      var(--you-ideal),
       /* Short phones: only as low as it must go to clear the pile. */
         calc(100cqh - var(--opp-bottom) - 10px - var(--block-h) - 50px * var(--ui, 1))
     );
     --you-top: calc(100cqh - var(--you-bottom) - 50px * var(--ui, 1));
-    --opp-bottom: calc(0.5cqh + var(--port) + 42px * var(--ui, 1));
+    --opp-bottom: calc(0.5cqh + var(--port) + 42px * var(--ui, 1) + var(--opp-powers, 0px));
     --block-h: calc(var(--bh) + 62px * var(--ui, 1) + var(--pch) + 2cqh);
     --board-top: calc(
       var(--opp-bottom) + max(6px, (var(--you-top) - var(--opp-bottom) - var(--block-h)) / 2)
     );
     /* Under the board and the two status lines. */
     --play-top: calc(var(--board-top) + var(--bh) + 62px * var(--ui, 1));
+  }
+  /* Pirate rules: the opponent's plaque carries a row of their powers, so it's taller. */
+  .table-grid.rail-one,
+  .table-grid.rail-two {
+    --opp-powers: calc(16px * var(--ui, 1));
   }
   .t-board {
     top: var(--board-top);
