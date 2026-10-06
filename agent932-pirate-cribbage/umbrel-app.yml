@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.30.0"
+version: "0.30.1"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,10 +37,10 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Report or block a player from the game menu, the leaderboard or your
-  friends list; blocked players are never matched with you and their emotes
-  are hidden. Bigger status text and play log on the table, a compact
-  counting panel, a way to change your account email, and a bigger help page.
+  The card that ends a run of play (31 or a Go) now stays on the table for a
+  moment, so you always see your opponent's last card. On phones held
+  upright, your name and the Throw button sit just above your hand, and the
+  board no longer hides behind your opponent's portrait.
 
 
 developer: agent932
