@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useDismiss } from "./useDismiss.js";
+import { useDialog } from "./useDialog.js";
 import { type Settings, updateSettings, useSettings } from "../settings.js";
 import wheelUrl from "../assets/ui/icon-wheel.webp";
 
@@ -49,7 +49,8 @@ function SettingsPanel({
   onClose: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  useDismiss(panel, opener, onClose);
+  // A drop-down: closes on a tap outside or Escape, but the page behind stays usable.
+  useDialog(panel, { opener, onClose, dismissOutside: true, modal: false });
   return (
     <div
       ref={panel}
@@ -67,7 +68,7 @@ function SettingsPanel({
       <SettingsFields />
       <button
         type="button"
-        className="mt-3 w-full text-xs text-parchment/60 hover:text-gold"
+        className="mt-3 min-h-11 w-full text-sm text-parchment/80 hover:text-gold"
         onClick={onClose}
       >
         Close

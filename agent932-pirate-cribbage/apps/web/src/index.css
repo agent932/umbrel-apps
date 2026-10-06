@@ -1291,3 +1291,251 @@ html[data-nav="pop"]::view-transition-old(root) {
     100vw - 14rem - max(12px, env(safe-area-inset-right, 0px))
   );
 }
+
+/* ---------- Counting the show ----------
+ * Phones held upright and tablets: a column (whose turn, the cards, the calls, the total, then Next
+ * and Skip). Short landscape phones: see the compact layout below. */
+.counting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.counting-head,
+.counting-body {
+  display: contents;
+}
+.counting-name {
+  order: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+}
+.counting-of {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: rgb(243 229 192 / 0.8);
+}
+/* "Peg: You +29" while the total is up: read out here; shown only in the compact layout. */
+.counting-peg {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.counting-cards {
+  order: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.counting-card.lit {
+  translate: 0 -12px;
+}
+.counting-say {
+  order: 3;
+  position: relative;
+  width: 100%;
+  min-height: 3.5rem;
+  text-align: center;
+}
+.counting-phrases {
+  font-size: 1.125rem;
+}
+.counting-total {
+  margin-top: 4px;
+}
+/* Here the total only appears once the hand is counted, with the "+2" floating off each call. */
+.counting-total:not(.final) .num {
+  display: none;
+}
+.counting-plus {
+  pointer-events: none;
+  position: absolute;
+  top: -20px;
+  right: 8px;
+  animation: float-up-right 700ms ease-out forwards;
+}
+.counting-buttons {
+  order: 4;
+  display: flex;
+  gap: 12px;
+}
+.counting-button {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 0 14px;
+  border: 1px solid rgb(242 184 75 / 0.45);
+  border-radius: 12px;
+  background: rgb(4 18 28 / 0.3);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: rgb(243 229 192 / 0.9);
+}
+.counting-button:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+}
+
+/* Short landscape phones: the show sits low and right of the board (so the pegs can be seen
+ * moving after each total), without its title while counting, at one constant height: a header
+ * row (whose hand, "2 of 3", Next and Skip), then the cards beside the calls with the running
+ * total pinned under them. */
+@media (orientation: landscape) and (max-height: 480px) {
+  .dialog-shade.see-board {
+    place-items: end center;
+    padding-top: 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    /* The board's right edge: the same sums as --bx and --bw on .table-grid (it's inside the
+       table's container, so cqw and cqh are the table's). */
+    padding-left: calc(
+      env(safe-area-inset-left, 0px) + max(8px, 1.2cqw) + 48px + 0.8cqw +
+        min(94cqh / 2.917, 23cqw) + 1cqw
+    );
+  }
+  .see-board .modal-panel {
+    max-width: 720px;
+    padding: 12px 14px;
+  }
+  .dialog-shade:has(.counting) .scroll-title,
+  .dialog-shade:has(.counting) .modal-panel > img,
+  .see-board .drop-when-short {
+    display: none;
+  }
+  .counting {
+    align-items: stretch;
+    gap: 8px;
+  }
+  .counting-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+  }
+  .counting-name {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .counting-peg {
+    order: 2;
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    flex: 1;
+    text-align: right;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-gold);
+  }
+  .counting-buttons {
+    order: 3;
+    gap: 8px;
+  }
+  .counting-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 16px;
+  }
+  .counting-cards {
+    align-self: center;
+    gap: 3px;
+    padding-top: 6px;
+  }
+  .counting-card > * {
+    width: clamp(38px, 6cqw, 44px);
+    height: auto;
+    aspect-ratio: 11 / 16;
+    font-size: 12px;
+  }
+  .counting-card.lit {
+    translate: 0 -6px;
+  }
+  .counting-say {
+    display: grid;
+    grid-template-rows: 5em 40px;
+    min-height: 0;
+    text-align: left;
+    font-size: 1rem;
+  }
+  /* Four lines of calls; once they're full the newest stay in view (Counting.tsx scrolls them). */
+  .counting-lines {
+    overflow: hidden;
+  }
+  .counting-phrases {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+  .counting-phrases > span:nth-last-child(n + 7) {
+    display: none;
+  }
+  .counting-phrases:has(> span:nth-last-child(7))::before {
+    content: "… ";
+  }
+  .counting-total {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 0;
+  }
+  .counting-total:not(.final) .num {
+    display: inline;
+  }
+  .counting-plus {
+    position: static;
+    animation: pop-in 200ms ease-out;
+  }
+
+  /* The totals afterwards: the three hands side by side. */
+  .show-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .show-list > li {
+    padding: 8px;
+  }
+  .show-list > li > div:first-child {
+    margin-bottom: 4px;
+    font-size: 0.875rem;
+    line-height: 1.2;
+  }
+  .show-cards {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  .show-cards > [role="img"] {
+    width: 28px;
+    height: 40px;
+    font-size: 10px;
+  }
+  .show-cards > [role="img"] + [role="img"] {
+    margin-left: -5px;
+  }
+  /* The cut card stands a little apart instead of after a "+". */
+  .show-cards > .show-plus {
+    display: none;
+  }
+  .show-cards > .show-plus + [role="img"] {
+    margin-left: 5px;
+  }
+  .show-parts {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .see-board .modal-panel .btn-primary {
+    margin-top: 8px;
+  }
+}

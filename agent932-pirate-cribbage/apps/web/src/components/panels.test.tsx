@@ -46,7 +46,11 @@ describe("menus and dialogs stay on screen", () => {
         onClose={() => {}}
       />,
     );
-    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveClass("float-panel", "t-menu-panel");
+    const menu = screen.getByRole("dialog", { name: "Menu" });
+    expect(menu).toHaveClass("float-panel", "t-menu-panel");
+    // A real dialog: focus on the panel itself (its first button leaves the game), the rest waits.
+    expect(menu).toHaveAttribute("aria-modal", "true");
+    expect(menu).toHaveFocus();
   });
 
   it("gives every panel a height limit inside the safe areas, and a scroll", () => {

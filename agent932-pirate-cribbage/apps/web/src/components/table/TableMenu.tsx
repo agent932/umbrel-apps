@@ -1,7 +1,7 @@
 import { type RefObject, useRef } from "react";
 import { Link } from "wouter";
 import { SettingsFields } from "../SettingsButton.js";
-import { useDismiss } from "../useDismiss.js";
+import { dialogProps, useDialog } from "../useDialog.js";
 
 /** The table's menu: round and rules, the way out, forfeit (online) and settings. */
 export function TableMenu({
@@ -24,12 +24,11 @@ export function TableMenu({
   opener?: RefObject<HTMLElement | null>;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  useDismiss(panel, opener, onClose);
+  useDialog(panel, { opener, onClose, dismissOutside: true, focusPanel: true });
   return (
     <div
       ref={panel}
-      role="dialog"
-      aria-label="Menu"
+      {...dialogProps("Menu")}
       className="float-panel t-menu-panel rounded-2xl border border-gold/40 bg-sea/95 p-4 text-sm text-parchment shadow-2xl"
     >
       <p className="mb-3 font-pirate text-xl text-gold">
@@ -59,7 +58,7 @@ export function TableMenu({
       </div>
       <button
         type="button"
-        className="mt-3 w-full text-xs text-parchment/60 hover:text-gold"
+        className="mt-3 min-h-11 w-full text-sm text-parchment/80 hover:text-gold"
         onClick={onClose}
       >
         Close

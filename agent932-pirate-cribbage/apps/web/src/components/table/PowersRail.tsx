@@ -1,5 +1,7 @@
 import { type Card as CardType, type PowerId, POWER_INFO } from "@pirate/engine";
 import { POWER_ART } from "../../brand/powerArt.js";
+import { useRef } from "react";
+import { dialogProps, useDialog } from "../useDialog.js";
 
 export const POWER_HINTS: Partial<Record<PowerId, string>> = {
   parley: "Select one card first.",
@@ -98,6 +100,8 @@ export function PowerPanel({
   onClose: () => void;
 }) {
   const info = POWER_INFO[power];
+  const panel = useRef<HTMLDivElement>(null);
+  useDialog(panel, { onClose });
   const status = used
     ? { text: "You've already used it this game.", tone: "text-parchment/60" }
     : usable
@@ -106,13 +110,10 @@ export function PowerPanel({
         ? { text: POWER_HINTS[power] ?? "Not quite yet.", tone: "text-parchment" }
         : { text: "Not available right now.", tone: "text-parchment/70" };
   return (
-    <div
-      className="dialog-shade z-40 bg-black/50"
-      onClick={onClose}
-      role="dialog"
-      aria-label={info.name}
-    >
+    <div className="dialog-shade z-40 bg-black/50" onClick={onClose}>
       <div
+        ref={panel}
+        {...dialogProps(info.name)}
         className="panel flex w-full max-w-sm flex-col items-center gap-2.5 p-4 text-center"
         onClick={(e) => e.stopPropagation()}
       >

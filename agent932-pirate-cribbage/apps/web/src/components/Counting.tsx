@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type Card as CardType,
   type GameEvent,
@@ -150,93 +150,112 @@ export function CountingShow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hand, step, current]);
 
+  // When the calls fill their box (short landscape phones), keep the newest in view.
+  const lines = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (lines.current) lines.current.scrollTop = lines.current.scrollHeight;
+  }, [hand, step]);
+
   if (!current) return null;
   const lit = step > 0 ? steps[step - 1]!.cards : [];
   const isLit = (c: CardType) => lit.some((l) => sameCard(l, c));
   const said = steps.slice(0, step).map((s) => s.phrase);
+  const running = steps.slice(0, step).reduce((sum, s) => sum + s.points, 0);
+  const owner = names[current.seat as Seat];
 
   return (
-    // Tapping anywhere on the count hurries it along; the buttons below do the same for keyboards.
-    <section
-      className="flex cursor-pointer flex-col items-center gap-3"
-      aria-label="Counting the hands"
-      aria-live="polite"
-      onClick={hurry}
-    >
-      <p className="text-sm text-parchment/70">
-        {hand + 1} of {show.length}
-      </p>
-      <h3 className="font-semibold">
-        {whose(names[current.seat as Seat])} {current.type === "crib" ? "crib" : "hand"}
-      </h3>
-      <div className="flex items-end gap-1.5">
-        {[...current.cards, ...(cut ? [cut] : [])].map((c, i) => (
-          <div
-            key={i}
-            className={`transition-all duration-300 ${isLit(c) ? "-translate-y-3 drop-shadow-[0_0_12px_rgba(242,184,75,0.9)]" : lit.length ? "opacity-60" : ""} ${i === current.cards.length ? "ml-2" : ""}`}
-          >
-            <Card card={c} small label={i === current.cards.length ? "Cut card" : undefined} />
-          </div>
-        ))}
-      </div>
-
-      <div className="relative min-h-[3.5rem] w-full text-center">
-        {step > 0 && (
-          <span
-            key={`${hand}-${step}`}
-            className="pointer-events-none absolute -top-5 right-2 rounded-full bg-gold px-2 text-sm font-extrabold text-night shadow-[0_0_12px_rgba(242,184,75,0.7)]"
-            style={{ animation: "float-up-right 700ms ease-out forwards" }}
-            aria-hidden
-          >
-            +{steps[step - 1]!.points}
+    // Tapping anywhere on the count hurries it along; Next does the same for keyboards. On a short
+    // landscape phone it packs into a header row and two columns of constant height (index.css).
+    <section className="counting" aria-label="Counting the hands" onClick={hurry}>
+      <div className="counting-head">
+        <h3 className="counting-name">
+          {whose(owner)} {current.type === "crib" ? "crib" : "hand"}
+          <span className="counting-of">
+            {hand + 1} of {show.length}
           </span>
-        )}
-        <p className="text-lg">
-          {said.length === 0 && !finished && <span className="text-parchment/50">Counting…</span>}
-          {said.map((p, i) => (
-            <span
-              key={i}
-              className={i === said.length - 1 ? "font-bold text-gold" : "text-parchment/80"}
-            >
-              {i === 0 ? p[0]!.toUpperCase() + p.slice(1) : p}
-              {i < said.length - 1 ? ", " : ""}
-            </span>
-          ))}
-          {finished && steps.length === 0 && (
-            <span className="text-parchment/80">Nineteen! Nothing at all. Awk.</span>
-          )}
+        </h3>
+        {/* While the total is up, say why the count pauses: that peg is moving. */}
+        <p className="counting-peg" aria-live="polite">
+          {finished && current.score.total > 0 ? `Peg: ${owner} +${current.score.total}` : ""}
         </p>
-        {finished && (
-          <p
-            className="num mt-1 text-3xl text-gold lantern-glow"
-            style={{ animation: "pop-in 200ms ease-out" }}
+        <div className="counting-buttons">
+          <button
+            type="button"
+            className="counting-button"
+            aria-label="Next hand"
+            onClick={(e) => {
+              e.stopPropagation();
+              hurry();
+            }}
           >
-            {current.score.total}
-          </p>
-        )}
+            Next ›
+          </button>
+          <button
+            type="button"
+            className="counting-button"
+            aria-label="Skip the count"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDone();
+            }}
+          >
+            Skip ⏭
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-6">
-        <button
-          type="button"
-          className="text-sm text-parchment/60 hover:text-gold"
-          onClick={(e) => {
-            e.stopPropagation();
-            hurry();
-          }}
-        >
-          Next ›
-        </button>
-        <button
-          type="button"
-          className="text-sm text-parchment/60 hover:text-gold"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDone();
-          }}
-        >
-          Skip ⏭
-        </button>
+      <div className="counting-body">
+        <div className="counting-cards">
+          {[...current.cards, ...(cut ? [cut] : [])].map((c, i) => (
+            <div
+              key={i}
+              className={`counting-card transition-all duration-300 ${isLit(c) ? "lit drop-shadow-[0_0_12px_rgba(242,184,75,0.9)]" : lit.length ? "opacity-60" : ""} ${i === current.cards.length ? "ml-2" : ""}`}
+            >
+              <Card card={c} small label={i === current.cards.length ? "Cut card" : undefined} />
+            </div>
+          ))}
+        </div>
+
+        <div className="counting-say">
+          {/* Only the calls are read out, one at a time as they come. */}
+          <div ref={lines} className="counting-lines">
+            <p className="counting-phrases" aria-live="polite">
+              {said.length === 0 && !finished && (
+                <span className="text-parchment/70">Counting…</span>
+              )}
+              {said.map((p, i) => (
+                <span
+                  key={i}
+                  className={i === said.length - 1 ? "font-bold text-gold" : "text-parchment/85"}
+                >
+                  {i === 0 ? p[0]!.toUpperCase() + p.slice(1) : p}
+                  {i < said.length - 1 ? ", " : ""}
+                </span>
+              ))}
+              {finished && steps.length === 0 && (
+                <span className="text-parchment/85">Nineteen! Nothing at all. Awk.</span>
+              )}
+            </p>
+          </div>
+          <p className={`counting-total ${finished ? "final" : ""}`}>
+            {step > 0 && (
+              <span
+                key={`${hand}-${step}`}
+                className="counting-plus rounded-full bg-gold px-2 text-sm font-extrabold text-night shadow-[0_0_12px_rgba(242,184,75,0.7)]"
+                aria-hidden
+              >
+                +{steps[step - 1]!.points}
+              </span>
+            )}
+            <span
+              key={finished ? "final" : "running"}
+              className="num text-3xl text-gold lantern-glow"
+              style={finished ? { animation: "pop-in 200ms ease-out" } : undefined}
+            >
+              {finished ? current.score.total : running}
+            </span>
+          </p>
+        </div>
       </div>
     </section>
   );
