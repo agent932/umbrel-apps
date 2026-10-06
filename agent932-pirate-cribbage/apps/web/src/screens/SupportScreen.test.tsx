@@ -30,3 +30,35 @@ describe("support FAQ: I forgot my password", () => {
     expect(screen.queryByRole("link", { name: "Forgot your password?" })).toBeNull();
   });
 });
+
+describe("support FAQ", () => {
+  it("groups fifteen questions under Playing, Online and your account, and Help", async () => {
+    stubEmail(true);
+    render(<SupportScreen />);
+    const faq = screen.getByRole("region", { name: "Common questions" });
+    const groups = ["Playing", "Online and your account", "Help"];
+    for (const group of groups)
+      expect(screen.getByRole("heading", { level: 3, name: group })).toBeInTheDocument();
+    const counts = groups.map(
+      (group) => screen.getByRole("region", { name: group }).querySelectorAll("details").length,
+    );
+    expect(counts).toEqual([8, 6, 1]);
+    expect(faq.querySelectorAll("details")).toHaveLength(15);
+    // Answers with lists sit in a <div>, never a list inside a <p>.
+    expect(faq.querySelector("p ul")).toBeNull();
+    expect(faq.querySelectorAll("details ul")).toHaveLength(2);
+    await screen.findByRole("link", { name: "Forgot your password?" });
+  });
+
+  it("links to real pages and to the form for bug reports", () => {
+    stubEmail(true);
+    render(<SupportScreen />);
+    const hrefs = [...document.querySelectorAll("details a")].map((a) => a.getAttribute("href"));
+    for (const href of ["/account", "/privacy", "/cribbage/daily", "/login", "/signup"])
+      expect(hrefs).toContain(href);
+    expect(screen.getByRole("link", { name: "form below" })).toHaveAttribute("href", "#contact");
+    expect(document.getElementById("contact")).toHaveAccessibleName("Contact us");
+    // The delete button's real label.
+    expect(screen.getByText("Delete my account")).toBeInTheDocument();
+  });
+});
