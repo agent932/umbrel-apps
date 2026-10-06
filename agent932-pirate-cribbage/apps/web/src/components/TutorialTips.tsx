@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PlayerView } from "@pirate/engine";
 import { Peggy } from "../brand/Peggy.js";
 
@@ -31,6 +31,32 @@ const TIPS: Partial<Record<PlayerView["phase"], { title: string; text: string }>
 };
 
 /**
+ * While a tip shows, `--tip-h` on the page says how far down it reaches, so the table and any open
+ * panel start below it (they re-fit into the room left) and nothing hides underneath.
+ */
+function useReserveTop(el: React.RefObject<HTMLElement | null>, active: boolean) {
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const node = el.current;
+    if (!active || !node) return;
+    const update = () =>
+      root.style.setProperty("--tip-h", `${Math.ceil(node.getBoundingClientRect().bottom) + 8}px`);
+    update();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    ro?.observe(node);
+    window.addEventListener("resize", update);
+    // Measured again once the pop-in animation (which scales it) has finished.
+    node.addEventListener("animationend", update);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", update);
+      node.removeEventListener("animationend", update);
+      root.style.removeProperty("--tip-h");
+    };
+  }, [el, active]);
+}
+
+/**
  * Peggy's step-by-step guide over a practice game. Each part of the game gets its tip once; tips
  * wait in turn until you tap "Got it", even if the game has already moved on.
  */
@@ -45,9 +71,12 @@ export function TutorialTips({ phase }: { phase: PlayerView["phase"] }) {
   }, [phase, seen]);
   const current = queue[0];
   const tip = current ? TIPS[current] : undefined;
+  const box = useRef<HTMLElement>(null);
+  useReserveTop(box, !!tip);
   if (!current || !tip) return null;
   return (
     <aside
+      ref={box}
       key={current}
       className="fixed top-[calc(env(safe-area-inset-top)+0.75rem)] left-1/2 z-40 flex w-[min(94vw,560px)] -translate-x-1/2 items-start gap-3 rounded-2xl border-2 border-gold/70 bg-night/95 p-3 shadow-2xl"
       style={{ animation: "pop-in 260ms ease-out" }}

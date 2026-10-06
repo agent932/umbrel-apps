@@ -23,4 +23,15 @@ describe("TutorialTips", () => {
     rerender(<TutorialTips phase="pegging" />);
     expect(screen.queryByLabelText("Peggy's tip")).toBeNull();
   });
+
+  it("keeps the table and panels below the tip while it shows", async () => {
+    const user = userEvent.setup();
+    const root = document.documentElement;
+    render(<TutorialTips phase="cutForDeal" />);
+    // The tip says how far down it reaches (jsdom lays nothing out, so just the 8px gap)...
+    expect(root.style.getPropertyValue("--tip-h")).toBe("8px");
+    await user.click(screen.getByRole("button", { name: "Got it" }));
+    // ...and gives the room back once it's dismissed.
+    expect(root.style.getPropertyValue("--tip-h")).toBe("");
+  });
 });

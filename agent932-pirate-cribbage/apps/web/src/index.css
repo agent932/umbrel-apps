@@ -389,7 +389,8 @@ html[data-nav="pop"]::view-transition-old(root) {
   z-index: 10;
   overflow: hidden;
   container: table / size;
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+  /* --tip-h: room taken by one of Peggy's tutorial tips, when one is showing. */
+  padding: max(env(safe-area-inset-top, 0px), var(--tip-h, 0px)) env(safe-area-inset-right, 0px)
     env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   background: #0b1520 url("./assets/table/table-land.webp") center / cover no-repeat;
   -webkit-user-select: none;
@@ -1289,8 +1290,9 @@ html[data-nav="pop"]::view-transition-old(root) {
   /* One cell filling the space inside the margins, so the panel's max-height is that space. */
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
-  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
-    max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  padding: max(12px, env(safe-area-inset-top, 0px), var(--tip-h, 0px))
+    max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
 }
 .dialog-shade > * {
   max-height: 100%;
@@ -1419,7 +1421,7 @@ html[data-nav="pop"]::view-transition-old(root) {
 @media (orientation: landscape) and (max-height: 480px) {
   .dialog-shade.see-board {
     place-items: end center;
-    padding-top: 8px;
+    padding-top: max(8px, var(--tip-h, 0px));
     padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
     /* The board's right edge: the same sums as --bx and --bw on .table-grid (it's inside the
        table's container, so cqw and cqh are the table's). */
