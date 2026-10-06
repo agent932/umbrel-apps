@@ -200,9 +200,9 @@ const FAQ: { group: string; items: Entry[] }[] = [
           <p>
             To change your password, sign in, open <Link href="/account">Account</Link> and use{" "}
             <b>Change password</b>: enter your current password and the new one twice. You'll be
-            signed out on your other devices afterwards. We don't have a way to change the email on
-            an account yet; if you need that, send us a message below and tell us the username and
-            the email you'd like.
+            signed out on your other devices afterwards. To change your email, use{" "}
+            <b>Change email</b> on the same page: type the new address and your current password.
+            That signs you out on your other devices too.
           </p>
         ),
       },

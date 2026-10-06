@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { eq, or, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
-import { users } from "../db/schema.js";
+import { passwordResets, users } from "../db/schema.js";
 import { hashPassword, needsRehash, verifyPassword } from "./password.js";
 import {
   SESSION_COOKIE,
@@ -23,12 +23,15 @@ declare module "fastify" {
 /** How many crew portraits there are to pick from. */
 export const AVATAR_COUNT = 8;
 
+/** Emails are kept in lower case; uniqueness ignores case too (see the users_email_lower index). */
+const Email = z.string().trim().toLowerCase().email("That email doesn't look right").max(254);
+
 const SignupBody = z.object({
   username: z
     .string()
     .trim()
     .regex(/^[A-Za-z0-9_]{3,20}$/, "Usernames are 3–20 letters, numbers or underscores"),
-  email: z.string().trim().toLowerCase().email("That email doesn't look right").max(254),
+  email: Email,
   password: z.string().min(8, "Passwords need at least 8 characters").max(200),
 });
 
@@ -199,6 +202,51 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
     // Sign out everywhere else; this browser stays signed in.
     await deleteUserSessions(db, user.id, sessionToken(req));
     return { ok: true };
+  });
+
+  /**
+   * Change your account email (D-19). Your password is checked first; your other sessions are
+   * signed out (this one stays), and any reset link sent to the old address stops working.
+   */
+  app.post("/api/auth/email", authLimit, async (req, reply) => {
+    const user = requireUser(req, reply);
+    if (!user) return;
+    const body = parseBody(
+      z.object({ password: z.string().min(1).max(200), email: Email }),
+      req.body,
+      reply,
+    );
+    if (!body) return;
+    const [row] = await db
+      .select({ hash: users.passwordHash, email: users.email })
+      .from(users)
+      .where(eq(users.id, user.id));
+    if (!row || !(await verifyPassword(body.password, row.hash))) {
+      return reply.code(401).send({ error: "That password isn't right" });
+    }
+    if (row.email.toLowerCase() === body.email) {
+      return reply.code(400).send({ error: "That's already your email" });
+    }
+    const taken = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(sql`lower(${users.email}) = ${body.email}`, ne(users.id, user.id)))
+      .limit(1);
+    if (taken.length) return reply.code(409).send({ error: "That email is already taken" });
+    try {
+      await db.update(users).set({ email: body.email }).where(eq(users.id, user.id));
+    } catch (err) {
+      // Someone took it in the moment between the check and the change.
+      const e = err as { code?: string; cause?: { code?: string } };
+      if ((e.code ?? e.cause?.code) === "23505")
+        return reply.code(409).send({ error: "That email is already taken" });
+      throw err;
+    }
+    await db
+      .delete(passwordResets)
+      .where(and(eq(passwordResets.userId, user.id), isNull(passwordResets.usedAt)));
+    await deleteUserSessions(db, user.id, sessionToken(req));
+    return { user: { ...user, email: body.email } };
   });
 
   /**

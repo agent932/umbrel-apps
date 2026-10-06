@@ -4,11 +4,12 @@ import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { AvatarPicker } from "../components/AvatarPicker.js";
+import { ChangeEmail } from "../components/ChangeEmail.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
 import { NoticeSettings } from "../components/NoticeSettings.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 
-/** Pick your portrait, and change your password (e.g. after an admin gave you a temporary one). */
+/** Pick your portrait, change your password (e.g. after an admin gave you a temporary one) or email. */
 export function AccountScreen() {
   const { user } = useAuth();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -100,6 +101,7 @@ export function AccountScreen() {
             Change password
           </button>
         </form>
+        <ChangeEmail />
         <DeleteAccount />
         <p className="text-center text-sm text-parchment/60">
           <Link href="/support" className="hover:text-gold">
