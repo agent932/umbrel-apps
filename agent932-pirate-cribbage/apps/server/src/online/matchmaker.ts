@@ -22,7 +22,8 @@ const INVITE_TTL_MS = 60 * 60 * 1000;
 
 /** Quick Match queues (one per rule set) and invite codes. In memory: they only matter while people wait. */
 export class Matchmaker {
-  private queues = new Map<string, Seeker>();
+  /** Who's waiting, per rule set, oldest first. */
+  private queues = new Map<string, Seeker[]>();
   private invites = new Map<string, { host: Seeker; menu: Menu; expires: number }>();
 
   /** Finished games where one player asked for a rematch: game id -> who asked. */
@@ -41,19 +42,25 @@ export class Matchmaker {
     private presence: Presence,
     /** Challenges are only for friends. */
     private canChallenge: (from: string, to: string) => Promise<boolean>,
+    /** Players someone has blocked, or been blocked by: they're never paired. */
+    private blockedWith: (userId: string) => Promise<Set<string>> = async () => new Set(),
   ) {}
 
   /** Pair with whoever is waiting for the same rules, or wait. Returns the new game id when paired. */
   async queue(seeker: Seeker, menu: Menu): Promise<string | null> {
     this.cancel(seeker.client);
+    const blocked = await this.blockedWith(seeker.userId);
+    // From here on nothing waits, so two people can't both take the same waiting player.
     const key = menuKey(menu);
-    const waiting = this.queues.get(key);
-    if (!waiting || waiting.userId === seeker.userId) {
-      this.queues.set(key, seeker);
+    const line = (this.queues.get(key) ?? []).filter((w) => w.userId !== seeker.userId);
+    const i = line.findIndex((w) => !blocked.has(w.userId));
+    if (i < 0) {
+      this.queues.set(key, [...line, seeker]);
       seeker.client.send({ t: "queued" });
       return null;
     }
-    this.queues.delete(key);
+    const [waiting] = line.splice(i, 1) as [Seeker];
+    this.queues.set(key, line);
     const gameId = await this.rooms.create(waiting, seeker, rulesFor(menu), menu.ranked);
     waiting.client.send({ t: "matched", gameId });
     seeker.client.send({ t: "matched", gameId });
@@ -77,6 +84,8 @@ export class Matchmaker {
       throw new RoomError("That invite has expired or was cancelled");
     if (invite.host.userId === guest.userId)
       throw new RoomError("You can't join your own invite — send the link to a friend");
+    if ((await this.blockedWith(guest.userId)).has(invite.host.userId))
+      throw new RoomError("That invite isn't available");
     this.invites.delete(code.toUpperCase());
     const gameId = await this.rooms.create(
       invite.host,
@@ -104,6 +113,8 @@ export class Matchmaker {
     const me = info.players.findIndex((p) => p.userId === seeker.userId);
     if (me < 0) throw new RoomError("You weren't in that game");
     const opponent = info.players[1 - me]!;
+    if ((await this.blockedWith(seeker.userId)).has(opponent.userId))
+      throw new RoomError("A rematch isn't available");
     const asked = this.rematches.get(gameId);
     if (!asked || asked === seeker.userId) {
       this.rematches.set(gameId, seeker.userId);
@@ -160,6 +171,10 @@ export class Matchmaker {
     if (!c || c.toUserId !== guest.userId || c.expires < Date.now()) {
       throw new RoomError("That challenge is no longer open");
     }
+    if ((await this.blockedWith(guest.userId)).has(c.from.userId)) {
+      this.challenges.delete(challengeId);
+      throw new RoomError("That challenge is no longer open");
+    }
     this.challenges.delete(challengeId);
     const gameId = await this.rooms.create(c.from, guest, rulesFor(c.menu), c.menu.ranked);
     c.from.client.send({ t: "matched", gameId });
@@ -180,7 +195,11 @@ export class Matchmaker {
    * often sends the host's browser to the background and drops its connection.
    */
   cancel(client: Client) {
-    for (const [key, s] of this.queues) if (s.client === client) this.queues.delete(key);
+    for (const [key, line] of this.queues) {
+      const left = line.filter((s) => s.client !== client);
+      if (left.length) this.queues.set(key, left);
+      else this.queues.delete(key);
+    }
     for (const [id, c] of this.challenges) if (c.from.client === client) this.challenges.delete(id);
   }
 }

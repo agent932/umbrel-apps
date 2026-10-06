@@ -217,6 +217,19 @@ const FAQ: { group: string; items: Entry[] }[] = [
           </p>
         ),
       },
+      {
+        q: "How do I report or block another player?",
+        a: (
+          <p>
+            In an online game, open the menu and choose <b>Report or block</b>. You can also tap a
+            player's name on the leaderboard, or use <b>Report or block</b> in your friends list.
+            Reports come straight to us and we look at every one within a day; players who break the
+            rules lose their account. Blocking means you're never matched with them again, they
+            can't challenge you or send friend requests, and you won't see their call-outs. Unblock
+            anyone on your <Link href="/account">Account</Link> page.
+          </p>
+        ),
+      },
     ],
   },
   {

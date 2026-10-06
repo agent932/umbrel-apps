@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { AvatarPicker } from "../components/AvatarPicker.js";
+import { BlockedPlayers } from "../components/BlockedPlayers.js";
 import { ChangeEmail } from "../components/ChangeEmail.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
 import { NoticeSettings } from "../components/NoticeSettings.js";
@@ -102,6 +103,7 @@ export function AccountScreen() {
           </button>
         </form>
         <ChangeEmail />
+        <BlockedPlayers />
         <DeleteAccount />
         <p className="text-center text-sm text-parchment/60">
           <Link href="/support" className="hover:text-gold">

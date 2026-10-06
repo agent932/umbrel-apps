@@ -13,12 +13,17 @@ export const SUPPORT_TOPICS = {
   bug: "Something's broken",
   feedback: "Ideas and feedback",
   other: "Something else",
+  /** Sent from a player's name in the game (Report), not from the contact form. */
+  report: "Player report",
 } as const;
+
+/** The topics people can pick on the contact form. */
+const FORM_TOPICS = ["help", "account", "bug", "feedback", "other"] as const;
 
 const SupportBody = z.object({
   name: z.string().trim().min(1, "Tell us your name").max(80),
   email: z.string().trim().email("That email doesn't look right").max(200),
-  topic: z.enum(Object.keys(SUPPORT_TOPICS) as [keyof typeof SUPPORT_TOPICS]),
+  topic: z.enum(FORM_TOPICS),
   message: z.string().trim().min(10, "Tell us a little more (10 characters or so)").max(4000),
   /** A hidden field people never see; bots fill it in. */
   website: z.string().max(200).optional(),
@@ -45,29 +50,16 @@ export async function supportRoutes(
         userId: req.user?.id ?? null,
       });
 
-      const config = await emailSettings(db);
-      if (config) {
-        const admins = await db
-          .select({ email: users.email })
-          .from(users)
-          .where(eq(users.isAdmin, true));
-        const who = req.user ? `${body.name} (signed in as ${req.user.username})` : body.name;
-        for (const admin of admins) {
-          const email = simpleEmail({
-            to: admin.email,
-            subject: `Support: ${SUPPORT_TOPICS[body.topic]} from ${body.name}`,
-            lines: [
-              `${who} <${body.email}> wrote:`,
-              body.message,
-              "Reply to this email to answer them.",
-            ],
-            button: { label: "Open the Admin page", url: `${config.siteUrl}/admin` },
-          });
-          await mailer(config, { ...email, replyTo: body.email }).catch((e: unknown) =>
-            req.log.error(e),
-          );
-        }
-      }
+      const who = req.user ? `${body.name} (signed in as ${req.user.username})` : body.name;
+      await emailAdmins(db, mailer, {
+        subject: `Support: ${SUPPORT_TOPICS[body.topic]} from ${body.name}`,
+        lines: [
+          `${who} <${body.email}> wrote:`,
+          body.message,
+          "Reply to this email to answer them.",
+        ],
+        replyTo: body.email,
+      }).catch((e: unknown) => req.log.error(e));
       return { ok: true };
     },
   );
@@ -100,4 +92,29 @@ export async function supportRoutes(
     await db.delete(supportMessages).where(eq(supportMessages.id, id));
     return { ok: true };
   });
+}
+
+/** Email every admin about a new inbox message (when email is set up). */
+export async function emailAdmins(
+  db: Db,
+  mailer: Mailer,
+  { subject, lines, replyTo }: { subject: string; lines: string[]; replyTo?: string },
+) {
+  const config = await emailSettings(db);
+  if (!config) return;
+  const admins = await db.select({ email: users.email }).from(users).where(eq(users.isAdmin, true));
+  // One admin's bad address shouldn't stop the others hearing about it.
+  let failed: unknown = null;
+  for (const admin of admins) {
+    const email = simpleEmail({
+      to: admin.email,
+      subject,
+      lines,
+      button: { label: "Open the Admin page", url: `${config.siteUrl}/admin` },
+    });
+    await mailer(config, replyTo ? { ...email, replyTo } : email).catch((e: unknown) => {
+      failed ??= e;
+    });
+  }
+  if (failed) throw failed;
 }

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { isOffensiveName } from "../players/names.js";
 import type { Db } from "../db/client.js";
 import { passwordResets, users } from "../db/schema.js";
 import { hashPassword, needsRehash, verifyPassword } from "./password.js";
@@ -30,7 +31,8 @@ const SignupBody = z.object({
   username: z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9_]{3,20}$/, "Usernames are 3–20 letters, numbers or underscores"),
+    .regex(/^[A-Za-z0-9_]{3,20}$/, "Usernames are 3–20 letters, numbers or underscores")
+    .refine((name) => !isOffensiveName(name), "Please pick a different username"),
   email: Email,
   password: z.string().min(8, "Passwords need at least 8 characters").max(200),
 });

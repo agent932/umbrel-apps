@@ -81,8 +81,9 @@ npx cap open ios
 
 - **Support URL:** https://deckhand.games/support
 - **Privacy policy URL:** https://deckhand.games/privacy
-- **Age rating:** answer _None_ to everything (no gambling for money, no user-generated text: emotes
-  are fixed). Expect 4+.
+- **Age rating:** answer _None_ to everything (no gambling for money; the only player-written text
+  is usernames, which are filtered for swear words and can be reported or blocked; emotes are
+  fixed). Expect 4+.
 - **Screenshots:** 6.9" iPhone (1320 × 2868, or 2868 × 1320 landscape) is required; take them in
   the Simulator with ⌘S (iPhone 17 Pro Max). The painted table in landscape looks best.
 - **Review notes:** give App Review a test account (username and password) so they can try online
@@ -95,6 +96,7 @@ Data linked to the user, used for **App Functionality** only, **not** used for t
 - Contact Info → Email Address
 - Identifiers → User ID
 - User Content → Gameplay Content (match history)
+- User Content → Customer Support (the contact form, and reports about other players)
 
 No usage data or diagnostics are collected by the app, and there's no third-party advertising or
 analytics in it.

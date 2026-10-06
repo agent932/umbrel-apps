@@ -10,6 +10,7 @@ export function TableMenu({
   oppName,
   onExit,
   onForfeit,
+  onReport,
   onClose,
   opener,
 }: {
@@ -19,6 +20,8 @@ export function TableMenu({
   onExit: () => void;
   /** Online games that are still going. */
   onForfeit?: () => void;
+  /** Online games: report or block the opponent. */
+  onReport?: () => void;
   onClose: () => void;
   /** The menu button: focus goes back to it when the menu closes. */
   opener?: RefObject<HTMLElement | null>;
@@ -41,6 +44,11 @@ export function TableMenu({
         <Link href="/" className="btn-secondary text-center">
           Home (all games)
         </Link>
+        {onReport && (
+          <button type="button" className="btn-secondary" onClick={onReport}>
+            Report or block {oppName}
+          </button>
+        )}
         {onForfeit && (
           <button
             type="button"

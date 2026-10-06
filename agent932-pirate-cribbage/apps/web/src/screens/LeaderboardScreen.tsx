@@ -7,6 +7,7 @@ import goldMedalUrl from "../assets/ui/medal-gold.webp";
 import silverMedalUrl from "../assets/ui/medal-silver.webp";
 import bronzeMedalUrl from "../assets/ui/medal-bronze.webp";
 import { CRIBBAGE_HOME } from "../routes.js";
+import { PlayerSheet } from "../components/PlayerSheet.js";
 
 const MEDALS = [goldMedalUrl, silverMedalUrl, bronzeMedalUrl];
 
@@ -26,6 +27,7 @@ export function LeaderboardScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   // Rows are tagged with the season they belong to, so switching seasons shows "loading" until they arrive.
   const [loaded, setLoaded] = useState<{ seasonId: number; rows: Row[] } | null>(null);
+  const [sheetFor, setSheetFor] = useState<string | null>(null);
 
   useEffect(() => {
     void api<{ seasons: Season[] }>("/api/seasons").then((r) => setSeasons(r.seasons));
@@ -118,7 +120,20 @@ export function LeaderboardScreen() {
                       r.rank
                     )}
                   </td>
-                  <td className="py-1.5 font-semibold">{r.username}</td>
+                  <td className="py-1.5 font-semibold">
+                    {user && r.id !== user.id ? (
+                      <button
+                        type="button"
+                        className="min-h-11 text-left hover:text-gold"
+                        onClick={() => setSheetFor(r.username)}
+                        aria-label={`${r.username}: report or block`}
+                      >
+                        {r.username}
+                      </button>
+                    ) : (
+                      r.username
+                    )}
+                  </td>
                   <td className="py-1.5">
                     <TierBadge tier={r.tier} />
                   </td>
@@ -130,6 +145,7 @@ export function LeaderboardScreen() {
           </table>
         )}
       </main>
+      {sheetFor && <PlayerSheet username={sheetFor} onClose={() => setSheetFor(null)} />}
     </>
   );
 }

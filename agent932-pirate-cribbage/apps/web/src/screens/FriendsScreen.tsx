@@ -7,6 +7,7 @@ import { socket } from "../online/socket.js";
 import { TierBadge } from "../components/TierBadge.js";
 import { CUTLASS_URL } from "../brand/powerArt.js";
 import { CRIBBAGE_HOME } from "../routes.js";
+import { PlayerSheet } from "../components/PlayerSheet.js";
 
 function FriendTier({ friend }: { friend: Friend }) {
   return (
@@ -57,6 +58,7 @@ export function FriendsScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [challenged, setChallenged] = useState<string | null>(null);
+  const [sheetFor, setSheetFor] = useState<string | null>(null);
 
   const load = useCallback(() => api<FriendsResponse>("/api/friends").then(setData), []);
   useEffect(() => {
@@ -152,6 +154,13 @@ export function FriendsScreen() {
                   >
                     Decline
                   </button>
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-xs text-parchment/60 hover:text-red-300"
+                    onClick={() => setSheetFor(f.username)}
+                  >
+                    Report or block
+                  </button>
                 </span>
               </div>
             ))}
@@ -208,13 +217,22 @@ export function FriendsScreen() {
               {open === f.id && (
                 <div className="mt-2 flex flex-col gap-2 rounded-lg border border-gold/30 bg-night/60 p-3">
                   <HeadToHead friend={f} />
-                  <button
-                    type="button"
-                    className="self-end text-xs text-parchment/60 hover:text-red-300"
-                    onClick={() => void remove(f)}
-                  >
-                    Remove friend
-                  </button>
+                  <span className="flex justify-end gap-4">
+                    <button
+                      type="button"
+                      className="min-h-11 text-xs text-parchment/60 hover:text-red-300"
+                      onClick={() => setSheetFor(f.username)}
+                    >
+                      Report or block
+                    </button>
+                    <button
+                      type="button"
+                      className="min-h-11 text-xs text-parchment/60 hover:text-red-300"
+                      onClick={() => void remove(f)}
+                    >
+                      Remove friend
+                    </button>
+                  </span>
                 </div>
               )}
             </div>
@@ -239,6 +257,13 @@ export function FriendsScreen() {
           </section>
         )}
       </main>
+      {sheetFor && (
+        <PlayerSheet
+          username={sheetFor}
+          onClose={() => setSheetFor(null)}
+          onBlockedChange={() => void load()}
+        />
+      )}
     </>
   );
 }

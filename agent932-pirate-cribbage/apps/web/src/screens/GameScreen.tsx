@@ -19,6 +19,7 @@ import { PowerPanel, PowersRail, readyPowers } from "../components/table/PowersR
 import { ScorePops } from "../components/table/ScorePops.js";
 import { TableBoard } from "../components/table/TableBoard.js";
 import { TableMenu } from "../components/table/TableMenu.js";
+import { PlayerSheet } from "../components/PlayerSheet.js";
 import {
   LAST_PLAY_MS,
   useCallout,
@@ -55,6 +56,7 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
   const opp = other(me);
   const oppName = label[opp];
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   /** The power whose explanation is open (tap a power to see what it does, then use it). */
   const [powerInfo, setPowerInfo] = useState<PowerId | null>(null);
@@ -332,9 +334,20 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           oppName={oppName}
           onExit={onExit}
           onForfeit={online && view.phase !== "gameOver" ? online.forfeit : undefined}
+          onReport={
+            online
+              ? () => {
+                  setMenuOpen(false);
+                  setReportOpen(true);
+                }
+              : undefined
+          }
           onClose={() => setMenuOpen(false)}
           opener={menuButton}
         />
+      )}
+      {reportOpen && online && (
+        <PlayerSheet username={oppName} onClose={() => setReportOpen(false)} opener={menuButton} />
       )}
 
       {tutorial && <TutorialTips phase={view.phase} />}

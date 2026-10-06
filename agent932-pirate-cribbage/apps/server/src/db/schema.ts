@@ -116,6 +116,25 @@ export const friendships = pgTable(
   ],
 );
 
+/** Players someone has blocked: never matched, challenged or befriended, and their emotes are hidden. */
+export const playerBlocks = pgTable(
+  "player_blocks",
+  {
+    /** Who blocked. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    blockedId: uuid("blocked_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.blockedId] }),
+    index("player_blocks_blocked").on(t.blockedId),
+  ],
+);
+
 /** Games in progress (and finished ones, until cleaned up). The full engine state lives here. */
 export const games = pgTable(
   "games",

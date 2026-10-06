@@ -24,6 +24,7 @@ import { games, users } from "../db/schema.js";
 import type { ClientAction } from "../games/actions.js";
 import { type RatingChange, type Tx, recordMatch } from "../games/record.js";
 import { toEngineAction } from "../games/toEngine.js";
+import { isBlocking } from "../players/blocks.js";
 import { currentSeason } from "../seasons/seasons.js";
 import type { Emote, ServerMessage } from "./protocol.js";
 
@@ -255,7 +256,12 @@ export class RoomManager {
     const now = Date.now();
     if (now - room.lastEmote[seat] < EMOTE_GAP_MS) return;
     room.lastEmote[seat] = now;
-    this.broadcast(room, () => ({ t: "emote", gameId, seat, emote }));
+    const message: ServerMessage = { t: "emote", gameId, seat, emote };
+    // Someone who blocked you doesn't see your emotes (and you can't tell).
+    const other = (1 - seat) as Seat;
+    const hidden = await isBlocking(this.db, room.players[other].userId, userId);
+    for (const s of hidden ? [seat] : ([0, 1] as Seat[]))
+      for (const client of room.clients[s]) client.send(message);
   }
 
   /** Who played a finished online game and how, for a rematch. Null if it isn't one. */

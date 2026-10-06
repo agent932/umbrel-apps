@@ -1,6 +1,7 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { friendships, users } from "../db/schema.js";
+import { isBlocking } from "../players/blocks.js";
 
 export interface FriendEntry {
   id: string;
@@ -74,6 +75,12 @@ export async function requestFriend(db: Db, me: string, username: string) {
     .where(sql`lower(${users.username}) = lower(${username.trim()})`);
   if (!them) throw new FriendError("No pirate by that name");
   if (them.id === me) throw new FriendError("You're already your own best mate");
+  if (await isBlocking(db, me, them.id))
+    throw new FriendError(
+      `You've blocked ${them.username}; unblock them on your Account page first`,
+    );
+  if (await isBlocking(db, them.id, me))
+    throw new FriendError(`${them.username} isn't taking friend requests`);
   const [existing] = await db.select().from(friendships).where(pair(me, them.id));
   if (existing?.status === "accepted")
     throw new FriendError(`You and ${them.username} are already friends`);

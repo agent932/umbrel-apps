@@ -42,8 +42,8 @@ describe("support FAQ", () => {
     const counts = groups.map(
       (group) => screen.getByRole("region", { name: group }).querySelectorAll("details").length,
     );
-    expect(counts).toEqual([8, 6, 1]);
-    expect(faq.querySelectorAll("details")).toHaveLength(15);
+    expect(counts).toEqual([8, 7, 1]);
+    expect(faq.querySelectorAll("details")).toHaveLength(16);
     // Answers with lists sit in a <div>, never a list inside a <p>.
     expect(faq.querySelector("p ul")).toBeNull();
     expect(faq.querySelectorAll("details ul")).toHaveLength(2);

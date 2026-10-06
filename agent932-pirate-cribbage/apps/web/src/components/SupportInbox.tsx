@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api.js";
-import { SUPPORT_TOPICS, type SupportTopic } from "../screens/SupportScreen.js";
+import { SUPPORT_TOPICS } from "../screens/SupportScreen.js";
+
+/** The contact form's topics, plus reports sent from a player's name. */
+const TOPIC_LABELS: Record<string, string> = { ...SUPPORT_TOPICS, report: "Player report" };
 
 interface SupportMessage {
   id: string;
   name: string;
   email: string;
-  topic: SupportTopic;
+  topic: string;
   message: string;
   username: string | null;
   createdAt: string;
@@ -40,7 +43,7 @@ export function SupportInbox() {
               {m.username && <span className="text-parchment/60"> · player {m.username}</span>}
             </span>
             <span className="text-xs text-parchment/60">
-              {SUPPORT_TOPICS[m.topic] ?? m.topic} · {new Date(m.createdAt).toLocaleString()}
+              {TOPIC_LABELS[m.topic] ?? m.topic} · {new Date(m.createdAt).toLocaleString()}
             </span>
           </div>
           <p className="text-sm whitespace-pre-wrap text-parchment/90">{m.message}</p>

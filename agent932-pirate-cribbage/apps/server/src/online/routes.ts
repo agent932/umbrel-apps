@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { IllegalActionError } from "@pirate/engine";
 import type { Db } from "../db/client.js";
 import { areFriends } from "../friends/friends.js";
+import { blockedEitherWay } from "../players/blocks.js";
 import { Matchmaker } from "./matchmaker.js";
 import type { Presence } from "./presence.js";
 import { ClientMessage, type ServerMessage } from "./protocol.js";
@@ -52,7 +53,12 @@ export async function onlineRoutes(
     mailer: Mailer;
   },
 ) {
-  const matchmaker = new Matchmaker(rooms, presence, (a, b) => areFriends(db, a, b));
+  const matchmaker = new Matchmaker(
+    rooms,
+    presence,
+    (a, b) => areFriends(db, a, b),
+    (userId) => blockedEitherWay(db, userId),
+  );
 
   /** Email a friend the link to your open invite. */
   app.post(
