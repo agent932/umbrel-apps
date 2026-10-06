@@ -1,0 +1,30 @@
+name: Deckhand uptime
+
+# Every 15 minutes, check that deckhand.games answers. A failed run makes GitHub email the
+# repository owner, so an outage (power cut, a bad update, the tunnel down) gets noticed.
+# GitHub may delay scheduled runs by a few minutes, and pauses them after 60 days without
+# activity in the repository (any push re-enables them).
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: deckhand.games is up
+        run: |
+          # Three tries, 30 seconds apart, so a restart during an update isn't an alert.
+          for attempt in 1 2 3; do
+            body=$(curl -fsS --max-time 20 https://deckhand.games/api/health || true)
+            if echo "$body" | grep -q '"status":"ok"'; then
+              echo "Up: $body"
+              exit 0
+            fi
+            echo "Attempt $attempt failed: ${body:-no answer}"
+            sleep 30
+          done
+          echo "::error::deckhand.games did not answer its health check (3 tries)"
+          exit 1
