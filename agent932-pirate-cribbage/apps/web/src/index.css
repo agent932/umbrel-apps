@@ -497,11 +497,43 @@ html[data-nav="pop"]::view-transition-old(root) {
 .t-status {
   z-index: 6;
   top: calc(var(--och) * 0.92);
-  left: var(--left);
-  right: calc(var(--right) + var(--oppw) + 2cqw);
+  /* The whole open width between the board and the opponent's plaque (the pile and deck are below). */
+  left: calc(var(--bx) + var(--bw) + 0.8cqw);
+  right: calc(var(--right) + var(--oppw) + 0.8cqw);
   margin-inline: auto;
   width: fit-content;
-  max-width: calc(100cqw - var(--left) - var(--right) - var(--oppw) - 2cqw);
+  max-width: var(--status-w);
+  /* The prompt and the log line are about 1.35 times the old 14px, a little less only where six
+     powers squeeze a small phone's table. */
+  --status-w: calc(100cqw - var(--bx) - var(--bw) - var(--right) - var(--oppw) - 1.6cqw);
+  --status-fs: clamp(15px, var(--status-w) / 12.8, 19px);
+}
+/* "Your play — the count is 27": one line, on a dark pill so it reads on any part of the art. */
+.t-prompt {
+  max-width: 100%;
+  border: 1px solid rgb(242 184 75 / 0.35);
+  border-radius: 9999px;
+  background: rgb(4 18 28 / 0.82);
+  padding: 2px 0.45em;
+  font-size: var(--status-fs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+/* The last thing that happened, under the prompt: a softer backing keeps it AA on lit wood. */
+.t-log {
+  max-width: 100%;
+  font-size: calc(var(--status-fs) * 0.95);
+  line-height: 1.2;
+}
+.t-log li {
+  border-radius: 9999px;
+  background: rgb(4 18 28 / 0.55);
+  padding: 1px 0.6em;
+  min-width: 0;
+}
+.t-log li > span:last-child:not(:first-child) {
+  font-size: 0.8em;
 }
 .t-pile-zone {
   z-index: 4;
@@ -1089,7 +1121,7 @@ html[data-nav="pop"]::view-transition-old(root) {
     --left: 2cqw;
     --right: 2cqw;
     /* Under the board and the two status lines. */
-    --play-top: calc(var(--port) + 5cqh + var(--bh) + 52px * var(--ui, 1));
+    --play-top: calc(var(--port) + 5cqh + var(--bh) + 62px * var(--ui, 1));
   }
   .t-board {
     top: calc(var(--port) + 5cqh);
@@ -1113,7 +1145,7 @@ html[data-nav="pop"]::view-transition-old(root) {
     top: calc(var(--port) + 5.5cqh + var(--bh));
     left: 2cqw;
     right: 2cqw;
-    max-width: 96cqw;
+    --status-w: 96cqw;
   }
   .t-pile-zone {
     top: var(--play-top);

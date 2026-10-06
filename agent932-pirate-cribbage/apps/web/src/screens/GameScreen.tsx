@@ -242,14 +242,11 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
         {/* What's happening now, and the last thing that happened. */}
         <div className="t-status flex flex-col items-center gap-0.5 text-center">
           {prompt && (
-            <p
-              className="rounded-full border border-gold/35 bg-night/80 px-4 py-0.5 text-sm font-bold"
-              aria-live="polite"
-            >
+            <p className="t-prompt" aria-live="polite">
               {prompt}
             </p>
           )}
-          <Feed items={shown.feed.slice(0, 1)} />
+          <Feed className="t-log" items={shown.feed.slice(0, 1)} />
           {error && (
             <p role="alert" className="rounded-full bg-night/80 px-3 text-sm text-red-300">
               {error}

@@ -2,10 +2,10 @@ import { motion } from "motion/react";
 import type { FeedItem } from "../../game/types.js";
 
 /** The game log: the newest line bright, older ones fading. */
-export function Feed({ items }: { items: FeedItem[] }) {
+export function Feed({ items, className = "" }: { items: FeedItem[]; className?: string }) {
   return (
     <ol
-      className="flex flex-col gap-0.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+      className={`flex flex-col gap-0.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${className}`}
       aria-label="Game log"
     >
       {/* New lines slide in; old ones just drop off the end (animating them out overlapped new lines). */}

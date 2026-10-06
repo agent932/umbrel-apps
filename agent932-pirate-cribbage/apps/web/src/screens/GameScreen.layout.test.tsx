@@ -69,4 +69,16 @@ describe("the table layout", () => {
     expect(plank.parentElement).toHaveClass("t-act-home");
     expect(container.querySelector(".t-you .t-you-chip")).not.toBeNull();
   });
+
+  it("shows the prompt and the latest log line in the big status pills", () => {
+    const game = atDiscard(CLASSIC_RULES);
+    const { container } = show(game);
+    const status = container.querySelector(".t-status")!;
+    const prompt = status.querySelector(".t-prompt")!;
+    expect(prompt).toHaveTextContent(/^Throw two cards to/);
+    expect(prompt).toHaveAttribute("aria-live", "polite");
+    // Only the newest line sits under the prompt.
+    expect(status.querySelectorAll(".t-log li")).toHaveLength(1);
+    expect(status.querySelector(".t-log li")).toHaveTextContent(game.p.feed[0]!.text);
+  });
 });
