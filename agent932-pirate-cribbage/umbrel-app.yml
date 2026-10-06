@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.28.2"
+version: "0.29.0"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,9 +37,10 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Fixes an update that couldn't start. Brings the new-look table, the Serpent
-  Reef board and the easier-to-follow pacing, and from now on every update
-  downloads the new version of the game.
+  Bigger pegs on phones, Peggy no longer covers the deck when your phone is
+  upright, menus close when you tap outside them, and treasure and Kraken
+  scenes now wait until the last card has been seen. The help page also
+  explains what to do about a forgotten password when email isn't set up.
 
 
 developer: agent932
