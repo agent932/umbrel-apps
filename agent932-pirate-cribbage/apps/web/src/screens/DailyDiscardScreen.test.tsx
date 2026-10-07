@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { cardLabel, dailyDeal } from "@pirate/engine";
 import type { Reward } from "../api.js";
 import { AuthProvider } from "../auth.js";
-import { DailyDiscardScreen, bestStreak } from "./DailyDiscardScreen.js";
+import { DailyDiscardScreen, bestStreak, today } from "./DailyDiscardScreen.js";
 
 /** No server here, so the player is a guest. */
 const Screen = () => (
@@ -82,9 +83,35 @@ describe("daily discard", () => {
     await throwTwo();
     const hint = screen.getByRole("link", { name: /^Sign in to earn doubloons/ });
     expect(hint).toHaveAccessibleName(
-      "Sign in to earn doubloons for the daily discard (10, or 25 for the best throw).",
+      "Sign in to earn doubloons: signed-in players get a different hand each day (10, or 25 for the best throw).",
     );
     expect(hint).toHaveAttribute("href", "/login");
+  });
+
+  /** The cards on the table, as labels ("5H"). */
+  const shown = async () =>
+    within(await screen.findByLabelText("Today's hand"))
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("data-card"));
+
+  it("deals a guest a hand of their own, so its answer can't be used for the paid hand", async () => {
+    render(<Screen />);
+    const day = today();
+    expect(await shown()).toEqual(dailyDeal(day, true).hand.map(cardLabel));
+    expect(await shown()).not.toEqual(dailyDeal(day).hand.map(cardLabel));
+  });
+
+  it("deals a fresh hand when the throw saved today isn't from it", async () => {
+    // Saved by an older version, when guests had the signed-in players' hand.
+    const day = today();
+    const old = dailyDeal(day).hand.map(cardLabel);
+    const mine = dailyDeal(day, true).hand.map(cardLabel);
+    const notMine = old.filter((c) => !mine.includes(c)).slice(0, 2);
+    localStorage.setItem("pc.daily", JSON.stringify({ days: { [day]: 80 } }));
+    localStorage.setItem(`pc.daily.${day}`, notMine.join(" "));
+    render(<Screen />);
+    expect(await shown()).toEqual(mine);
+    expect(screen.getByRole("button", { name: "Throw to the crib" })).toBeInTheDocument();
   });
 });
 

@@ -10,4 +10,14 @@ describe("dailyDeal", () => {
     expect(dailyDeal("2026-10-04")).toEqual(today);
     expect(dailyDeal("2026-10-05").hand.map(cardLabel)).not.toEqual(today.hand.map(cardLabel));
   });
+
+  it("deals guests a different hand from the one signed-in players are paid for", () => {
+    const hand = (day: string, guest?: boolean) =>
+      dailyDeal(day, guest).hand.map(cardLabel).join(" ");
+    expect(hand("2026-10-04", true)).toBe(hand("2026-10-04", true));
+    for (let d = 1; d <= 31; d++) {
+      const day = `2026-10-${String(d).padStart(2, "0")}`;
+      expect(hand(day, true), day).not.toBe(hand(day));
+    }
+  });
 });

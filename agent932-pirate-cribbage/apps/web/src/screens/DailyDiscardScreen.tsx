@@ -71,7 +71,10 @@ interface ServerResult {
   best: boolean;
 }
 
-/** /cribbage/daily: the same hand for everyone each day. Which two would you throw? */
+/**
+ * /cribbage/daily: which two would you throw? Signed-in players all get the same hand each day,
+ * and it pays doubloons; guests get a hand of their own (see dailyDeal).
+ */
 export function DailyDiscardScreen() {
   const { user, loading } = useAuth();
   return (
@@ -89,12 +92,15 @@ export function DailyDiscardScreen() {
 function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
   const { refresh } = useAuth();
   const day = today();
-  const { hand, isDealer } = useMemo(() => dailyDeal(day), [day]);
+  const { hand, isDealer } = useMemo(() => dailyDeal(day, !signedIn), [day, signedIn]);
   const [record, setRecord] = useState(load);
   const [picked, setPicked] = useState<CardType[]>([]);
   const [result, setResult] = useState<DiscardAnalysis | null>(() => {
     if (signedIn || record.days[day] === undefined) return null;
-    return analyzeDiscard(hand, findSaved(hand, day) ?? hand.slice(0, 2), isDealer);
+    // Saved cards that aren't in this hand (thrown when guests shared the signed-in hand) mean
+    // today's hand hasn't been played yet.
+    const saved = findSaved(hand, day);
+    return saved ? analyzeDiscard(hand, saved, isDealer) : null;
   });
   // Signed in: the server's verdict and streak, once loaded.
   const [server, setServer] = useState<{ best: boolean | null; streak: number } | null>(null);
@@ -269,8 +275,8 @@ function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
           </p>
           {!signedIn && (
             <EarnHint>
-              Sign in to earn doubloons for the daily discard ({DAILY_PLAYED}, or {DAILY_BEST} for
-              the best throw).
+              Sign in to earn doubloons: signed-in players get a different hand each day (
+              {DAILY_PLAYED}, or {DAILY_BEST} for the best throw).
             </EarnHint>
           )}
         </div>
