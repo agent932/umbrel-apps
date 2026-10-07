@@ -407,8 +407,9 @@ html[data-nav="pop"]::view-transition-old(root) {
 .table-grid {
   /* The action plank's width: your hand fans between the board and the plank. */
   --plank: calc(136px * var(--ui, 1));
-  /* Room left of your hand for your plaque, which sits beside the board's foot. */
-  --you: calc(70px * var(--ui, 1));
+  /* Room left of your hand for your plaque (about 100px wide, with its portrait), which sits
+     beside the board's foot from 0.5cqw past the board; the hand starts 2cqw past it, plus this. */
+  --you: calc(100px * var(--ui, 1) - 1.5cqw + 6px);
   /* Card heights: your hand (six cards must fit between the board and the plank: a fan is about
      2.95 card heights wide), the opponent's fan, the pile, and the deck and crib. */
   --ch: min(38cqh, (100cqw - var(--left) - var(--you) - var(--plank) - 3cqw) / 2.95, 300px);
@@ -427,7 +428,7 @@ html[data-nav="pop"]::view-transition-old(root) {
   --med: clamp(48px, 15cqh, 72px);
   /* The opponent's column (porthole and plaque) and where the pile, deck and crib row starts. */
   --oppw: max(calc(var(--port) * 1.3), 124px);
-  --play-top: 34cqh;
+  --play-top: 36cqh;
   /* The menu button in the top-left corner, a margin in from the edge, and the board just right
      of it (--bx is the board's left edge). */
   --edge: max(8px, 1.2cqw);
@@ -491,7 +492,8 @@ html[data-nav="pop"]::view-transition-old(root) {
 }
 .t-status {
   z-index: 6;
-  top: calc(var(--och) * 0.92);
+  /* Just under the opponent's cards (their tilted fan reaches the bottom of its row). */
+  top: var(--och);
   /* The whole open width between the board and the opponent's plaque (the pile and deck are below). */
   left: calc(var(--bx) + var(--bw) + 0.8cqw);
   right: calc(var(--right) + var(--oppw) + 0.8cqw);
@@ -733,10 +735,12 @@ html[data-nav="pop"]::view-transition-old(root) {
   gap: 0;
   min-width: 0;
 }
+/* Your own plate always says "You", so it keeps its full width: squeezed to fit a box sized
+   before the iPad and desktop zoom (--ui), it used to read "Y…". */
 .t-chip .t-plaque {
   margin-left: -10px;
   padding-left: 16px;
-  max-width: 100%;
+  flex: none;
 }
 .t-avatar {
   position: relative;

@@ -15,6 +15,7 @@ const PARTS: Record<string, string> = {
   opponent: ".t-opp",
   board: ".t-board",
   prompt: ".t-status",
+  pile: ".t-pile-zone",
   deck: '[aria-label="Deck"]',
   crib: '[aria-label$="crib"]',
   "action button": ".t-act",
@@ -42,11 +43,14 @@ async function measure(page: Page) {
         bottom: Math.max(...cards.map((c) => c.bottom)),
       };
     }
+    // Your name on its plate, cut short ("Y…") if the plate is squeezed.
+    const name = document.querySelector(".t-you .truncate");
     return {
       found,
       width: innerWidth,
       height: innerHeight,
       scrollWidth: document.documentElement.scrollWidth,
+      nameCut: !!name && name.scrollWidth > name.clientWidth + 1,
     };
   }, PARTS);
 }
@@ -106,7 +110,7 @@ for (const rules of ["Classic", "Pirate"] as const) {
       page,
     }, info) => {
       test.skip(info.project.name !== "iphone", "Phones and iPads: WebKit, as in the app");
-      const { found, width, height, scrollWidth } = await tableAt(
+      const { found, width, height, scrollWidth, nameCut } = await tableAt(
         page,
         screen.width,
         screen.height,
@@ -116,6 +120,7 @@ for (const rules of ["Classic", "Pirate"] as const) {
       expect(overlaps(found)).toEqual([]);
       expect(offScreen(found, width, height, [])).toEqual([]);
       expect(scrollWidth).toBeLessThanOrEqual(width);
+      expect(nameCut, "your name is cut short").toBe(false);
     });
   }
 
@@ -124,24 +129,17 @@ for (const rules of ["Classic", "Pirate"] as const) {
       page,
     }, info) => {
       test.skip(info.project.name !== screen.project);
-      const { found, width, height, scrollWidth } = await tableAt(
+      const { found, width, height, scrollWidth, nameCut } = await tableAt(
         page,
         screen.width,
         screen.height,
         rules,
       );
-      // Known on wide screens, to fix (DEV-42): your hand slides under your name plate, the
-      // opponent's cards touch the top of the prompt, and on a sideways phone the opponent's
-      // crib tucks under their plate.
-      const known = [
-        ["your name", "your cards"],
-        ["opponent's cards", "prompt"],
-        ["opponent", "crib"],
-      ];
-      expect(overlaps(found, known)).toEqual([]);
+      expect(overlaps(found)).toEqual([]);
       // On a wide screen your hand peeks up from the bottom edge, by design.
       expect(offScreen(found, width, height, ["your cards"])).toEqual([]);
       expect(scrollWidth).toBeLessThanOrEqual(width);
+      expect(nameCut, "your name is cut short").toBe(false);
     });
   }
 }

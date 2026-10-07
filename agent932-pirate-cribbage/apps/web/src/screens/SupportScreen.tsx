@@ -46,6 +46,31 @@ const FAQ: { group: string; items: Entry[] }[] = [
         ),
       },
       {
+        q: "What are doubloons, and how do I earn them?",
+        a: (
+          <>
+            <p>
+              Doubloons are the game's pirate coins. You earn them by playing with a free account
+              (guest games don't earn), and your balance shows beside your name in the harbour. They
+              can't be bought or turned into money. A shop of new boards and card decks to spend
+              them on is on its way.
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              <li>A win against the crew: 20 on Easy, 35 on Medium, 50 on Hard.</li>
+              <li>A win online: 50, or 60 in a ranked game.</li>
+              <li>A skunk: 10 more (25 for a double skunk). Your first win of the day: 50 more.</li>
+              <li>The daily discard: 10 for your throw, or 25 if it's the best one.</li>
+              <li>Achievements: each pays once when you unlock it, 1,500 in all.</li>
+            </ul>
+            <p className="mt-1">
+              To keep it fair, a win pays only when the game lasted at least 4 rounds and 3 minutes.
+              Each day (from midnight UTC) up to 10 wins against the crew and 10 online wins pay,
+              and no more than 3 against the same player.
+            </p>
+          </>
+        ),
+      },
+      {
         q: "What's the difference between Classic and Pirate?",
         a: (
           <p>
@@ -175,6 +200,19 @@ const FAQ: { group: string; items: Entry[] }[] = [
             <b>Play online</b> screen. If it has expired or been cancelled, just make a new one with{" "}
             <b>Invite a friend</b> and send that. If a fresh link still doesn't work, send us a
             message below and tell us what you see.
+          </p>
+        ),
+      },
+      {
+        q: "What happens if I leave or forfeit an online game?",
+        a: (
+          <p>
+            To give up, tap <b>Menu</b>, then <b>Forfeit</b>: the other player wins. If you close
+            the app or lose your connection, you have 5 minutes to come back (your opponent sees the
+            countdown) before the game is forfeited for you. Your <b>Ship's Log</b> counts the games
+            you've forfeited. In a ranked game, a forfeit in the first 4 rounds or 3 minutes doesn't
+            change either player's rating; after that it counts as a loss. A win by forfeit that
+            early pays no doubloons, and half the usual win after that.
           </p>
         ),
       },
