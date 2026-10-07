@@ -37,6 +37,11 @@ export interface Reward {
   balance: number;
   /** For the winner: why the win paid nothing or half. Null for losers and full-pay wins. */
   note: WinNote | null;
+  /**
+   * Every achievement this unlocked, paid or not (a win-based one from a game too short to pay
+   * unlocks but pays nothing), so the result screen can list them all.
+   */
+  unlocked: string[];
 }
 
 export const BOT_WIN: Record<BotLevel, number> = { easy: 20, medium: 35, hard: 50 };

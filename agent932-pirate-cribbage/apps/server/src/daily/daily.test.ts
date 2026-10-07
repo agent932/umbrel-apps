@@ -125,6 +125,7 @@ describe("daily discard on the server", () => {
         total: 10,
         balance: 10,
         note: null,
+        unlocked: [],
       });
       vi.setSystemTime(new Date("2026-10-05T12:00:00Z"));
       const top = (await play("2026-10-05", best("2026-10-05"))).json();
@@ -165,6 +166,7 @@ describe("daily discard on the server", () => {
         { reason: "achievement", delta: 150, key: "sharpEye" },
       ]);
       expect(rewards[6].total).toBe(175);
+      expect(rewards[6].unlocked).toEqual(["sharpEye"]);
       expect(rewards[7].lines).toEqual([{ reason: "daily", delta: 25, key: "best" }]);
       expect((await me()).doubloons).toBe(8 * 25 + 150);
       await expectLedgerMatches(t.db);

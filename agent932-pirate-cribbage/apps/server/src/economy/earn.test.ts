@@ -171,6 +171,7 @@ describe("doubloons for games", () => {
     // Using a power pays; First Plunder unlocks but pays only for a game long enough to pay.
     expect(line(fast, "achievement", "power:spyglass")).toMatchObject({ delta: 50 });
     expect(line(fast, "achievement", "firstWin")).toBeUndefined();
+    expect(fast.unlocked).toEqual(expect.arrayContaining(["firstWin", "power:spyglass"]));
     const unlocked = await t.db
       .select({ key: achievements.key })
       .from(achievements)

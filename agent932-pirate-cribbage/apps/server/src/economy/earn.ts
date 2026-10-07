@@ -30,8 +30,9 @@ function payer(exec: Tx | Db, userId: string, balance: number, now: Date) {
       balance = r.balance;
       if (r.paid) lines.push({ reason, delta, ...(key && { key }) });
     },
-    reward(note: WinNote | null): Reward {
-      return { lines, total: lines.reduce((sum, l) => sum + l.delta, 0), balance, note };
+    reward(note: WinNote | null, unlocked: string[]): Reward {
+      const total = lines.reduce((sum, l) => sum + l.delta, 0);
+      return { lines, total, balance, note, unlocked };
     },
   };
 }
@@ -118,11 +119,12 @@ export async function awardDoubloons(
 
     // Win-based achievements pay only for a game long enough to pay; the rest always do.
     const long = longEnough(state, forfeited, durationMs);
-    for (const key of unlocked.get(userId) ?? []) {
+    const keys = unlocked.get(userId) ?? [];
+    for (const key of keys) {
       const amount = achievementPayout(key, long);
       if (amount > 0) await wallet.pay("achievement", amount, key, key);
     }
-    rewards.set(userId, wallet.reward(note));
+    rewards.set(userId, wallet.reward(note, keys));
   }
   return rewards;
 }
@@ -142,5 +144,5 @@ export async function payDaily(
     const amount = achievementPayout(key, true);
     if (amount > 0) await wallet.pay("achievement", amount, key, key);
   }
-  return wallet.reward(null);
+  return wallet.reward(null, unlocked);
 }
