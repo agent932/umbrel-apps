@@ -18,13 +18,23 @@ const person = (isAdmin = false): User => ({
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
-/** The account page, with the shop open or not, and what GET /api/shop says you own. */
-function renderAccount(user: User, shopOpen: boolean, shop: ShopResponse | 404 = NOT_YET) {
+/**
+ * The account page, with the shop open or not, and what GET /api/shop says you own ("offline": no
+ * connection; a promise: the answer once it settles).
+ */
+function renderAccount(
+  user: User,
+  shopOpen: boolean,
+  shop: ShopResponse | 404 | "offline" | Promise<ShopResponse> = NOT_YET,
+) {
   const calls: string[] = [];
   vi.stubGlobal("fetch", async (url: string) => {
     calls.push(url);
     if (url === "/api/auth/me") return json({ user, shopOpen });
-    if (url === "/api/shop") return shop === 404 ? json({ error: "Not found" }, 404) : json(shop);
+    if (url === "/api/shop") {
+      if (shop === "offline") throw new TypeError("Failed to fetch");
+      return shop === 404 ? json({ error: "Not found" }, 404) : json(await shop);
+    }
     if (url === "/api/blocks") return json({ blocked: [] });
     if (url === "/api/email/enabled") return json({ enabled: false });
     return json({ error: "Not found" }, 404);
@@ -70,6 +80,25 @@ describe("the account page's link to your boards and card backs", () => {
     expect(await screen.findByRole("link", LINK)).toHaveAttribute("href", "/shop");
   });
 
+  it("shows before the shop has said what you own, so nothing below it moves", async () => {
+    let answer!: (shop: ShopResponse) => void;
+    const calls = renderAccount(
+      person(),
+      false,
+      new Promise<ShopResponse>((resolve) => (answer = resolve)),
+    );
+    await waitFor(() => expect(calls).toContain("/api/shop"));
+    // The shop hasn't answered yet, and the link is already there.
+    expect(screen.getByRole("link", LINK)).toBeInTheDocument();
+    answer(NOT_YET);
+  });
+
+  it("stays when the shop can't be reached (the shop says so itself)", async () => {
+    const calls = renderAccount(person(), false, "offline");
+    await waitFor(() => expect(calls).toContain("/api/shop"));
+    expect(await screen.findByRole("link", LINK)).toBeInTheDocument();
+  });
+
   it("shows while the shop is closed when you own more than one board", async () => {
     renderAccount(
       person(),
@@ -88,12 +117,12 @@ describe("the account page's link to your boards and card backs", () => {
     );
     await waitFor(() => expect(calls).toContain("/api/shop"));
     expect(await screen.findByRole("heading", { name: "Change password" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", LINK)).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("link", LINK)).toBeNull());
   });
 
   it("is left out on a server without the shop", async () => {
     const calls = renderAccount(person(), false, 404);
     await waitFor(() => expect(calls).toContain("/api/shop"));
-    expect(screen.queryByRole("link", LINK)).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("link", LINK)).toBeNull());
   });
 });

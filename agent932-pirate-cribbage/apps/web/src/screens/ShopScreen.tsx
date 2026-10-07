@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { type Cosmetics, DEFAULT_COSMETICS, ITEM_TYPES, type ItemType } from "@pirate/engine";
 import { ApiError, type ShopItem, type ShopResponse, api } from "../api.js";
 import { useAuth } from "../auth.js";
@@ -9,7 +9,11 @@ import { BuySheet, failureText } from "../components/shop/BuySheet.js";
 import { ItemCard, amount } from "../components/shop/ItemCard.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 
-type Load = { kind: "loading" } | { kind: "failed" } | { kind: "ready"; shop: ShopResponse };
+type Load =
+  | { kind: "loading" }
+  /** `retrying`: Try again was pressed, and the shop hasn't answered yet. */
+  | { kind: "failed"; retrying?: boolean }
+  | { kind: "ready"; shop: ShopResponse };
 
 /** A server without the shop (404) shows it as not open yet. */
 const NO_SHOP: ShopResponse = { open: false, items: [] };
@@ -35,14 +39,23 @@ export function ShopScreen() {
   const opener = useRef<HTMLElement | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  /** The page's heading, which takes focus when the element that had it goes away. */
+  const heading = useRef<HTMLHeadingElement>(null);
+  /** Set when the next render may take away the element that has focus (see below). */
+  const refocus = useRef(false);
 
   useEffect(() => {
     let live = true;
+    const done = (next: Load) => {
+      if (!live) return;
+      // After Try again: the shop takes that button's place, so focus goes to the heading.
+      if (attempt > 0) refocus.current = true;
+      setLoad(next);
+    };
     api<ShopResponse>("/api/shop").then(
-      (shop) => live && setLoad({ kind: "ready", shop }),
+      (shop) => done({ kind: "ready", shop }),
       (e) =>
-        live &&
-        setLoad(
+        done(
           e instanceof ApiError && e.status === 404
             ? { kind: "ready", shop: NO_SHOP }
             : { kind: "failed" },
@@ -52,6 +65,16 @@ export function ShopScreen() {
       live = false;
     };
   }, [attempt]);
+
+  // Never leave focus on <body>: when the element that had it has gone (the Try again button once
+  // the shop loads, the confirm sheet over an item that's no longer for sale), it goes to the
+  // heading, so a keyboard or VoiceOver user carries on from the top of the shop.
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    const active = document.activeElement;
+    if (!active || active === document.body) heading.current?.focus();
+  });
 
   useEffect(() => {
     if (!notice) return;
@@ -64,40 +87,53 @@ export function ShopScreen() {
       setLoad((l) => (l.kind === "ready" ? { kind: "ready", shop: { ...l.shop, ...change } } : l)),
     [],
   );
-  /** Read the shop again behind the page (a new price, a new balance), keeping it on screen. */
+  /** Read the shop again behind the page (a new price, a new balance), keeping it on screen.
+   *  Gives what it read, or null if it couldn't. */
   const reload = useCallback(
     () =>
       api<ShopResponse>("/api/shop").then(
-        (shop) => setLoad({ kind: "ready", shop }),
-        () => {},
+        (shop) => {
+          setLoad({ kind: "ready", shop });
+          return shop;
+        },
+        () => null,
       ),
     [],
   );
 
   if (loading || load.kind === "loading")
     return (
-      <Shell>
+      <Shell heading={heading}>
         <p className="text-center text-parchment/60">Opening the shop…</p>
       </Shell>
     );
-  if (load.kind === "failed")
+  if (load.kind === "failed") {
+    const retrying = load.retrying === true;
     return (
-      <Shell>
-        <div role="alert" className="flex flex-col items-center gap-3 text-center">
-          <p className="text-red-300">Couldn't reach the shop</p>
+      <Shell heading={heading}>
+        <div className="flex flex-col items-center gap-3 text-center">
+          {/* Emptied while it tries again, so a second failure is announced too. */}
+          <p role="alert" className="min-h-6 text-red-300">
+            {retrying ? "" : "Couldn't reach the shop"}
+          </p>
+          {/* Stays on the page while it tries, so focus stays on it. */}
           <button
             type="button"
-            className="btn-secondary min-h-11"
+            className="btn-secondary min-h-11 aria-disabled:cursor-not-allowed"
+            aria-disabled={retrying || undefined}
+            aria-busy={retrying || undefined}
             onClick={() => {
-              setLoad({ kind: "loading" });
+              if (retrying) return;
+              setLoad({ kind: "failed", retrying: true });
               setAttempt((n) => n + 1);
             }}
           >
-            Try again
+            {retrying ? "Trying again…" : "Try again"}
           </button>
         </div>
       </Shell>
     );
+  }
 
   const { shop } = load;
   const visible = shop.open || shop.preview === true;
@@ -107,20 +143,31 @@ export function ShopScreen() {
   const equipped: Cosmetics = shop.equipped ?? DEFAULT_COSMETICS;
   const mode = !user ? "guest" : visible ? "shop" : "owned";
 
-  /** Buy at the price shown. A charged purchase must never look failed, so the account bar's
-   *  balance is read again only as a best effort. */
+  /** Buy at the price shown. A charged purchase must never look failed: a buy that fails is
+   *  checked against the shop before it's called a failure, and the account bar's balance is
+   *  read again only as a best effort. */
   async function buy(item: ShopItem, price: number) {
     try {
       const r = await api<{ doubloons: number; owned: string[] }>("/api/shop/buy", {
         body: { itemId: item.id, price },
       });
       patch({ doubloons: r.doubloons, owned: r.owned });
-      void refresh().catch(() => {});
     } catch (e) {
       // A new price, a new balance, an item gone: read the shop again before saying why.
-      await reload();
-      throw e;
+      const now = await reload();
+      // Unless it's yours now: the purchase went through and only its reply was lost (the signal
+      // dropped, a gateway timed out), or it was bought already.
+      if (!now?.owned?.includes(item.id)) {
+        if (offSale(now, item, e)) {
+          // Nothing left to buy, and its card may be gone with it: close the sheet and say why.
+          refocus.current = true;
+          setBuying(null);
+          setNotice({ ok: false, text: failureText(e) });
+        }
+        throw e;
+      }
     }
+    void refresh().catch(() => {});
   }
 
   /** Use an item from now on. The next table you sit at (or host) draws it. */
@@ -169,7 +216,7 @@ export function ShopScreen() {
   const sheetItem = buying && (items.find((i) => i.id === buying.id) ?? buying);
 
   return (
-    <Shell>
+    <Shell heading={heading}>
       {visible ? (
         <>
           {user && (
@@ -256,13 +303,35 @@ export function ShopScreen() {
 const TOAST =
   "rounded-xl border border-gold/60 bg-night/95 px-4 py-2 text-center text-sm shadow-lg";
 
-/** The page around every state of the shop. */
-function Shell({ children }: { children: React.ReactNode }) {
+/**
+ * Whether a buy failed because the item can't be bought here any more: the shop closed, or the
+ * item went off sale. `now` is the shop read again since (null if it couldn't be).
+ */
+function offSale(now: ShopResponse | null, item: ShopItem, error: unknown) {
+  const code = error instanceof ApiError ? error.code : undefined;
+  if (code === "closed" || code === "unknown") return true;
+  return !!now && !((now.open || now.preview) && now.items.some((i) => i.id === item.id));
+}
+
+/** The page around every state of the shop. Its heading takes focus when nothing else has it. */
+function Shell({
+  heading,
+  children,
+}: {
+  heading: RefObject<HTMLHeadingElement | null>;
+  children: React.ReactNode;
+}) {
   return (
     <>
       <NavBar title="Shop" back={{ to: CRIBBAGE_HOME, label: "Harbour" }} />
       <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-5 px-4 pt-2 pb-6">
-        <h1 className="text-center font-pirate text-4xl text-gold">Shop</h1>
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="text-center font-pirate text-4xl text-gold outline-none"
+        >
+          Shop
+        </h1>
         {children}
       </main>
     </>

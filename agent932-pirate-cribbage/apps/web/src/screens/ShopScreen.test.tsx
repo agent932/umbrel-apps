@@ -20,6 +20,19 @@ vi.mock("../native.js", async (importOriginal) => {
   };
 });
 
+/** Every pair the shop asked to have its art fetched for. */
+const preloaded = vi.hoisted(() => [] as { board: string; deck: string }[]);
+vi.mock("../brand/preloadSkins.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../brand/preloadSkins.js")>();
+  return {
+    ...real,
+    preloadCosmetics: (pair: { board: string; deck: string }) => {
+      preloaded.push(pair);
+      return real.preloadCosmetics(pair);
+    },
+  };
+});
+
 /**
  * A number as this machine's language writes it, with the plain spaces Testing Library compares
  * against (Finnish and French group thousands with a no-break space).
@@ -49,8 +62,11 @@ const ITEMS: ShopItem[] = SHOP_ITEMS.map(({ sort: _sort, ...item }) => ({
 const FREE = ITEMS.filter((i) => i.price === 0).map((i) => i.id);
 const item = (id: string) => ITEMS.find((i) => i.id === id)!;
 
-/** How a request goes instead of working: the server's error, or no connection at all. */
-type Failure = "offline" | { status: number; error: string; code?: string };
+/**
+ * How a request goes instead of working: the server's error, no connection at all, or "lost": the
+ * server does it, but its reply never arrives.
+ */
+type Failure = "offline" | "lost" | { status: number; error: string; code?: string };
 type Route = "me" | "shop" | "buy" | "use";
 
 interface Server {
@@ -60,6 +76,8 @@ interface Server {
   posts: { path: string; body: { itemId: string; price?: number } }[];
   /** Failures to answer the next requests on each route with (then they work again). */
   next: Record<Route, Failure[]>;
+  /** Requests on each route that wait until the test lets them go (see hold). */
+  held: Record<Route, Promise<void>[]>;
   /** The shop as the server holds it: buying and using change it. */
   state: ShopResponse;
 }
@@ -83,6 +101,7 @@ function stubServer({
     calls: [],
     posts: [],
     next: { me: [], shop: [], buy: [], use: [] },
+    held: { me: [], shop: [], buy: [], use: [] },
     state,
   };
   const routes: Record<string, Route> = {
@@ -98,9 +117,16 @@ function stubServer({
     if (!route) return json({ error: "Not found" }, 404);
     const body = init.body ? JSON.parse(init.body as string) : undefined;
     if (route === "buy" || route === "use") server.posts.push({ path: url, body });
+    const wait = server.held[route].shift();
+    if (wait) await wait;
     const fail = server.next[route].shift();
     if (fail === "offline") throw new TypeError("Failed to fetch");
-    if (fail) return json({ error: fail.error, code: fail.code }, fail.status);
+    if (fail && fail !== "lost") return json({ error: fail.error, code: fail.code }, fail.status);
+    const reply = answer(route, body);
+    if (fail === "lost") throw new TypeError("Failed to fetch");
+    return reply;
+  });
+  function answer(route: Route, body: { itemId: string }) {
     switch (route) {
       case "me":
         return json({
@@ -121,8 +147,15 @@ function stubServer({
         return json({ equipped: state.equipped });
       }
     }
-  });
+  }
   return server;
+}
+
+/** Hold the next request on a route until the test lets it go; then it's answered as usual. */
+function hold(server: Server, route: Route) {
+  let release!: () => void;
+  server.held[route].push(new Promise<void>((resolve) => (release = resolve)));
+  return release;
 }
 
 function renderShop() {
@@ -149,10 +182,14 @@ async function openSheet(user: ReturnType<typeof userEvent.setup>, name = "Treas
 
 const count = (server: Server, call: string) => server.calls.filter((c) => c === call).length;
 
+/** The page's "Shop" heading. */
+const heading = () => screen.getByRole("heading", { level: 1, name: "Shop" });
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   native.app = false;
+  preloaded.length = 0;
 });
 
 describe("the shop", () => {
@@ -180,7 +217,7 @@ describe("the shop", () => {
     expect(await button("Serpent Reef")).toHaveAccessibleName("In use: Serpent Reef");
     expect(await button("Serpent Reef")).toHaveAttribute("aria-disabled", "true");
     expect(await button("Pirate Cribbage")).toHaveAccessibleName("In use: Pirate Cribbage");
-    expect(await button("Moon and Compass")).toHaveAccessibleName("Use Moon and Compass");
+    expect(await button("Moon and Compass")).toHaveAccessibleName("Use it: Moon and Compass");
     expect(await button("Treasure Map")).toHaveAccessibleName(
       `Buy Treasure Map for ${num(1500)} doubloons`,
     );
@@ -231,7 +268,7 @@ describe("the shop", () => {
     // Bought, not switched on; the account bar's balance is read again.
     expect(screen.getByText(`You have ${num(1000)} doubloons`)).toBeInTheDocument();
     expect(within(await card("Treasure Map")).getByRole("button")).toHaveAccessibleName(
-      "Use Treasure Map",
+      "Use it: Treasure Map",
     );
     await waitFor(() => expect(count(server, "GET /api/auth/me")).toBe(2));
   });
@@ -253,7 +290,7 @@ describe("the shop", () => {
     expect(buy).toHaveAccessibleName("In use: Treasure Map");
     expect(buy).toHaveAttribute("aria-disabled", "true");
     expect(within(await card("Serpent Reef")).getByRole("button")).toHaveAccessibleName(
-      "Use Serpent Reef",
+      "Use it: Serpent Reef",
     );
     // And the tables you sit at next are told (the signed-in player is read again).
     await waitFor(() => expect(count(server, "GET /api/auth/me")).toBe(3));
@@ -267,7 +304,7 @@ describe("the shop", () => {
     await user.click(await within(sheet).findByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(buy);
-    expect(buy).toHaveAccessibleName("Use Treasure Map");
+    expect(buy).toHaveAccessibleName("Use it: Treasure Map");
   });
 
   it("uses an item from its card, keeping focus on that button", async () => {
@@ -282,7 +319,7 @@ describe("the shop", () => {
     expect(document.activeElement).toBe(use);
     expect(use).toHaveAccessibleName("In use: Moon and Compass");
     expect(within(await card("Pirate Cribbage")).getByRole("button")).toHaveAccessibleName(
-      "Use Pirate Cribbage",
+      "Use it: Pirate Cribbage",
     );
   });
 
@@ -295,7 +332,7 @@ describe("the shop", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach the shop. Try again."),
     );
-    expect(use).toHaveAccessibleName("Use Moon and Compass");
+    expect(use).toHaveAccessibleName("Use it: Moon and Compass");
     expect(document.activeElement).toBe(use);
   });
 
@@ -386,6 +423,145 @@ describe("the shop", () => {
     expect(within(sheet).queryByRole("alert")).toBeNull();
   });
 
+  it("says it's yours when the purchase went through but its reply was lost", async () => {
+    const server = stubServer();
+    server.next.buy.push("lost");
+    const user = renderShop();
+    const { sheet } = await openSheet(user);
+    await user.click(within(sheet).getByRole("button", { name: `Buy for ${num(1500)} doubloons` }));
+    // The shop, read again, says it's owned: a success, not "Couldn't reach the shop".
+    expect(await within(sheet).findByText("Treasure Map is yours.")).toBeInTheDocument();
+    expect(within(sheet).queryByRole("alert")).toBeNull();
+    expect(sheet).toHaveTextContent(`You have ${num(1000)} doubloons left.`);
+    expect(within(sheet).getByRole("button", { name: "Use it now" })).toHaveFocus();
+    expect(count(server, "GET /api/shop")).toBe(2);
+    expect(server.posts).toHaveLength(1);
+  });
+
+  it("announces the purchase in a live region that was there all along, and names the sheet for it", async () => {
+    stubServer();
+    const user = renderShop();
+    const { sheet } = await openSheet(user);
+    const status = within(sheet).getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    await user.click(within(sheet).getByRole("button", { name: `Buy for ${num(1500)} doubloons` }));
+    await waitFor(() => expect(status).toHaveTextContent("Treasure Map is yours."));
+    expect(within(sheet).getByRole("status")).toBe(status);
+    expect(sheet).toHaveAccessibleName("Treasure Map is yours");
+    // Focus lands on Use it now, which says it too.
+    const useNow = within(sheet).getByRole("button", { name: "Use it now" });
+    expect(useNow).toHaveFocus();
+    expect(useNow).toHaveAccessibleDescription("Treasure Map is yours.");
+  });
+
+  it("says Buying… while it buys, sends it once, and can't be closed until it's done", async () => {
+    const server = stubServer();
+    const user = renderShop();
+    const { sheet } = await openSheet(user);
+    const release = hold(server, "buy");
+    const confirm = within(sheet).getByRole("button", { name: `Buy for ${num(1500)} doubloons` });
+    await user.click(confirm);
+    // The same button, busy: never `disabled`, so it keeps focus.
+    expect(confirm).toHaveAccessibleName("Buying…");
+    expect(confirm).toHaveAttribute("aria-disabled", "true");
+    expect(confirm).toHaveAttribute("aria-busy", "true");
+    expect(confirm).not.toBeDisabled();
+    expect(confirm).toHaveFocus();
+    // A second press sends nothing; Cancel and Escape leave it open, so nobody walks away from a
+    // purchase that's going through.
+    await user.click(confirm);
+    const cancel = within(sheet).getByRole("button", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("aria-disabled", "true");
+    await user.click(cancel);
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBe(sheet);
+    release();
+    expect(await within(sheet).findByText("Treasure Map is yours.")).toBeInTheDocument();
+    expect(server.posts).toHaveLength(1);
+  });
+
+  it("says Switching… on a card while it switches, keeping focus, and sends it once", async () => {
+    const server = stubServer();
+    const user = renderShop();
+    const use = within(await card("Moon and Compass")).getByRole("button");
+    const release = hold(server, "use");
+    await user.click(use);
+    expect(use).toHaveAccessibleName("Switching to Moon and Compass…");
+    expect(use).toHaveTextContent("Switching…");
+    expect(use).toHaveAttribute("aria-disabled", "true");
+    expect(use).toHaveAttribute("aria-busy", "true");
+    expect(use).not.toBeDisabled();
+    expect(use).toHaveFocus();
+    await user.click(use);
+    release();
+    expect(await screen.findByText("Moon and Compass is now in use")).toBeInTheDocument();
+    expect(server.posts).toEqual([
+      { path: "/api/shop/use", body: { itemId: "deck.moon-compass" } },
+    ]);
+    expect(use).toHaveFocus();
+  });
+
+  it("fetches the art on Use it now, and says in the sheet why it couldn't switch", async () => {
+    const server = stubServer();
+    const user = renderShop();
+    const { sheet } = await openSheet(user);
+    await user.click(within(sheet).getByRole("button", { name: `Buy for ${num(1500)} doubloons` }));
+    const useNow = await within(sheet).findByRole("button", { name: "Use it now" });
+    const release = hold(server, "use");
+    server.next.use.push("offline");
+    await user.click(useNow);
+    expect(useNow).toHaveTextContent("Switching…");
+    expect(useNow).toHaveAttribute("aria-disabled", "true");
+    expect(useNow).toHaveAttribute("aria-busy", "true");
+    expect(useNow).not.toBeDisabled();
+    expect(within(sheet).getByRole("button", { name: "Close" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    // Its art is on its way already, so the next table opens on it.
+    expect(preloaded).toContainEqual({ board: "board.treasure-map", deck: DEFAULT_COSMETICS.deck });
+    release();
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      "Couldn't reach the shop. Try again.",
+    );
+    // Still bought, and Use it now can be tried again.
+    expect(screen.getByRole("dialog")).toBe(sheet);
+    expect(sheet).toHaveTextContent("Treasure Map is yours.");
+    expect(useNow).toHaveTextContent("Use it now");
+    expect(useNow).toHaveFocus();
+  });
+
+  it("closes the sheet when the shop closes, and says why with focus on the heading", async () => {
+    const server = stubServer();
+    const user = renderShop();
+    const { sheet } = await openSheet(user);
+    // An admin closes the shop while the sheet is open.
+    Object.assign(server.state, {
+      open: false,
+      items: ITEMS.filter((i) => FREE.includes(i.id)),
+      doubloons: undefined,
+    });
+    server.next.buy.push({ status: 403, error: "The shop isn't open yet", code: "closed" });
+    await user.click(within(sheet).getByRole("button", { name: `Buy for ${num(1500)} doubloons` }));
+    expect(await screen.findByText("The shop opens soon.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("The shop isn't open yet");
+    expect(heading()).toHaveFocus();
+  });
+
+  it("closes the sheet when the item goes off sale, and says why with focus on the heading", async () => {
+    const server = stubServer();
+    const user = renderShop();
+    const { sheet } = await openSheet(user);
+    server.state.items = ITEMS.filter((i) => i.id !== "board.treasure-map");
+    server.next.buy.push({ status: 404, error: "That item isn't in the shop", code: "unknown" });
+    await user.click(within(sheet).getByRole("button", { name: `Buy for ${num(1500)} doubloons` }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByRole("article", { name: "Treasure Map" })).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("That item isn't in the shop");
+    expect(heading()).toHaveFocus();
+  });
+
   it("lets guests look at the prices, with no buttons", async () => {
     stubServer({ user: null });
     renderShop();
@@ -467,15 +643,33 @@ describe("the shop", () => {
     expect(screen.queryByRole("article")).toBeNull();
   });
 
-  it("says when it can't reach the shop, and tries again", async () => {
+  it("says when it can't reach the shop, and tries again without losing focus", async () => {
     const server = stubServer();
-    server.next.shop.push("offline");
+    server.next.shop.push("offline", "offline");
     const user = renderShop();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Couldn't reach the shop");
-    await user.click(within(alert).getByRole("button", { name: "Try again" }));
-    expect(await card("Treasure Map")).toBeInTheDocument();
+    const again = screen.getByRole("button", { name: "Try again" });
+    const release = hold(server, "shop");
+    await user.click(again);
+    // The same button while it tries, so focus stays on it.
+    expect(again).toHaveAccessibleName("Trying again…");
+    expect(again).toHaveAttribute("aria-disabled", "true");
+    expect(again).toHaveAttribute("aria-busy", "true");
+    expect(again).toHaveFocus();
+    expect(alert).toBeEmptyDOMElement();
+    await user.click(again);
+    release();
+    // It fails again, and says so again.
+    await waitFor(() => expect(alert).toHaveTextContent("Couldn't reach the shop"));
+    expect(again).toHaveAccessibleName("Try again");
+    expect(again).toHaveFocus();
     expect(count(server, "GET /api/shop")).toBe(2);
+    // Then it works: the shop takes the button's place, and focus goes to the heading.
+    await user.click(again);
+    expect(await card("Treasure Map")).toBeInTheDocument();
+    expect(heading()).toHaveFocus();
+    expect(count(server, "GET /api/shop")).toBe(3);
   });
 
   it("leaves out item types this build doesn't know", async () => {
@@ -498,20 +692,26 @@ describe("the shop", () => {
   });
 
   describe("an item this build has no art for", () => {
-    const newer: ShopItem[] = [
-      { ...item("board.treasure-map"), id: "board.sea-serpent", name: "Sea Serpent" },
-      { ...item("deck.crimson"), id: "deck.mermaid", name: "Mermaid" },
-    ];
-
-    async function showNewer() {
+    /**
+     * A newer server's board and back. Each test gives them ids of its own: a missing skin is
+     * logged once per id for the whole file, so with shared ids only the first test to run would
+     * see it logged.
+     */
+    async function showNewer(tag: string) {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
-      stubServer({ shop: { items: [...ITEMS, ...newer], owned: [...FREE, "deck.mermaid"] } });
+      const newer: ShopItem[] = [
+        { ...item("board.treasure-map"), id: `board.sea-serpent-${tag}`, name: "Sea Serpent" },
+        { ...item("deck.crimson"), id: `deck.mermaid-${tag}`, name: "Mermaid" },
+      ];
+      stubServer({
+        shop: { items: [...ITEMS, ...newer], owned: [...FREE, `deck.mermaid-${tag}`] },
+      });
       renderShop();
       return { serpent: await card("Sea Serpent"), mermaid: await card("Mermaid"), error };
     }
 
     it("shows the default with a note to reload, and can't be bought (but can be used)", async () => {
-      const { serpent, mermaid, error } = await showNewer();
+      const { serpent, mermaid, error } = await showNewer("web");
       expect(serpent).toHaveTextContent("Reload the page to see this item");
       expect(serpent.querySelector("svg")).toHaveAttribute("data-skin", "serpent-reef");
       const buy = within(serpent).getByRole("button");
@@ -520,7 +720,7 @@ describe("the shop", () => {
       expect(mermaid).toHaveTextContent("Reload the page to see this item");
       expect(mermaid.querySelector("img")).toHaveAttribute("data-deck", "cribbage-logo");
       const use = within(mermaid).getByRole("button");
-      expect(use).toHaveAccessibleName("Use Mermaid");
+      expect(use).toHaveAccessibleName("Use it: Mermaid");
       expect(use).not.toHaveAttribute("aria-disabled");
       // Logged once for each, however often it's drawn.
       expect(error.mock.calls.filter(([m]) => /can't be used/.test(String(m)))).toHaveLength(2);
@@ -528,7 +728,7 @@ describe("the shop", () => {
 
     it("says to update the app in the iPhone app", async () => {
       native.app = true;
-      const { serpent } = await showNewer();
+      const { serpent } = await showNewer("app");
       expect(serpent).toHaveTextContent("Update the app to see this item");
       expect(serpent).not.toHaveTextContent("Reload the page");
     });

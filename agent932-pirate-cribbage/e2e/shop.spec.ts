@@ -10,6 +10,9 @@ const board = (page: Page) => page.locator(".t-board svg[data-skin]");
 /** The opponent's face-down cards that wear this back. */
 const opponentsBacks = (page: Page, deck: string) =>
   page.locator(`[aria-label^="Opponent holds"] [data-deck="${deck}"]`);
+/** The opponent's face-down cards that wear any other back. */
+const otherBacks = (page: Page, deck: string) =>
+  page.locator(`[aria-label^="Opponent holds"] [data-deck]:not([data-deck="${deck}"])`);
 
 /** The shopper's own request, which must work for the test to go on. */
 async function post(page: Page, url: string, data: object) {
@@ -24,9 +27,11 @@ test("a player buys a board, uses it, and plays on it", async ({ shopper }) => {
   await page.getByRole("button", { name: "Buy Treasure Map for 1,500 doubloons" }).click();
   const sheet = page.getByRole("dialog", { name: "Buy Treasure Map?" });
   await sheet.getByRole("button", { name: "Buy for 1,500 doubloons" }).click();
-  await expect(sheet.getByRole("status")).toHaveText("Treasure Map is yours.");
-  await sheet.getByRole("button", { name: "Use it now" }).click();
-  await expect(sheet).toBeHidden();
+  // Bought: the sheet is named for it now.
+  const bought = page.getByRole("dialog", { name: "Treasure Map is yours" });
+  await expect(bought.getByRole("status")).toHaveText("Treasure Map is yours.");
+  await bought.getByRole("button", { name: "Use it now" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: "now in use" })).toHaveText(
     "Treasure Map is now in use",
   );
@@ -46,12 +51,13 @@ test("a player buys a card back, uses it, and the crew's cards wear it", async (
   await page.getByRole("button", { name: "Buy Crimson for 1,000 doubloons" }).click();
   const sheet = page.getByRole("dialog", { name: "Buy Crimson?" });
   await sheet.getByRole("button", { name: "Buy for 1,000 doubloons" }).click();
-  await expect(sheet.getByRole("status")).toHaveText("Crimson is yours.");
+  const bought = page.getByRole("dialog", { name: "Crimson is yours" });
+  await expect(bought.getByRole("status")).toHaveText("Crimson is yours.");
   // Not now: Close, then Use it on the card, whose button has focus again. From the keyboard,
   // where focus matters (Safari doesn't focus a button that's clicked).
-  await sheet.getByRole("button", { name: "Close" }).click();
-  await expect(sheet).toBeHidden();
-  const use = page.getByRole("button", { name: "Use Crimson" });
+  await bought.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const use = page.getByRole("button", { name: "Use it: Crimson" });
   await expect(use).toBeFocused();
   await expect(page.getByText("You have 0 doubloons")).toBeVisible();
   await page.keyboard.press("Enter");
@@ -68,7 +74,10 @@ test("a player buys a card back, uses it, and the crew's cards wear it", async (
   await expect(cut.locator('[data-deck]:not([data-deck="crimson"])')).toHaveCount(0);
   await cutForDeal(page);
   await expect(hand(page).getByRole("button")).toHaveCount(6);
-  await expect(opponentsBacks(page, "crimson")).toHaveCount(6);
+  // The crew throws to the crib soon after the deal, so its fan may hold 6 cards or 4: count
+  // backs of another kind, not Crimson ones.
+  await expect(opponentsBacks(page, "crimson").first()).toBeVisible();
+  await expect(otherBacks(page, "crimson")).toHaveCount(0);
 });
 
 test("a player who can't afford an item can't buy it", async ({ shopper }) => {
@@ -85,7 +94,7 @@ test("a player who can't afford an item can't buy it", async ({ shopper }) => {
   await buy.click({ force: true });
   await expect(page.getByRole("dialog")).toHaveCount(0);
   // The free items are already theirs.
-  await expect(page.getByRole("button", { name: "Use Moon and Compass" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use it: Moon and Compass" })).toBeVisible();
 });
 
 test("a guest can look at the shop but not buy", async ({ page }) => {

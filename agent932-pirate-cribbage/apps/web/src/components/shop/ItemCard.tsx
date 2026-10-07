@@ -113,13 +113,14 @@ export function ItemCard({
                   ? "btn-secondary"
                   : "rounded-xl border border-parchment/25 px-5 py-2.5 font-bold text-parchment/80"
             } aria-disabled:cursor-not-allowed ${cantBuy ? "aria-disabled:opacity-50" : ""}`}
+            // Each name holds the words on the button, so voice control finds it ("Tap Use it").
             aria-label={
               switching
                 ? `Switching to ${item.name}…`
                 : action === "buy"
                   ? `Buy ${item.name} for ${price}`
                   : action === "use"
-                    ? `Use ${item.name}`
+                    ? `Use it: ${item.name}`
                     : `In use: ${item.name}`
             }
             aria-disabled={off || undefined}

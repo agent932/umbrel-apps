@@ -24,19 +24,22 @@ function canChoose(owned: string[]) {
 /**
  * A link to your boards and card backs, whenever there's a choice to make: the shop is open to you,
  * or you own more than one of a kind (a free extra back, or items bought while the shop was open),
- * so you can still switch after it closes.
+ * so you can still switch after it closes. Everyone owns two free card backs, so the link shows
+ * at once rather than after asking the server (which would push the page down under your finger),
+ * and goes only if the server says there's nothing to choose.
  */
 function ShopLink() {
   const { user, loading, shopOpen } = useAuth();
   const visible = shopOpen || !!user?.isAdmin;
-  const [choice, setChoice] = useState(false);
+  const [choice, setChoice] = useState(true);
   useEffect(() => {
     if (loading || visible) return;
     let live = true;
-    // A server without the shop (or no server) leaves the link out.
+    // A server without the shop leaves the link out. With no connection it stays: the shop says
+    // so itself.
     api<ShopResponse>("/api/shop").then(
       (r) => live && setChoice(canChoose(r.owned ?? [])),
-      () => {},
+      (e) => live && e instanceof ApiError && e.status === 404 && setChoice(false),
     );
     return () => {
       live = false;
