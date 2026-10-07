@@ -6,8 +6,10 @@ const FOCUSABLE =
 /** How many open modal dialogs hold each table inert (two can be open at once: a power's panel
  * over the show, say). */
 const inertHolds = new Map<Element, number>();
-/** The open dialogs, newest last: only the newest answers Tab and Escape. */
+/** The open dialogs, top last: only the top one answers Tab and Escape. */
 const openDialogs: HTMLElement[] = [];
+/** Open dialogs that stay on top of any opened after them (the pirate scenes). */
+const onTopDialogs = new Set<HTMLElement>();
 
 function holdInert(el: Element) {
   inertHolds.set(el, (inertHolds.get(el) ?? 0) + 1);
@@ -36,6 +38,9 @@ export interface DialogOptions {
   modal?: boolean;
   /** Focus the panel itself rather than its first button (a menu whose first button leaves the game). */
   focusPanel?: boolean;
+  /** Stays above dialogs that open while it's up (a pirate scene over the show): they open
+   * behind it, and focus goes into them when it closes. */
+  onTop?: boolean;
 }
 
 /**
@@ -46,7 +51,14 @@ export interface DialogOptions {
  */
 export function useDialog(
   panel: RefObject<HTMLElement | null>,
-  { onClose, opener, dismissOutside = false, modal = true, focusPanel = false }: DialogOptions = {},
+  {
+    onClose,
+    opener,
+    dismissOutside = false,
+    modal = true,
+    focusPanel = false,
+    onTop = false,
+  }: DialogOptions = {},
 ) {
   // The latest onClose, without re-adding the listeners every render.
   const close = useRef(onClose);
@@ -65,10 +77,15 @@ export function useDialog(
       ? [...document.querySelectorAll(".table-grid")].filter((t) => !t.contains(panelEl))
       : [];
     behind.forEach(holdInert);
-    openDialogs.push(panelEl);
+    // Opening while a pirate scene is up: open behind it, and leave focus with it.
+    const above = openDialogs.findIndex((d) => onTopDialogs.has(d));
+    const covered = !onTop && above >= 0;
+    if (covered) openDialogs.splice(above, 0, panelEl);
+    else openDialogs.push(panelEl);
+    if (onTop) onTopDialogs.add(panelEl);
 
     // Into the panel, unless something in it already took focus (autoFocus).
-    if (!panelEl.contains(document.activeElement)) {
+    if (!covered && !panelEl.contains(document.activeElement)) {
       const first = focusPanel ? null : focusables(panelEl)[0];
       if (first) first.focus();
       else {
@@ -110,14 +127,17 @@ export function useDialog(
       document.removeEventListener("keydown", onKeyDown);
       behind.forEach(releaseInert);
       openDialogs.splice(openDialogs.indexOf(panelEl), 1);
-      // Back to the button, unless you've already moved on to something else on the page.
+      onTopDialogs.delete(panelEl);
+      // Back to the button, unless you've already moved on to something else on the page. A
+      // scene closing over another dialog hands focus to that dialog instead.
       const active = document.activeElement;
       if (!active || active === document.body || panelEl.contains(active) || !active.isConnected) {
-        const back = openerEl ?? before;
+        const under = onTop ? openDialogs.at(-1) : undefined;
+        const back = under ? (focusables(under)[0] ?? under) : (openerEl ?? before);
         if (back?.isConnected) back.focus();
       }
     };
-  }, [panel, opener, dismissOutside, modal, focusPanel]);
+  }, [panel, opener, dismissOutside, modal, focusPanel, onTop]);
 }
 
 /** The attributes a dialog's panel carries. */

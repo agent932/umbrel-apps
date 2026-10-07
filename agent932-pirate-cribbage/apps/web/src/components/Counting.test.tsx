@@ -83,6 +83,26 @@ describe("CountingShow", () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  it("holds the count while a pirate scene is up, then picks up where it stopped", () => {
+    vi.useFakeTimers();
+    const names: [string, string] = ["You", "Bosun"];
+    const counting = (paused: boolean) => (
+      <CountingShow
+        show={show}
+        cut={parseCard("KS")}
+        names={names}
+        onDone={() => {}}
+        paused={paused}
+      />
+    );
+    const { rerender } = render(counting(true));
+    tick(5000);
+    expect(screen.getByLabelText("Counting the hands")).not.toHaveTextContent(/Fifteen two/);
+    rerender(counting(false));
+    tick(500 + 100);
+    expect(screen.getByLabelText("Counting the hands")).toHaveTextContent(/Fifteen two/);
+  });
+
   it("skips straight to the totals", () => {
     const onDone = vi.fn();
     render(

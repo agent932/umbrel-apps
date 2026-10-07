@@ -37,6 +37,30 @@ export async function startCrewGame(page: Page, rules: "Classic" | "Pirate" = "C
   await expect(hand(page).getByRole("button")).toHaveCount(6);
 }
 
+export const lobby = (page: Page) => page.getByRole("region", { name: "Play online" });
+
+/** One player sends an invite link and the other opens it: both end up at the same table. */
+export async function inviteGame(host: Page, guest: Page, rules: "classic" | "pirate" = "classic") {
+  await host.goto("/cribbage");
+  const choice = lobby(host)
+    .getByRole("group", { name: "Online rules" })
+    .getByRole("button", { name: rules });
+  await choice.click();
+  await expect(choice).toHaveAttribute("aria-pressed", "true");
+  await lobby(host).getByRole("button", { name: "Invite a friend" }).click();
+  const link = await lobby(host).getByLabel("Invite link").inputValue();
+  await guest.goto(new URL(link).pathname);
+  await expect(host).toHaveURL(/\/online\//);
+  await expect(guest).toHaveURL(/\/online\//);
+  await Promise.all([cutForDeal(host), cutForDeal(guest)]);
+}
+
+/** Opens a pirate power's card and uses it. */
+export async function usePower(page: Page, name: string) {
+  await page.getByRole("group", { name: "Pirate powers" }).getByRole("button", { name }).click();
+  await page.getByRole("button", { name: `Use ${name}` }).click();
+}
+
 /** Cut for the deal (again on a tie) until the cards are dealt. The deck is fanned, so like a
  * player, pick the card on top of the fan. */
 export async function cutForDeal(page: Page) {
@@ -48,14 +72,17 @@ export async function cutForDeal(page: Page) {
 }
 
 /**
- * Makes this player's next move if there is one: next round, cut, set sail, throw two to the
- * crib, or play the first card that can be played. Returns false when there's nothing to do yet.
+ * Makes this player's next move if there is one: carry on past a pirate scene, next round, cut,
+ * set sail, throw two to the crib, or play the first card that can be played. Returns false when there's nothing to do yet.
  */
 export async function move(page: Page) {
-  // While a dialog (the Show) covers the table, only its buttons can be pressed.
+  // While a dialog (a pirate scene, or the Show) covers the table, only its buttons work.
   const dialog = page.getByRole("dialog");
   if (await dialog.count()) {
-    return tryClick(dialog.getByRole("button", { name: "Next round", exact: true }));
+    for (const name of ["Carry on", "Next round"]) {
+      if (await tryClick(dialog.getByRole("button", { name, exact: true }))) return true;
+    }
+    return false;
   }
   // Cut for the starter; in pirate games, set sail without using a power before pegging.
   for (const name of ["Cut the deck", "Set sail"]) {
@@ -81,7 +108,9 @@ export async function playToTheEnd(pages: Page[], timeout = 200_000) {
     let over = 0;
     let moved = false;
     for (const page of pages) {
-      if (await gameOver(page).isVisible()) over++;
+      // Over once the result shows with no scene (a skunk's) still up over it.
+      const scene = page.getByRole("button", { name: "Carry on" });
+      if ((await gameOver(page).isVisible()) && !(await scene.count())) over++;
       else if (await move(page)) moved = true;
     }
     if (over === pages.length) return;

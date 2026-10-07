@@ -28,6 +28,8 @@ interface Props {
   instant?: boolean;
   /** How many hands have been counted out, so the board can move their pegs. */
   onReveal?: (counted: number) => void;
+  /** A pirate scene is up: the counting waits behind it. */
+  paused?: boolean;
 }
 
 /** How your throw compared with the best one, by expected points (hand over every cut ± crib). */
@@ -111,11 +113,19 @@ export function RoundSummary({
   isDealer = false,
   instant,
   onReveal,
+  paused,
 }: Props) {
   return (
     <Modal title="The Show" seeBoard shortTitle={false}>
       {/* Count each hand out in order first, then the totals and the next-round button. */}
-      <CountThenShow show={show} cut={cut} names={names} instant={instant} onReveal={onReveal}>
+      <CountThenShow
+        show={show}
+        cut={cut}
+        names={names}
+        instant={instant}
+        onReveal={onReveal}
+        paused={paused}
+      >
         {decision && <DiscardReview decision={decision} isDealer={isDealer} />}
         <ShowList show={show} cut={cut} names={names} />
         {onNext && (

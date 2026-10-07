@@ -74,6 +74,10 @@ export interface OnlineInfo {
   returnBy: [number | null, number | null];
   /** Seats that pressed "Next round" on the summary. */
   nextRoundReady: Seat[];
+  /** Seats still watching the latest pirate scene; the server holds play until it's empty. */
+  sceneWaits: Seat[];
+  /** Tell the server you've seen the scene. */
+  carryOn: () => void;
   forfeit: () => void;
   /** Set when a player lost on time or by leaving. */
   forfeitedBy: Seat | null;
@@ -92,4 +96,9 @@ export interface GameController {
   online?: OnlineInfo;
   /** The server's doubloons for a finished game; undefined for games played in the browser. */
   reward?: Reward | null;
+  /**
+   * Hold the crew's moves (and the deal) while a pirate scene is up. Online games are held by
+   * the server instead.
+   */
+  pause?: (paused: boolean) => void;
 }

@@ -25,11 +25,14 @@ export type ClientMessage =
   | { t: "createInvite"; menu: Menu }
   | { t: "cancelInvite" }
   | { t: "joinInvite"; code: string }
-  | { t: "watch"; gameId: string }
+  /** `carryOn`: this app shows the Carry on button on pirate scenes, so the server waits for it. */
+  | { t: "watch"; gameId: string; carryOn?: boolean }
   | { t: "act"; gameId: string; action: UiAction }
   | { t: "forfeit"; gameId: string }
   | { t: "challenge"; friendId: string; menu: Menu }
   | { t: "emote"; gameId: string; emote: Emote }
+  /** Done watching the pirate scene. */
+  | { t: "carryOn"; gameId: string }
   | { t: "rematch"; gameId: string }
   | { t: "acceptChallenge"; challengeId: string }
   | { t: "declineChallenge"; challengeId: string };
@@ -48,6 +51,8 @@ export type StateMessage = {
   /** When a disconnected player forfeits unless they're back (ms since epoch). */
   returnBy: [number | null, number | null];
   nextRoundReady: Seat[];
+  /** Seats still watching the latest pirate scene; play waits until it's empty. */
+  sceneWaits?: Seat[];
   /** Your doubloons, on the gameOver state sent as the game finishes. */
   reward?: Reward;
 };
@@ -58,7 +63,7 @@ export type ServerMessage =
   | { t: "invite"; code: string }
   | { t: "matched"; gameId: string }
   | StateMessage
-  | { t: "waiting"; gameId: string; for: "nextRound"; ready: Seat[] }
+  | { t: "waiting"; gameId: string; for: "nextRound" | "scene"; ready: Seat[] }
   | {
       t: "presence";
       gameId: string;

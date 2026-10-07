@@ -33,6 +33,8 @@ export const CUT_REVEAL_MS = 2200;
 export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameController {
   const [game, setGame] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  // While a pirate scene is up, the crew and the deal wait.
+  const [paused, setPaused] = useState(false);
   // Latest state for `apply`, so rapid clicks never apply an action to a stale game.
   const gameRef = useRef(game);
   useLayoutEffect(() => {
@@ -55,6 +57,7 @@ export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameC
 
   // The host deals automatically, and the bot takes its turns after a short pause.
   useEffect(() => {
+    if (paused) return;
     const { state, options } = game;
     const house = houseAction(state);
     if (house) {
@@ -72,7 +75,7 @@ export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameC
       delay = Math.max(delay, Math.round(RESET_HOLD_MS * (botDelay / BOT_DELAY_MS)));
     const t = setTimeout(() => apply(move), delay);
     return () => clearTimeout(t);
-  }, [game, apply, botDelay]);
+  }, [game, apply, botDelay, paused]);
 
   return {
     p: game.p,
@@ -81,5 +84,6 @@ export function useLocalGame(initial: LocalGame, botDelay = BOT_DELAY_MS): GameC
     act: (a: UiAction) => apply(toEngineAction(gameRef.current.state, a)),
     error,
     ranked: false,
+    pause: setPaused,
   };
 }

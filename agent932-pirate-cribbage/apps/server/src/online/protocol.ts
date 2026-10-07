@@ -22,13 +22,16 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("createInvite"), menu: Menu }),
   z.object({ t: z.literal("cancelInvite") }),
   z.object({ t: z.literal("joinInvite"), code: z.string().max(20) }),
-  z.object({ t: z.literal("watch"), gameId: z.string().uuid() }),
+  /** `carryOn`: this app shows the Carry on button on pirate scenes (older iPhone builds don't). */
+  z.object({ t: z.literal("watch"), gameId: z.string().uuid(), carryOn: z.boolean().optional() }),
   z.object({ t: z.literal("act"), gameId: z.string().uuid(), action: ClientAction }),
   z.object({ t: z.literal("forfeit"), gameId: z.string().uuid() }),
   z.object({ t: z.literal("challenge"), friendId: z.string().uuid(), menu: Menu }),
   z.object({ t: z.literal("acceptChallenge"), challengeId: z.string().max(40) }),
   z.object({ t: z.literal("declineChallenge"), challengeId: z.string().max(40) }),
   z.object({ t: z.literal("emote"), gameId: z.string().uuid(), emote: Emote }),
+  /** Done watching the pirate scene; play goes on once both players are. */
+  z.object({ t: z.literal("carryOn"), gameId: z.string().uuid() }),
   /** Play the same opponent again with the same rules (unranked games only). */
   z.object({ t: z.literal("rematch"), gameId: z.string().uuid() }),
 ]);
@@ -54,10 +57,13 @@ export type ServerMessage =
       online: [boolean, boolean];
       returnBy: [number | null, number | null];
       nextRoundReady: Seat[];
+      /** Seats still watching the latest pirate scene; play waits until it's empty. */
+      sceneWaits: Seat[];
       /** This player's doubloons, on the gameOver state sent as the game finishes. */
       reward?: Reward;
     }
-  | { t: "waiting"; gameId: string; for: "nextRound"; ready: Seat[] }
+  /** Who's ready: for the next round, or (for "scene") who has carried on past the scene. */
+  | { t: "waiting"; gameId: string; for: "nextRound" | "scene"; ready: Seat[] }
   | {
       t: "presence";
       gameId: string;

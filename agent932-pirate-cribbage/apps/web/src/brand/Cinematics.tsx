@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import type { GameEvent, PowerId, Seat } from "@pirate/engine";
+import { useEffect, useRef, useState } from "react";
+import { type GameEvent, type PowerId, type Seat, other } from "@pirate/engine";
+import { dialogProps, useDialog } from "../components/useDialog.js";
 import { useSettings } from "../settings.js";
 
 /** The short pirate scenes, and which game moment plays each one. */
@@ -24,7 +25,7 @@ const POWER_SCENES: Record<PowerId, Scene> = {
   belay: "slash",
 };
 
-/** How long a scene plays: each painted clip (in public/cinematics) is 3.4 seconds. */
+/** How long a scene's painted clip (in public/cinematics) plays: 3.4 seconds. */
 export const SCENE_MS = 3400;
 
 /** The most dramatic scene for a batch of events (and a caption), or null. */
@@ -44,8 +45,9 @@ export function sceneFor(
     if (!best || rank > best.rank) best = { rank, scene, caption, effect };
   };
   const who = (s: Seat) => names[s];
-  /** "You find" / "Bosun Barnaby finds". */
-  const does = (s: Seat, verb: string) => (s === me ? `You ${verb}` : `${who(s)} ${verb}s`);
+  /** "You find" / "Bosun Barnaby finds" (or "spies", given as `theirs`). */
+  const does = (s: Seat, verb: string, theirs = `${verb}s`) =>
+    s === me ? `You ${verb}` : `${who(s)} ${theirs}`;
   const points = (n: number, s: Seat): SceneEffect => ({
     text: `${n > 0 ? "+" : "−"}${Math.abs(n)} point${Math.abs(n) === 1 ? "" : "s"} to ${s === me ? "You" : who(s)}`,
     good: n > 0,
@@ -54,11 +56,11 @@ export function sceneFor(
     switch (e.type) {
       case "power": {
         const captions: Record<PowerId, string> = {
-          spyglass: `${who(e.seat)} spies from the crow's nest!`,
+          spyglass: `${does(e.seat, "spy", "spies")} from the crow's nest!`,
           crowsNest: `${does(e.seat, "fire")} from the crow's nest: the cut is revealed!`,
-          parley: `${who(e.seat)} swings in for a parley!`,
-          pickpocket: `${who(e.seat)} pinches some loot!`,
-          rebury: `${who(e.seat)} reburies the treasure`,
+          parley: `${does(e.seat, "swing")} in for a parley!`,
+          pickpocket: `${does(e.seat, "pinch", "pinches")} some loot!`,
+          rebury: `${does(e.seat, "rebury", "reburies")} the treasure`,
           belay: `${does(e.seat, "cry")} "Belay that!"`,
         };
         pick(
@@ -108,7 +110,9 @@ export function sceneFor(
 /* ---------- Characters and props, drawn in a 400×240 scene ---------- */
 
 /**
- * Plays the pirate scene for the latest game events: a few seconds, tap to skip.
+ * Plays the pirate scene for the latest game events. It stays up until the player taps Carry on,
+ * and play waits behind it (`onActive` tells the table). Online, the scene stays until both
+ * players have carried on, showing who is still watching.
  * With animations off in Settings, or for people who prefer reduced motion, a still frame shows.
  * While `hold` is on (the last card of pegging is still on the table), scenes wait their turn
  * and play, one after another, once it's lifted.
@@ -118,11 +122,17 @@ export function Cinematics({
   names,
   me,
   hold = false,
+  onActive,
+  online,
 }: {
   events: GameEvent[];
   names: [string, string];
   me: Seat;
   hold?: boolean;
+  /** Whether a scene is up or waiting its turn, so the table can pause behind it. */
+  onActive?: (active: boolean) => void;
+  /** Online: the seats the server is still waiting on, and how to tell it you've carried on. */
+  online?: { waits: Seat[]; carryOn: () => void };
 }) {
   const { animations } = useSettings();
   const reduceMotion =
@@ -134,46 +144,91 @@ export function Cinematics({
   const [queue, setQueue] = useState<
     { scene: Scene; caption: string; effect?: SceneEffect; key: number }[]
   >([]);
+  // Online: the scene you've carried on from, while your opponent is still watching it.
+  const [tapped, setTapped] = useState<number | null>(null);
 
   useEffect(() => {
     const next = sceneFor(events, names, me);
     if (!next) return;
     const scene = { ...next, key: Date.now() };
-    // In normal play the newest scene takes over; during the hold they line up.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setQueue((q) => (hold ? [...q, scene] : [scene]));
+    setQueue((q) => [...q, scene]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events]);
+  const active = queue.length > 0;
+  useEffect(() => onActive?.(active), [active, onActive]);
+
   const playing = hold ? null : (queue[0] ?? null);
+  const opponentWatching = !!online?.waits.includes(other(me));
+  const waiting = !!playing && tapped === playing.key && opponentWatching;
+  // Online: once your opponent has carried on too, the scene you tapped closes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (playing && tapped === playing.key && !opponentWatching) setQueue((q) => q.slice(1));
+  }, [playing, tapped, opponentWatching]);
+
+  function carryOn() {
     if (!playing) return;
-    const t = setTimeout(() => setQueue((q) => q.slice(1)), SCENE_MS);
-    return () => clearTimeout(t);
-  }, [playing]);
+    if (!online) return setQueue((q) => q.slice(1));
+    online.carryOn();
+    setTapped(playing.key);
+  }
 
   if (!playing) return null;
   return (
-    <div
+    <ScenePanel
       key={playing.key}
+      scene={playing}
+      still={still}
+      waitingFor={waiting ? names[other(me)] : null}
+      onCarryOn={carryOn}
+    />
+  );
+}
+
+/** The scene on screen: a dialog over everything (even a show opening behind it). */
+function ScenePanel({
+  scene,
+  still,
+  waitingFor,
+  onCarryOn,
+}: {
+  scene: { scene: Scene; caption: string; effect?: SceneEffect };
+  still: boolean;
+  /** Online, after you've carried on: who is still watching. */
+  waitingFor: string | null;
+  onCarryOn: () => void;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  useDialog(panel, { onTop: true });
+  return (
+    <div
+      ref={panel}
       className="fixed inset-0 z-40 grid place-items-center bg-night/60 p-4 backdrop-blur-[2px]"
-      onClick={() => setQueue((q) => q.slice(1))}
-      role="status"
-      aria-label={playing.effect ? `${playing.caption} ${playing.effect.text}` : playing.caption}
-      style={{ animation: `cin-fade ${SCENE_MS}ms ease-in-out forwards` }}
+      {...dialogProps(scene.effect ? `${scene.caption} ${scene.effect.text}` : scene.caption)}
+      style={{ animation: "cin-fade 300ms ease-out both" }}
     >
       <div className="flex w-full max-w-lg flex-col items-center gap-2">
-        <SceneMedia scene={playing.scene} still={still} />
+        <SceneMedia scene={scene.scene} still={still} />
         <p className="text-center font-pirate text-3xl text-gold lantern-glow sm:text-4xl">
-          {playing.caption}
+          {scene.caption}
         </p>
-        {playing.effect && (
+        {scene.effect && (
           <p
-            className={`rounded-full px-4 py-1 text-lg font-extrabold ${playing.effect.good ? "bg-gold/25 text-gold" : "bg-red-900/60 text-red-200"}`}
+            className={`rounded-full px-4 py-1 text-lg font-extrabold ${scene.effect.good ? "bg-gold/25 text-gold" : "bg-red-900/60 text-red-200"}`}
           >
-            {playing.effect.text}
+            {scene.effect.text}
           </p>
         )}
-        <p className="text-xs text-parchment/50">tap to skip</p>
+        {waitingFor ? (
+          <p role="status" className="min-h-11 py-2 text-parchment/80">
+            Waiting for {waitingFor}…
+          </p>
+        ) : (
+          <button type="button" className="btn-primary min-w-40" autoFocus onClick={onCarryOn}>
+            Carry on
+          </button>
+        )}
       </div>
     </div>
   );

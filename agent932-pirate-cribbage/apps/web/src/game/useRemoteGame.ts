@@ -21,6 +21,8 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
   const [queue, setQueue] = useState<Step[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // While a pirate scene is up, the crew's moves wait to be shown (and the Belay window too).
+  const [paused, setPaused] = useState(false);
   // Your doubloons, from the response that finished the game.
   const [reward, setReward] = useState<Reward | null>(null);
   // Ignore clicks while a move is in flight or the bot's moves are still playing out.
@@ -58,7 +60,7 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
   // Play queued steps one by one.
   useEffect(() => {
     const [next, ...rest] = queue;
-    if (!next) return;
+    if (!next || paused) return;
     const quick = next.events.some((e) => e.type === "dealt");
     // After a run ends (31 or a Go), let its last card be seen before the bot leads again.
     const afterReset = p.lastEvents.some((e) => e.type === "reset");
@@ -73,12 +75,12 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
     }, wait);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue, botDelay]);
+  }, [queue, botDelay, paused]);
 
   // The server pauses before the bot plays over your card, in case you want to Belay That!
   const v = p.view;
   const pausedForBelay =
-    !sending && queue.length === 0 && v.phase === "pegging" && v.toAct.includes(1);
+    !paused && !sending && queue.length === 0 && v.phase === "pegging" && v.toAct.includes(1);
   useEffect(() => {
     if (!pausedForBelay) return;
     const t = setTimeout(() => void send({ type: "continue" }), botDelay > 0 ? BELAY_WINDOW_MS : 0);
@@ -93,5 +95,6 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
     error,
     ranked: true,
     reward,
+    pause: setPaused,
   };
 }

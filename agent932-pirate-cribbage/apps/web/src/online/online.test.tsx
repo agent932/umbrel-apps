@@ -125,7 +125,7 @@ describe("online game screen", () => {
     render(<OnlineTable gameId={gameId} />);
     await opened();
     const ws = FakeSocket.last!;
-    expect(ws.sent).toContainEqual({ t: "watch", gameId });
+    expect(ws.sent).toContainEqual({ t: "watch", gameId, carryOn: true });
 
     // We're seat 1 in this game.
     const state = applyAction(createGame(0, CLASSIC_RULES), {

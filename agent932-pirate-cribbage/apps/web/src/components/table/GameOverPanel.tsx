@@ -30,6 +30,7 @@ export function GameOverPanel({
   tutorial,
   level,
   onReveal,
+  paused,
   onPlayAgain,
   onExit,
 }: {
@@ -53,6 +54,8 @@ export function GameOverPanel({
   level?: BotLevel | null;
   /** How many hands have been counted out, so the board can move their pegs. */
   onReveal?: (counted: number) => void;
+  /** A pirate scene is up: the final count waits behind it. */
+  paused?: boolean;
   onPlayAgain: () => void;
   onExit: () => void;
 }) {
@@ -61,7 +64,14 @@ export function GameOverPanel({
   return (
     <Modal title={winner === me ? "Victory!" : "Defeat…"} seeBoard>
       {winner === me && <img src={flagUrl} alt="" className="mx-auto -mt-2 mb-2 h-16 w-auto" />}
-      <CountThenShow show={show} cut={cut} names={label} instant={instant} onReveal={onReveal}>
+      <CountThenShow
+        show={show}
+        cut={cut}
+        names={label}
+        instant={instant}
+        onReveal={onReveal}
+        paused={paused}
+      >
         {online?.forfeitedBy != null && (
           <p className="mb-2 text-center text-parchment/80">
             {online.forfeitedBy === me ? "You abandoned ship." : `${oppName} abandoned ship.`}

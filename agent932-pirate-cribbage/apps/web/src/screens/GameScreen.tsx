@@ -77,6 +77,19 @@ export function GameScreen({
   // During the show the pegs, sounds and log wait for each hand to be counted out.
   const shown = useShowReveal(p, !!instant);
   const events = shown.events;
+  // A pirate scene is up (or waiting its turn): the crew, the deal and the counting wait behind it.
+  const [sceneUp, setSceneUp] = useState(false);
+  const pause = game.pause;
+  useEffect(() => pause?.(sceneUp), [pause, sceneUp]);
+  // Online the server waits for you to carry on past a scene. With no scene here to show (you
+  // came back after it played), carry on at once rather than hold up the game.
+  const owesCarryOn = !!online?.sceneWaits.includes(me) && !sceneUp;
+  const carryOnline = online?.carryOn;
+  useEffect(() => {
+    if (!owesCarryOn || !carryOnline) return;
+    const t = setTimeout(carryOnline, 1500);
+    return () => clearTimeout(t);
+  }, [owesCarryOn, carryOnline]);
   const { speed } = useSettings();
 
   // Sound effects for each new step.
@@ -384,7 +397,14 @@ export function GameScreen({
       <CutReveal events={p.lastEvents} names={label} me={me} />
       {!instant && <ScorePops events={events} me={me} names={label} />}
       {!instant && (
-        <Cinematics events={events} names={label} me={me} hold={!!lastPlay || !!runOver} />
+        <Cinematics
+          events={events}
+          names={label}
+          me={me}
+          hold={!!lastPlay || !!runOver}
+          onActive={setSceneUp}
+          online={online && { waits: online.sceneWaits, carryOn: online.carryOn }}
+        />
       )}
 
       {view.phase === "roundEnd" && !lastPlay && (
@@ -396,6 +416,7 @@ export function GameScreen({
           waitingNote={online && !waitingForMe ? `Waiting for ${oppName}…` : undefined}
           instant={instant}
           onReveal={shown.reveal}
+          paused={sceneUp}
           decision={view.myDiscardDecision}
           isDealer={view.dealer === me}
         />
@@ -418,6 +439,7 @@ export function GameScreen({
           tutorial={!!tutorial}
           level={game.level}
           onReveal={shown.reveal}
+          paused={sceneUp}
           onPlayAgain={onPlayAgain}
           onExit={onExit}
         />

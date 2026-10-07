@@ -14,6 +14,7 @@ import {
   newGame,
   cryptoRandom,
   other,
+  playsScene,
   rateGame,
   redactEvent,
   shuffle,
@@ -86,6 +87,10 @@ export function forfeitState(current: GameState, seat: Seat): GameState {
 class Room {
   readonly clients: [Set<Client>, Set<Client>] = [new Set(), new Set()];
   nextRoundVotes = new Set<Seat>();
+  /** Seats still watching the latest pirate scene. Play waits until nobody is. */
+  sceneWaits = new Set<Seat>();
+  /** Connections whose app has the Carry on button (older iPhone builds don't). */
+  readonly carriesOn = new WeakSet<Client>();
   /** When each seat last called out an emote (rate limit). */
   lastEmote: [number, number] = [0, 0];
   turnTimer: ReturnType<typeof setTimeout> | null = null;
@@ -122,6 +127,11 @@ class Room {
 
   online(seat: Seat) {
     return this.clients[seat].size > 0;
+  }
+
+  /** Whether this seat has an app open that can carry on past a scene. */
+  canCarryOn(seat: Seat) {
+    return [...this.clients[seat]].some((c) => this.carriesOn.has(c));
   }
 }
 
@@ -208,13 +218,14 @@ export class RoomManager {
   }
 
   /** Connect a client to their seat and send them the current state. */
-  async join(gameId: string, userId: string, client: Client): Promise<void> {
+  async join(gameId: string, userId: string, client: Client, carryOn = false): Promise<void> {
     const room = await this.load(gameId);
     if (!room) throw new RoomError("That game isn't running");
     const seat = room.seatOf(userId);
     if (seat === null) throw new RoomError("You're not in that game");
     await room.run(async () => {
       const wasOnline = room.online(seat);
+      if (carryOn) room.carriesOn.add(client);
       room.clients[seat].add(client);
       if (room.disconnectTimers[seat]) {
         clearTimeout(room.disconnectTimers[seat]!);
@@ -232,8 +243,11 @@ export class RoomManager {
     if (!room) return;
     void room.run(async () => {
       for (const seat of [0, 1] as Seat[]) {
-        if (!room.clients[seat].delete(client) || room.online(seat)) continue;
-        this.awayClock(room, seat);
+        if (!room.clients[seat].delete(client)) continue;
+        // Nobody left on this seat to carry on past the scene: stop waiting for them.
+        if (!room.canCarryOn(seat) && room.sceneWaits.delete(seat) && !room.sceneWaits.size)
+          this.resume(room);
+        if (!room.online(seat)) this.awayClock(room, seat);
       }
     });
   }
@@ -281,6 +295,7 @@ export class RoomManager {
     if (action.type === "continue") return;
     await room.run(async () => {
       if (room.state.phase === "gameOver") throw new RoomError("The game is over");
+      if (room.sceneWaits.size) throw new RoomError("Waiting for both players to carry on");
       if (action.type === "nextRound") return this.voteNextRound(room, seat);
       await this.apply(room, toEngineAction(room.state, seat, action));
     });
@@ -300,6 +315,33 @@ export class RoomManager {
     const hidden = await isBlocking(this.db, room.players[other].userId, userId);
     for (const s of hidden ? [seat] : ([0, 1] as Seat[]))
       for (const client of room.clients[s]) client.send(message);
+  }
+
+  /** A player has seen the pirate scene. Once nobody is still watching it, play goes on. */
+  async carryOn(gameId: string, userId: string): Promise<void> {
+    // A game that has finished (and closed) has nothing waiting: a skunk's scene at the end.
+    const room = this.rooms.get(gameId);
+    if (!room) return;
+    const seat = room.seatOf(userId);
+    if (seat === null) throw new RoomError("You're not in that game");
+    await room.run(async () => {
+      if (!room.sceneWaits.delete(seat)) return;
+      if (!room.sceneWaits.size) return this.resume(room);
+      this.broadcast(room, () => ({
+        t: "waiting",
+        gameId: room.id,
+        for: "scene",
+        ready: ([0, 1] as Seat[]).filter((s) => !room.sceneWaits.has(s)),
+      }));
+    });
+  }
+
+  /** Nobody is watching the scene any more: the move clock starts again and both are told. */
+  private resume(room: Room) {
+    room.sceneWaits.clear();
+    this.schedule(room);
+    for (const seat of [0, 1] as Seat[])
+      for (const client of room.clients[seat]) this.sendState(room, seat, client, []);
   }
 
   /** Who played a finished online game and how, for a rematch. Null if it isn't one. */
@@ -380,6 +422,10 @@ export class RoomManager {
     room.state = state;
 
     const finished = state.phase === "gameOver";
+    // A pirate scene stops play until each player carries on. The show already waits for both
+    // players, and a finished game has nothing left to wait for.
+    const scene = !finished && state.phase !== "roundEnd" && events.some(playsScene);
+    room.sceneWaits = new Set(scene ? ([0, 1] as Seat[]).filter((s) => room.canCarryOn(s)) : []);
     // A finished game is saved by finish(), in the same transaction that records and pays it.
     const rewards = finished ? await this.finish(room, null, before) : null;
     if (!finished) {
@@ -527,6 +573,8 @@ export class RoomManager {
       void room
         .run(async () => {
           if (room.state.phase === "gameOver") return;
+          // A scene left up too long: carry on for whoever hasn't, and the move clock restarts.
+          if (room.sceneWaits.size) return this.resume(room);
           if (room.state.phase === "roundEnd") return this.apply(room, { type: "nextRound" });
           for (const seat of toAct(room.state)) {
             const move = botAction(room.state, seat, "medium", cryptoRandom);
@@ -562,6 +610,7 @@ export class RoomManager {
       online: [room.online(0), room.online(1)],
       returnBy: room.returnBy,
       nextRoundReady: [...room.nextRoundVotes],
+      sceneWaits: [...room.sceneWaits],
       ...(reward && { reward }),
     });
   }

@@ -17,6 +17,7 @@ interface OnlineState {
   online: [boolean, boolean];
   returnBy: [number | null, number | null];
   nextRoundReady: Seat[];
+  sceneWaits: Seat[];
   forfeitedBy: Seat | null;
   /** Your doubloons, sent with the state that ends the game. */
   reward: Reward | null;
@@ -43,6 +44,7 @@ export function useOnlineGame(
     online: [true, true],
     returnBy: [null, null],
     nextRoundReady: [],
+    sceneWaits: [],
     forfeitedBy: null,
     reward: null,
     error: null,
@@ -72,13 +74,18 @@ export function useOnlineGame(
               online: m.online,
               returnBy: m.returnBy ?? [null, null],
               nextRoundReady: m.nextRoundReady,
+              sceneWaits: m.sceneWaits ?? [],
               reward: m.reward ?? prev.reward,
               error: null,
             };
           });
           break;
         case "waiting":
-          setS((prev) => ({ ...prev, nextRoundReady: m.ready }));
+          setS((prev) =>
+            m.for === "scene"
+              ? { ...prev, sceneWaits: ([0, 1] as Seat[]).filter((s) => !m.ready.includes(s)) }
+              : { ...prev, nextRoundReady: m.ready },
+          );
           break;
         case "presence":
           setS((prev) => ({ ...prev, online: m.online, returnBy: m.returnBy ?? [null, null] }));
@@ -101,7 +108,7 @@ export function useOnlineGame(
       }
     });
     // Subscribe now and after every reconnect; the server answers with the full current state.
-    const stopOpen = socket.onOpen(() => socket.send({ t: "watch", gameId }));
+    const stopOpen = socket.onOpen(() => socket.send({ t: "watch", gameId, carryOn: true }));
     return () => {
       stopOpen();
       stopListening();
@@ -130,6 +137,8 @@ export function useOnlineGame(
       online: s.online,
       returnBy: s.returnBy,
       nextRoundReady: s.nextRoundReady,
+      sceneWaits: s.sceneWaits,
+      carryOn: () => socket.send({ t: "carryOn", gameId }),
       forfeitedBy: s.forfeitedBy,
       forfeit: () => socket.send({ t: "forfeit", gameId }),
     },

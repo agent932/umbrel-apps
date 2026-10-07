@@ -58,6 +58,8 @@ const forfeited = (forfeitedBy: Seat): OnlineInfo => ({
   rematchGameId: null,
   returnBy: [null, null],
   nextRoundReady: [],
+  sceneWaits: [],
+  carryOn: () => {},
   forfeit: () => {},
   forfeitedBy,
 });

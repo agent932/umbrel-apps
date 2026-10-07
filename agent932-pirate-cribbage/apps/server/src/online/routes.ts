@@ -164,7 +164,7 @@ export async function onlineRoutes(
             await matchmaker.joinInvite(seeker, msg.code);
             break;
           case "watch":
-            await rooms.join(msg.gameId, user.id, client);
+            await rooms.join(msg.gameId, user.id, client, msg.carryOn === true);
             watching.add(msg.gameId);
             break;
           case "act":
@@ -181,6 +181,9 @@ export async function onlineRoutes(
             break;
           case "emote":
             await rooms.emote(msg.gameId, user.id, msg.emote);
+            break;
+          case "carryOn":
+            await rooms.carryOn(msg.gameId, user.id);
             break;
           case "rematch":
             await matchmaker.rematch(seeker, msg.gameId);

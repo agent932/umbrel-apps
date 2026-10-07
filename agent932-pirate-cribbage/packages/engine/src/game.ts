@@ -224,6 +224,24 @@ export type GameEvent =
   | { type: "belayed"; seat: Seat; card: Card }
   | { type: "gameOver"; winner: Seat; skunk: 0 | 1 | 2 };
 
+/**
+ * Whether an event plays a pirate scene at the table: a power, buried treasure, the Kraken, the
+ * Black Spot, or a skunk. Play waits behind the scene until each player carries on.
+ */
+export function playsScene(event: GameEvent): boolean {
+  switch (event.type) {
+    case "power":
+    case "treasure":
+    case "kraken":
+    case "blackSpot":
+      return true;
+    case "gameOver":
+      return event.skunk > 0;
+    default:
+      return false;
+  }
+}
+
 export class IllegalActionError extends Error {}
 
 export interface ActionResult {

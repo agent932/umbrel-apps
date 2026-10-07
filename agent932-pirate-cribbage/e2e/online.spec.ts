@@ -1,24 +1,5 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
-import { cutForDeal, gameOver, playToTheEnd } from "./table.js";
-
-const lobby = (page: Page) => page.getByRole("region", { name: "Play online" });
-
-/** One player sends an invite link and the other opens it: both end up at the same table. */
-async function inviteGame(host: Page, guest: Page, rules: "classic" | "pirate" = "classic") {
-  await host.goto("/cribbage");
-  const choice = lobby(host)
-    .getByRole("group", { name: "Online rules" })
-    .getByRole("button", { name: rules });
-  await choice.click();
-  await expect(choice).toHaveAttribute("aria-pressed", "true");
-  await lobby(host).getByRole("button", { name: "Invite a friend" }).click();
-  const link = await lobby(host).getByLabel("Invite link").inputValue();
-  await guest.goto(new URL(link).pathname);
-  await expect(host).toHaveURL(/\/online\//);
-  await expect(guest).toHaveURL(/\/online\//);
-  await Promise.all([cutForDeal(host), cutForDeal(guest)]);
-}
+import { gameOver, inviteGame, lobby, playToTheEnd } from "./table.js";
 
 test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });

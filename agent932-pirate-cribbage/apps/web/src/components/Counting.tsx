@@ -99,12 +99,15 @@ export function CountingShow({
   names,
   onDone,
   onReveal,
+  paused,
 }: {
   show: ShowEvent[];
   cut: CardType | null;
   names: [string, string];
   onDone: () => void;
   onReveal?: (counted: number) => void;
+  /** Hold the count (a pirate scene is up); it picks up where it stopped. */
+  paused?: boolean;
 }) {
   const [hand, setHand] = useState(0);
   const [step, setStep] = useState(0);
@@ -131,6 +134,7 @@ export function CountingShow({
       onDone();
       return;
     }
+    if (paused) return;
     const lastStep = step >= steps.length;
     // Hands with lots to call (like a 29) count faster, so none takes too long.
     const stepMs = steps.length > 8 ? 320 : STEP_MS;
@@ -148,7 +152,7 @@ export function CountingShow({
     );
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hand, step, current]);
+  }, [hand, step, current, paused]);
 
   // When the calls fill their box (short landscape phones), keep the newest in view.
   const lines = useRef<HTMLDivElement>(null);
@@ -268,12 +272,15 @@ export function CountThenShow({
   names,
   instant,
   onReveal,
+  paused,
   children,
 }: {
   show: ShowEvent[];
   cut: CardType | null;
   names: [string, string];
   instant?: boolean;
+  /** A pirate scene is up: the counting waits behind it. */
+  paused?: boolean;
   /** How many hands have been counted out so far (all of them once the totals show). */
   onReveal?: (counted: number) => void;
   children: React.ReactNode;
@@ -295,6 +302,7 @@ export function CountThenShow({
         names={names}
         onDone={() => setCounted(true)}
         onReveal={onReveal}
+        paused={paused}
       />
     );
   return <>{children}</>;
