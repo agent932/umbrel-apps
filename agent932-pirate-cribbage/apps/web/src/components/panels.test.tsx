@@ -146,3 +146,34 @@ describe("menus close when you're done with them", () => {
     expect(wheel).toHaveFocus();
   });
 });
+
+describe("the table menu says whose board it is", () => {
+  const menu = (hostIsYou?: boolean) =>
+    render(
+      <TableMenu
+        round={2}
+        pirate={false}
+        oppName="Anne"
+        hostIsYou={hostIsYou}
+        onExit={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+  it("online: yours when you host, otherwise the other player's", () => {
+    const { unmount } = menu(true);
+    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveTextContent(
+      "Board and card backs: yours",
+    );
+    unmount();
+    menu(false);
+    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveTextContent(
+      "Board and card backs: Anne's",
+    );
+  });
+
+  it("says nothing against the crew, where they're always yours", () => {
+    menu();
+    expect(screen.getByRole("dialog", { name: "Menu" })).not.toHaveTextContent(/Board and card/);
+  });
+});

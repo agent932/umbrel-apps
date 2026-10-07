@@ -1,11 +1,6 @@
 import type { Card as CardType } from "@pirate/engine";
 import { cardLabel } from "@pirate/engine";
-import cardBackUrl from "../assets/table/card-back.webp";
-import jackUrl from "../assets/table/court-jack.webp";
-import queenUrl from "../assets/table/court-queen.webp";
-import kingUrl from "../assets/table/court-king.webp";
-
-const COURT = { 11: jackUrl, 12: queenUrl, 13: kingUrl } as const;
+import { useDeckSkin, useFaceStyle } from "../brand/cosmetics.js";
 
 const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" } as const;
 const SUIT_NAME = { S: "spades", H: "hearts", D: "diamonds", C: "clubs" } as const;
@@ -54,6 +49,9 @@ export function Card({
   onClick,
   label,
 }: CardProps) {
+  // The back is the table's (the host's online); the faces are always the viewer's own.
+  const deck = useDeckSkin();
+  const faces = useFaceStyle();
   const size = fluid
     ? "t-card"
     : small
@@ -66,10 +64,12 @@ export function Card({
     return (
       <div
         className={`${base} bg-cover bg-center`}
-        // Quoted: Vite may inline the SVG as a data URI containing quotes and spaces.
-        style={{ backgroundImage: `url("${cardBackUrl}")` }}
+        // Quoted: Vite may inline the SVG as a data URI containing quotes and spaces. The field
+        // colour underneath keeps a back that hasn't loaded yet looking like a card.
+        style={{ backgroundImage: `url("${deck.backUrl}")`, backgroundColor: deck.backColor }}
         aria-label={label ?? "Face-down card"}
         role="img"
+        data-deck={deck.id}
       />
     );
   }
@@ -98,10 +98,11 @@ export function Card({
         {index}
       </span>
       {face ? (
-        // Painted pirate portraits for the jack, queen and king, framed between the corners.
+        // The face style's court art (the pirate portraits) for the jack, queen and king, framed
+        // between the corners.
         <span
           className="absolute inset-x-[21%] inset-y-[11%] rounded-[3px] border border-[#b7a374] bg-cover bg-top shadow-inner"
-          style={{ backgroundImage: `url("${COURT[card.rank as 11 | 12 | 13]}")` }}
+          style={{ backgroundImage: `url("${faces.courts[card.rank as 11 | 12 | 13]}")` }}
           aria-hidden
         />
       ) : (

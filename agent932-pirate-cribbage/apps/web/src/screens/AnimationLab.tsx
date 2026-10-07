@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { PIRATE_RULES, parseCard, parseCards, scoreHand } from "@pirate/engine";
+import { useMemo, useState } from "react";
+import { DEFAULT_COSMETICS, PIRATE_RULES, parseCard, parseCards, scoreHand } from "@pirate/engine";
 import { ALL_SCENES, SceneOnce } from "../brand/Cinematics.js";
+import { listBoards } from "../brand/boardSkins.js";
+import { CosmeticsProvider } from "../brand/cosmetics.js";
+import { listDecks } from "../brand/deckSkins.js";
 import { Card } from "../components/Card.js";
 import { CountingShow } from "../components/Counting.js";
 import { PaintedBoard } from "../components/table/PaintedBoard.js";
@@ -18,13 +21,16 @@ const CAPTIONS: Record<string, string> = {
   island: "Bosun is marooned!",
 };
 
-/** Development-only page: play any pirate scene or a sample count on demand. */
+/** Development-only page: play any pirate scene or a sample count on demand, and look at each
+ *  board and card back. */
 export function AnimationLab() {
   const [scene, setScene] = useState<string | null>(null);
   const [run, setRun] = useState(0);
   const [counting, setCounting] = useState(false);
   const [pegs, setPegs] = useState<[number, number]>([60, 85]);
-  const [skinId, setSkinId] = useState("serpent-reef");
+  const [board, setBoard] = useState(DEFAULT_COSMETICS.board);
+  const [deck, setDeck] = useState(DEFAULT_COSMETICS.deck);
+  const cosmetics = useMemo(() => ({ board, deck }), [board, deck]);
   const [upright, setUpright] = useState(true);
   const cut = parseCard("5S");
   const show = [
@@ -98,9 +104,19 @@ export function AnimationLab() {
               {pegs[i]}
             </label>
           ))}
-          <select value={skinId} onChange={(e) => setSkinId(e.target.value)}>
-            <option value="serpent-reef">Serpent Reef</option>
-            <option value="classic-serpent">Classic Serpent</option>
+          <select aria-label="Board" value={board} onChange={(e) => setBoard(e.target.value)}>
+            {listBoards().map(({ key, skin }) => (
+              <option key={key} value={key}>
+                {skin.name}
+              </option>
+            ))}
+          </select>
+          <select aria-label="Card back" value={deck} onChange={(e) => setDeck(e.target.value)}>
+            {listDecks().map(({ key, skin }) => (
+              <option key={key} value={key}>
+                {skin.name}
+              </option>
+            ))}
           </select>
           <label className="flex items-center gap-1">
             <input
@@ -119,29 +135,40 @@ export function AnimationLab() {
             names={["You", "Opponent"]}
             me={0}
             upright={upright}
-            skinId={skinId}
+            skinId={board}
           />
         </div>
       </section>
-      {/* Every court card at every size the game uses, to check the corners stay readable. */}
-      <section className="panel flex flex-col gap-4 p-4" aria-label="Court cards">
-        {(["small", "normal", "fluid"] as const).map((size) => (
-          <div
-            key={size}
-            className="flex flex-wrap gap-2"
-            style={size === "fluid" ? ({ "--h": "150px" } as React.CSSProperties) : undefined}
-          >
-            {parseCards("JH QS KD JC 10H").map((c) => (
-              <Card
-                key={size + c.rank + c.suit}
-                card={c}
-                small={size === "small"}
-                fluid={size === "fluid"}
-              />
-            ))}
-          </div>
-        ))}
-      </section>
+      {/* Every court card at every size the game uses, to check the corners stay readable, with
+          the chosen back beside them as a table would draw it. */}
+      <CosmeticsProvider value={cosmetics}>
+        <section className="panel flex flex-col gap-4 p-4" aria-label="Court cards">
+          {(["small", "normal", "fluid"] as const).map((size) => (
+            <div
+              key={size}
+              className="flex flex-wrap gap-2"
+              style={size === "fluid" ? ({ "--h": "150px" } as React.CSSProperties) : undefined}
+            >
+              {parseCards("JH QS KD JC 10H").map((c) => (
+                <Card
+                  key={size + c.rank + c.suit}
+                  card={c}
+                  small={size === "small"}
+                  fluid={size === "fluid"}
+                />
+              ))}
+              {[0, 1].map((i) => (
+                <Card
+                  key={`${size}-back-${i}`}
+                  hidden
+                  small={size === "small"}
+                  fluid={size === "fluid"}
+                />
+              ))}
+            </div>
+          ))}
+        </section>
+      </CosmeticsProvider>
     </main>
   );
 }

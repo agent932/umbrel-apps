@@ -1,5 +1,13 @@
 import type { Emote } from "../online/protocol.js";
-import type { BotLevel, Card, GameEvent, PlayerView, Reward, Seat } from "@pirate/engine";
+import type {
+  BotLevel,
+  Card,
+  GameEvent,
+  OnlineCosmetics,
+  PlayerView,
+  Reward,
+  Seat,
+} from "@pirate/engine";
 
 /** What the table asks for. Seats and randomness are filled in by whoever runs the game. */
 export type UiAction =
@@ -61,6 +69,9 @@ export interface OnlineInfo {
   online: [boolean, boolean];
   /** Each player's crew portrait (1-8), or null for their initial. */
   avatars: [number | null, number | null];
+  /** The board and card backs both players see (the host's), and which seat hosts. Null or
+   *  missing from a server that doesn't send them: both players see the defaults. */
+  cosmetics?: OnlineCosmetics | null;
   ranked: boolean;
   /** The latest call-out from either player, to show by their name. */
   emote: { seat: Seat; emote: Emote; key: number } | null;

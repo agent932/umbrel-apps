@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   CLASSIC_RULES,
+  DEFAULT_COSMETICS,
   KRAKEN_HOLES,
   PIRATE_RULES,
   TREASURE_HOLES,
@@ -9,10 +10,12 @@ import {
   parseCard,
 } from "@pirate/engine";
 import { getBoardSkin, holePoint } from "../../brand/boardSkins.js";
+import { CosmeticsProvider } from "../../brand/cosmetics.js";
 import { HandSlot } from "./HandSlot.js";
 import { PaintedBoard } from "./PaintedBoard.js";
 import { pileTilt } from "./PlayArea.js";
 import { ScorePops } from "./ScorePops.js";
+import { TableBoard } from "./TableBoard.js";
 
 describe("ScorePops", () => {
   afterEach(() => vi.useRealTimers());
@@ -247,6 +250,36 @@ describe("PaintedBoard", () => {
     ]);
     expect(rings).toEqual(
       [0, 1].flatMap((lane) => KRAKEN_HOLES.map((n) => holePoint(layout, lane as 0 | 1, n))),
+    );
+  });
+});
+
+describe("TableBoard", () => {
+  const props = {
+    scores: [3, 4] as [number, number],
+    backPegs: [0, 0] as [number, number],
+    rules: CLASSIC_RULES,
+    names: ["You", "Anne"] as [string, string],
+    me: 0 as const,
+    instant: true,
+  };
+  const drawn = (container: HTMLElement) => container.querySelector(".t-board > svg")!;
+
+  it("draws Serpent Reef when nothing says otherwise", () => {
+    const { container } = render(<TableBoard {...props} />);
+    expect(drawn(container)).toHaveAttribute("data-skin", "serpent-reef");
+  });
+
+  it("draws the table's board", () => {
+    const { container } = render(
+      <CosmeticsProvider value={{ ...DEFAULT_COSMETICS, board: "board.treasure-map" }}>
+        <TableBoard {...props} />
+      </CosmeticsProvider>,
+    );
+    expect(drawn(container)).toHaveAttribute("data-skin", "treasure-map");
+    expect(drawn(container).querySelector(":scope > image")).toHaveAttribute(
+      "href",
+      getBoardSkin("treasure-map").imageUrl,
     );
   });
 });

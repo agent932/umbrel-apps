@@ -1,6 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { type Card as CardType, type PowerId, cardLabel, other, sameCard } from "@pirate/engine";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Card as CardType,
+  DEFAULT_COSMETICS,
+  type PowerId,
+  cardLabel,
+  other,
+  sameCard,
+} from "@pirate/engine";
 import { Cinematics } from "../brand/Cinematics.js";
+import { CosmeticsProvider, useCosmetics } from "../brand/cosmetics.js";
 import { PeggyChatter } from "../brand/PeggyChatter.js";
 import { avatarUrl } from "../brand/avatars.js";
 import { BOT_CREW } from "../brand/botCrew.js";
@@ -53,15 +61,26 @@ interface Props {
   guest?: boolean;
 }
 
-export function GameScreen({
-  game,
-  onExit,
-  onPlayAgain,
-  instant,
-  myAvatar,
-  tutorial,
-  guest,
-}: Props) {
+/**
+ * The table, drawn with the right board and card backs: your own against the crew, the host's in an
+ * online game (the defaults if the server doesn't say). It wraps everything the table shows, the cut
+ * for deal and the game-over panel included. Card faces stay your own: it never touches them.
+ */
+export function GameScreen(props: Props) {
+  const viewer = useCosmetics();
+  const o = props.game.online;
+  const board = o ? (o.cosmetics?.board ?? DEFAULT_COSMETICS.board) : viewer.board;
+  const deck = o ? (o.cosmetics?.deck ?? DEFAULT_COSMETICS.deck) : viewer.deck;
+  // Every state message brings a new object; the table changes only when the two ids do.
+  const value = useMemo(() => ({ board, deck }), [board, deck]);
+  return (
+    <CosmeticsProvider value={value}>
+      <GameTable {...props} />
+    </CosmeticsProvider>
+  );
+}
+
+function GameTable({ game, onExit, onPlayAgain, instant, myAvatar, tutorial, guest }: Props) {
   const { p, names: label, act, error, online } = game;
   const view = p.view;
   // Seat-relative: online you may be seat 1.
@@ -375,6 +394,7 @@ export function GameScreen({
           round={view.round}
           pirate={!!pirate}
           oppName={oppName}
+          hostIsYou={online?.cosmetics ? online.cosmetics.hostSeat === me : undefined}
           onExit={onExit}
           onForfeit={online && view.phase !== "gameOver" ? online.forfeit : undefined}
           onReport={

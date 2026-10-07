@@ -146,6 +146,7 @@ export function PaintedBoard({
       overflow="visible"
       className="h-full w-full drop-shadow-[0_10px_14px_rgba(0,0,0,0.6)]"
       role="img"
+      data-skin={skin.id}
       aria-label={`Board: ${names[0]} ${scores[0]}, ${names[1]} ${scores[1]}`}
     >
       <defs>

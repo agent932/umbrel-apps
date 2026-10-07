@@ -3,11 +3,13 @@ import { Link } from "wouter";
 import { SettingsFields } from "../SettingsButton.js";
 import { dialogProps, useDialog } from "../useDialog.js";
 
-/** The table's menu: round and rules, the way out, forfeit (online) and settings. */
+/** The table's menu: round and rules, the way out, forfeit (online), whose board it is (online)
+ *  and settings. */
 export function TableMenu({
   round,
   pirate,
   oppName,
+  hostIsYou,
   onExit,
   onForfeit,
   onReport,
@@ -17,6 +19,9 @@ export function TableMenu({
   round: number;
   pirate: boolean;
   oppName: string;
+  /** Online games: true when you host, so the board and card backs are yours; false when they're
+   *  the other player's. Unset against the crew. */
+  hostIsYou?: boolean;
   onExit: () => void;
   /** Online games that are still going. */
   onForfeit?: () => void;
@@ -61,6 +66,12 @@ export function TableMenu({
           </button>
         )}
       </div>
+      {/* Answers "why isn't my board showing?": in quick match the host isn't always you. */}
+      {hostIsYou !== undefined && (
+        <p className="mt-4 text-parchment/80">
+          Board and card backs: {hostIsYou ? "yours" : `${oppName}'s`}
+        </p>
+      )}
       <div className="mt-4 border-t border-parchment/15 pt-3">
         <SettingsFields />
       </div>

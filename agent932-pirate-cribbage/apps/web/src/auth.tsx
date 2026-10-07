@@ -4,6 +4,9 @@ import { type User, api } from "./api.js";
 interface AuthState {
   user: User | null;
   loading: boolean;
+  /** The shop is open to players (from /api/auth/me). False until it says so: an older server, or
+   *  no server at all, keeps the shop hidden. Admins see it anyway, as a preview. */
+  shopOpen: boolean;
   login: (login: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -11,15 +14,25 @@ interface AuthState {
   refresh: () => Promise<void>;
 }
 
+/** GET /api/auth/me. `shopOpen` is missing from servers older than the shop. */
+interface Me {
+  user: User | null;
+  shopOpen?: boolean;
+}
+
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shopOpen, setShopOpen] = useState(false);
 
   useEffect(() => {
-    api<{ user: User | null }>("/api/auth/me")
-      .then((r) => setUser(r.user))
+    api<Me>("/api/auth/me")
+      .then((r) => {
+        setUser(r.user);
+        setShopOpen(r.shopOpen === true);
+      })
       // No server (e.g. opened as a static page): play as a guest.
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
@@ -34,7 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
   const refresh = useCallback(async () => {
-    setUser((await api<{ user: User | null }>("/api/auth/me")).user);
+    const r = await api<Me>("/api/auth/me");
+    setUser(r.user);
+    setShopOpen(r.shopOpen === true);
   }, []);
   const logout = useCallback(async () => {
     await api("/api/auth/logout", { body: {} });
@@ -42,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, shopOpen, login, signup, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

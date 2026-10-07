@@ -4,6 +4,8 @@ import { CLASSIC_RULES } from "@pirate/engine";
 import { ApiError, type GameResponse, api } from "./api.js";
 import { AuthProvider, useAuth } from "./auth.js";
 import { MoonlitScene } from "./brand/MoonlitScene.js";
+import { ViewerCosmetics } from "./brand/cosmetics.js";
+import { preloadCosmetics } from "./brand/preloadSkins.js";
 import { SPEED_FACTOR, useSettings } from "./settings.js";
 import { type LocalGame, loadGame, newLocalGame, saveGame } from "./game/localGame.js";
 import { type MenuChoice, rulesFor } from "./game/menu.js";
@@ -70,6 +72,9 @@ function RemotePlay({ res, botDelay, ...rest }: PlayProps & { res: GameResponse 
   );
 }
 
+/** How long boarding waits for the host's board and backs before the table opens anyway. */
+const SKIN_WAIT_MS = 800;
+
 function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) {
   const game = useOnlineGame(gameId);
   const [, navigate] = useLocation();
@@ -78,13 +83,33 @@ function OnlinePlay({ gameId, onExit }: { gameId: string; onExit: () => void }) 
   useEffect(() => {
     if (rematch) navigate(`/online/${rematch}`);
   }, [rematch, navigate]);
-  if ("loading" in game) {
+  // The host's board and backs may be new to you. Keep boarding until they've loaded or the wait
+  // is up, so the cut for deal never opens on empty cards. (useOnlineGame started the load, and
+  // preloadCosmetics does each URL once, so this waits on that same load.) A server that sends no
+  // cosmetics has nothing to wait for.
+  const skins = "loading" in game ? undefined : (game.online?.cosmetics ?? undefined);
+  const [skinsReady, setSkinsReady] = useState(false);
+  const board = skins?.board;
+  const deck = skins?.deck;
+  useEffect(() => {
+    if (!board || !deck) return;
+    let live = true;
+    const ready = () => live && setSkinsReady(true);
+    const t = setTimeout(ready, SKIN_WAIT_MS);
+    void preloadCosmetics({ board, deck }).then(ready);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [board, deck]);
+  if ("loading" in game || (skins && !skinsReady)) {
+    const error = "loading" in game ? game.error : null;
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
-        {game.error ? (
+        {error ? (
           <>
             <p role="alert" className="text-red-300">
-              {game.error}
+              {error}
             </p>
             <Link href={CRIBBAGE_HOME} className="btn-secondary">
               Back to the harbour
@@ -275,12 +300,15 @@ function Routes({ botDelay }: { botDelay?: number }) {
 export function App({ botDelay }: { botDelay?: number } = {}) {
   return (
     <AuthProvider>
-      <MoonlitScene />
-      {/* The current screen; an edge swipe drags this, leaving the backdrop in place. */}
-      <div id="screen">
-        <Routes botDelay={botDelay} />
-      </div>
-      <ChallengeToast />
+      {/* Your own board and card backs, for every table (online games put the host's on top). */}
+      <ViewerCosmetics>
+        <MoonlitScene />
+        {/* The current screen; an edge swipe drags this, leaving the backdrop in place. */}
+        <div id="screen">
+          <Routes botDelay={botDelay} />
+        </div>
+        <ChallengeToast />
+      </ViewerCosmetics>
     </AuthProvider>
   );
 }

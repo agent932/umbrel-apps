@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Reward, Seat } from "@pirate/engine";
+import type { OnlineCosmetics, Reward, Seat } from "@pirate/engine";
+import { preloadCosmetics } from "../brand/preloadSkins.js";
 import { initialPresentation, present } from "../game/present.js";
 import type { GameController, Presentation, UiAction } from "../game/types.js";
 import type { Emote, StateMessage } from "./protocol.js";
@@ -9,6 +10,8 @@ interface OnlineState {
   p: Presentation | null;
   names: [string, string];
   avatars: [number | null, number | null];
+  /** The host's board and card backs; null until a state brings them (or the server never does). */
+  cosmetics: OnlineCosmetics | null;
   ranked: boolean;
   emote: { seat: Seat; emote: Emote; key: number } | null;
   rematch: "none" | "waiting" | "offered";
@@ -36,6 +39,7 @@ export function useOnlineGame(
     p: null,
     names: ["You", "Opponent"],
     avatars: [null, null],
+    cosmetics: null,
     ranked: false,
     emote: null,
     rematch: "none",
@@ -65,6 +69,9 @@ export function useOnlineGame(
       switch (m.t) {
         case "state":
           serverWaits.current = Array.isArray(m.sceneWaits);
+          // The host's art, fetched before the table needs it. They're the same for the whole game,
+          // and preloadCosmetics does each URL once, so later states cost nothing.
+          if (m.cosmetics) void preloadCosmetics(m.cosmetics);
           setS((prev) => {
             const names = namesFor(m);
             const base = prev.p ?? initialPresentation(m.step.view);
@@ -73,6 +80,7 @@ export function useOnlineGame(
               p: present(base, m.step.events, m.step.view, names),
               names,
               avatars: m.avatars ?? [null, null],
+              cosmetics: m.cosmetics ?? null,
               ranked: m.ranked ?? false,
               deadline: m.deadline,
               online: m.online,
@@ -136,6 +144,7 @@ export function useOnlineGame(
     reward: s.reward,
     online: {
       avatars: s.avatars,
+      cosmetics: s.cosmetics,
       ranked: s.ranked,
       emote: s.emote,
       sendEmote: (emote: Emote) => socket.send({ t: "emote", gameId, emote }),

@@ -1,18 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import {
   CLASSIC_RULES,
   type GameEvent,
+  type GameState,
+  type OnlineCosmetics,
+  type Seat,
   applyAction,
   createDeck,
   createGame,
+  newGame,
   shuffle,
   viewFor,
 } from "@pirate/engine";
+import { App } from "../App.js";
 import { AuthProvider } from "../auth.js";
+import { FaceStyleContext } from "../brand/cosmetics.js";
+import type { FaceStyle } from "../brand/faceStyles.js";
 import { GameScreen } from "../screens/GameScreen.js";
 import { OnlineLobby } from "./OnlineLobby.js";
 import type { ServerMessage } from "./protocol.js";
@@ -284,5 +291,200 @@ describe("online game screen", () => {
     expect(screen.getByText("Bonny wants a rematch!")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Accept rematch" }));
     expect(ws.sent.at(-1)).toEqual({ t: "rematch", gameId });
+  });
+});
+
+describe("the host's board and card backs", () => {
+  /** A state message for seat `seat`, with the host's cosmetics when given. */
+  const stateFor = (
+    gameId: string,
+    state: GameState,
+    seat: Seat,
+    cosmetics?: OnlineCosmetics,
+  ): ServerMessage => ({
+    t: "state",
+    gameId,
+    seat,
+    names: ["Anne", "Bonny"],
+    avatars: [null, null],
+    ...(cosmetics && { cosmetics }),
+    ranked: false,
+    step: { events: [], view: viewFor(state, seat) },
+    deadline: null,
+    online: [true, true],
+    returnBy: [null, null],
+    nextRoundReady: [],
+    sceneWaits: [],
+  });
+  /** Waiting to cut for the deal, the deck spread face down. */
+  const cutting = () =>
+    applyAction(newGame(CLASSIC_RULES), { type: "shuffleForCut", deck: shuffle(createDeck()) })
+      .state;
+  /** Dealt from `deck`, both players have thrown to the crib: four cards each, four in the crib. */
+  function thrown(deck = shuffle(createDeck())) {
+    let state = applyAction(createGame(0, CLASSIC_RULES), { type: "deal", deck }).state;
+    for (const seat of [0, 1] as const)
+      state = applyAction(state, {
+        type: "discard",
+        seat,
+        cards: state.hands[seat].slice(0, 2),
+      }).state;
+    return state;
+  }
+  const boardSkin = () => document.querySelector(".t-board > svg")?.getAttribute("data-skin");
+  const backsIn = (selector: string) =>
+    [...document.querySelector(selector)!.querySelectorAll("[data-deck]")].map((c) =>
+      c.getAttribute("data-deck"),
+    );
+  const menuText = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    const text = screen.getByRole("dialog", { name: "Menu" }).textContent;
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    return text;
+  };
+
+  it("draws the host's board and backs from the cut for deal on, and your own faces", async () => {
+    const user = userEvent.setup();
+    const gameId = "77777777-7777-4777-8777-777777777777";
+    // Your own face style, which no host can change.
+    const faces: FaceStyle = {
+      id: "stub",
+      courts: { 11: "/stub-jack.webp", 12: "/stub-queen.webp", 13: "/stub-king.webp" },
+    };
+    render(
+      <FaceStyleContext.Provider value={faces}>
+        <OnlineTable gameId={gameId} />
+      </FaceStyleContext.Provider>,
+    );
+    await opened();
+    const ws = FakeSocket.last!;
+    // Anne hosts from seat 0; you're Bonny, in seat 1.
+    const cosmetics = { board: "board.treasure-map", deck: "deck.crimson", hostSeat: 0 } as const;
+
+    ws.push(stateFor(gameId, cutting(), 1, cosmetics));
+    expect(
+      within(screen.getByRole("group", { name: "Deck to cut" }))
+        .getAllByRole("img")
+        .map((c) => c.getAttribute("data-deck")),
+    ).toEqual(Array(52).fill("crimson"));
+
+    // Every card dealt is a court card, so your hand shows only faces.
+    const deck = createDeck();
+    ws.push(
+      stateFor(
+        gameId,
+        thrown([...deck.filter((c) => c.rank >= 11), ...deck.filter((c) => c.rank < 11)]),
+        1,
+        cosmetics,
+      ),
+    );
+    expect(boardSkin()).toBe("treasure-map");
+    expect(backsIn(".t-opp-fan")).toEqual(Array(4).fill("crimson"));
+    expect(backsIn(".t-deck")).toEqual(Array(3).fill("crimson"));
+    expect(backsIn(".t-crib")).toEqual(Array(4).fill("crimson"));
+    const courts = within(screen.getByLabelText("Your hand"))
+      .getAllByRole("button")
+      .map((card) => card.querySelector<HTMLElement>("span[aria-hidden]")!.style.backgroundImage);
+    expect(courts).toHaveLength(4);
+    for (const art of courts) expect(art).toMatch(/^url\("\/stub-(jack|queen|king)\.webp"\)$/);
+    expect(await menuText(user)).toContain("Board and card backs: Anne's");
+  });
+
+  it("says they're yours when you host", async () => {
+    const user = userEvent.setup();
+    const gameId = "88888888-8888-4888-8888-888888888888";
+    render(<OnlineTable gameId={gameId} />);
+    await opened();
+    const cosmetics = { board: "board.ghost-ship", deck: "deck.ghost", hostSeat: 0 } as const;
+    FakeSocket.last!.push(stateFor(gameId, thrown(), 0, cosmetics));
+    expect(boardSkin()).toBe("ghost-ship");
+    expect(backsIn(".t-opp-fan")).toEqual(Array(4).fill("ghost"));
+    expect(await menuText(user)).toContain("Board and card backs: yours");
+  });
+
+  it("draws the defaults when an older server doesn't say, and doesn't say whose they are", async () => {
+    const user = userEvent.setup();
+    const gameId = "99999999-9999-4999-8999-999999999999";
+    render(<OnlineTable gameId={gameId} />);
+    await opened();
+    FakeSocket.last!.push(stateFor(gameId, thrown(), 1));
+    expect(boardSkin()).toBe("serpent-reef");
+    expect(backsIn(".t-opp-fan")).toEqual(Array(4).fill("cribbage-logo"));
+    expect(await menuText(user)).not.toMatch(/Board and card/);
+  });
+
+  describe("boarding", () => {
+    /** Images that decode only when the test says so. */
+    function slowArt() {
+      let decoded!: () => void;
+      const gate = new Promise<void>((resolve) => (decoded = resolve));
+      vi.stubGlobal(
+        "Image",
+        class {
+          src = "";
+          decode = () => gate;
+        },
+      );
+      return decoded;
+    }
+    /** The whole app on an online game's page, with the socket open. */
+    async function board(gameId: string) {
+      window.history.pushState({}, "", `/online/${gameId}`);
+      render(<App />);
+      await waitFor(() =>
+        expect(FakeSocket.last?.sent).toContainEqual({ t: "watch", gameId, carryOn: true }),
+      );
+      return FakeSocket.last!;
+    }
+    const deckToCut = () => screen.queryByRole("group", { name: "Deck to cut" });
+    afterEach(() => {
+      vi.useRealTimers();
+      window.history.pushState({}, "", "/");
+    });
+
+    it("waits for the host's art before the cut for deal", async () => {
+      const decoded = slowArt();
+      const gameId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const ws = await board(gameId);
+      const cosmetics = {
+        board: "board.royal-navy",
+        deck: "deck.ships-wheel",
+        hostSeat: 0,
+      } as const;
+      ws.push(stateFor(gameId, cutting(), 1, cosmetics));
+      expect(screen.getByText("Boarding…")).toBeInTheDocument();
+      expect(deckToCut()).toBeNull();
+      await act(async () => decoded());
+      expect(deckToCut()).toBeInTheDocument();
+      expect(within(deckToCut()!).getAllByRole("img")[0]).toHaveAttribute(
+        "data-deck",
+        "ships-wheel",
+      );
+    });
+
+    it("opens the table anyway when the art is slow", async () => {
+      slowArt();
+      const gameId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+      const ws = await board(gameId);
+      vi.useFakeTimers();
+      const cosmetics = {
+        board: "board.krakens-reef",
+        deck: "deck.treasure",
+        hostSeat: 1,
+      } as const;
+      ws.push(stateFor(gameId, cutting(), 1, cosmetics));
+      act(() => vi.advanceTimersByTime(799));
+      expect(screen.getByText("Boarding…")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(deckToCut()).toBeInTheDocument();
+    });
+
+    it("doesn't wait when the server sends no board or backs", async () => {
+      slowArt();
+      const gameId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+      const ws = await board(gameId);
+      ws.push(stateFor(gameId, cutting(), 1));
+      expect(deckToCut()).toBeInTheDocument();
+    });
   });
 });
