@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.33.0"
+version: "0.33.1"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,11 +37,9 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  The shop is built and ready, closed to players for now: admins can preview
-  it in Captain's Quarters and open it when the time comes. It sells four new
-  boards and four new card backs for doubloons, and every game now uses the
-  new Pirate Cribbage card back by default. Online, both players see the
-  host's board and card backs.
+  Fixes: card backs that showed a broken image for some players after the
+  last update now load again, and the daily discard lists the best throws
+  with suit symbols (3♠ 4♦) instead of letters.
 
 
 developer: agent932
