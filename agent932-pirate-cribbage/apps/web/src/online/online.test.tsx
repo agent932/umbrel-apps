@@ -414,6 +414,16 @@ describe("the host's board and card backs", () => {
   });
 
   describe("boarding", () => {
+    /**
+     * The app loaded afresh for each test. A URL is preloaded once for the whole module, so
+     * without this a load an earlier test left hanging (or already finished) would decide whether
+     * this test's table waits.
+     */
+    let FreshApp: typeof App;
+    beforeEach(async () => {
+      vi.resetModules();
+      ({ App: FreshApp } = await import("../App.js"));
+    });
     /** Images that decode only when the test says so. */
     function slowArt() {
       let decoded!: () => void;
@@ -430,7 +440,7 @@ describe("the host's board and card backs", () => {
     /** The whole app on an online game's page, with the socket open. */
     async function board(gameId: string) {
       window.history.pushState({}, "", `/online/${gameId}`);
-      render(<App />);
+      render(<FreshApp />);
       await waitFor(() =>
         expect(FakeSocket.last?.sent).toContainEqual({ t: "watch", gameId, carryOn: true }),
       );
@@ -452,6 +462,8 @@ describe("the host's board and card backs", () => {
         hostSeat: 0,
       } as const;
       ws.push(stateFor(gameId, cutting(), 1, cosmetics));
+      // Still boarding once everything already settled has run: it really waits for the art.
+      await act(async () => {});
       expect(screen.getByText("Boarding…")).toBeInTheDocument();
       expect(deckToCut()).toBeNull();
       await act(async () => decoded());
