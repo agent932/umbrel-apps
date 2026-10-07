@@ -29,12 +29,16 @@ export function AccountBar({ home = false }: { home?: boolean }) {
     >
       {user ? (
         <>
-          <span className="flex w-full items-center gap-2 text-parchment/80 sm:mr-auto sm:w-auto">
+          <span className="flex w-full min-w-0 items-center gap-2 text-parchment/80 sm:mr-auto sm:w-auto">
             <SettingsButton />
-            Ahoy, <b className="text-gold">{user.username}</b>
+            Ahoy,{" "}
+            {/* A long name gives way (…) before the balance does, so the row fits a phone. */}
+            <b className="min-w-0 truncate text-gold" title={user.username}>
+              {user.username}
+            </b>
             {/* Your doubloons (read again from the server after each game and daily puzzle). */}
             <span
-              className="ml-1 inline-flex items-center gap-1 font-semibold text-gold tabular-nums"
+              className="ml-1 inline-flex shrink-0 items-center gap-1 font-semibold text-gold tabular-nums"
               title="Doubloons"
             >
               <DoubloonIcon className="h-4 w-4" />

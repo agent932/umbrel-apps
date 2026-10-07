@@ -191,7 +191,7 @@ function PlayersTab() {
               <th className="py-1">Joined</th>
               <th className="py-1 text-right">Games</th>
               <th className="py-1 text-right">Rating</th>
-              <th className="py-1 text-right">Doubloons</th>
+              <th className="py-1 pl-3 text-right">Doubloons</th>
               <th className="py-1 text-right">Actions</th>
             </tr>
           </thead>
@@ -222,7 +222,7 @@ function PlayersTab() {
                 <td className="py-1.5 text-right tabular-nums">
                   {u.rating} <span className="text-xs text-parchment/60">{u.tier}</span>
                 </td>
-                <td className="py-1.5 text-right tabular-nums">
+                <td className="py-1.5 pl-3 text-right tabular-nums">
                   {(u.doubloons ?? 0).toLocaleString()}
                 </td>
                 <td className="py-1.5 text-right">

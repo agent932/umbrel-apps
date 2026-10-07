@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ADMIN_MAX_DELTA, type LedgerReason } from "@pirate/engine";
+import { ADMIN_MAX_DELTA, DAILY_PLAYED, type LedgerReason, SKUNK_BONUS } from "@pirate/engine";
 import { ApiError, api } from "../api.js";
 import { lineLabel, newRequestId } from "../economy.js";
 import { DoubloonIcon } from "./Doubloons.js";
@@ -28,12 +28,21 @@ const when = (iso: string) =>
 /** "+500" or "−200" (a real minus sign). */
 const signed = (n: number) => `${n > 0 ? "+" : "−"}${Math.abs(n).toLocaleString()}`;
 
+/**
+ * The line key a ledger row was paid under (see DoubloonLine). Rows don't keep it, but the amount
+ * tells: a best throw pays more than a played one, and a double skunk more than a single (even
+ * at half pay in a 61-point game, 13 against 5).
+ */
+function rowKey(row: LedgerRow): string | undefined {
+  if (row.reason === "achievement") return row.ref;
+  if (row.reason === "daily" && row.delta > DAILY_PLAYED) return "best";
+  if (row.reason === "skunk" && row.delta > SKUNK_BONUS) return "double";
+  return undefined;
+}
+
 /** What a ledger row was for, with the details an admin needs to check it. */
 function rowText(row: LedgerRow) {
-  const label = lineLabel({
-    reason: row.reason,
-    key: row.reason === "achievement" ? row.ref : undefined,
-  });
+  const label = lineLabel({ reason: row.reason, key: rowKey(row) });
   const details =
     row.reason === "admin"
       ? [`by ${row.actor ?? "a deleted account"}`, row.note]
@@ -212,7 +221,12 @@ export function DoubloonsSheet({
         ) : rows.length === 0 ? (
           <p className="text-parchment/60">No doubloons yet.</p>
         ) : (
-          <ul aria-label="Doubloon history">
+          // Its own scroll area, so Close stays near on a phone (there's no Escape key there).
+          <ul
+            aria-label="Doubloon history"
+            tabIndex={0}
+            className="max-h-[40dvh] overflow-y-auto overscroll-contain"
+          >
             {rows.map((row) => {
               const { label, details } = rowText(row);
               return (

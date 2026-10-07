@@ -160,6 +160,12 @@ describe("admin: doubloons", () => {
       ledgerRow(1, { reason: "admin", delta: 100, ref: "x", note: "Welcome back", actor: "Don" }),
       ledgerRow(2, { reason: "achievement", delta: 50, ref: "firstWin" }),
       ledgerRow(3, { reason: "daily", delta: 25, ref: "2026-10-05" }),
+      ledgerRow(4, { reason: "daily", delta: 10, ref: "2026-10-04" }),
+      ledgerRow(5, { reason: "skunk", delta: 25 }),
+      ledgerRow(6, { reason: "skunk", delta: 10 }),
+      // Half pay, in a 61-point game.
+      ledgerRow(7, { reason: "skunk", delta: 13 }),
+      ledgerRow(8, { reason: "skunk", delta: 5 }),
     ]);
     server.next.push(450);
     const { user, sheet } = await openWallet("Anne");
@@ -168,7 +174,15 @@ describe("admin: doubloons", () => {
     expect(rows[0]).toHaveTextContent(/Win vs the computer.*\+35/);
     expect(rows[1]).toHaveTextContent(/Adjustment.*by Don · Welcome back.*\+100/);
     expect(rows[2]).toHaveTextContent(/First Plunder.*\+50/);
-    expect(rows[3]).toHaveTextContent(/Daily discard.*puzzle of 2026-10-05.*\+25/);
+    // Named as on the player's result screen.
+    expect(rows[3]).toHaveTextContent(/Best throw.*puzzle of 2026-10-05.*\+25/);
+    expect(rows[4]).toHaveTextContent(/Daily discard.*puzzle of 2026-10-04.*\+10/);
+    expect(rows.slice(5).map((r) => r.firstChild!.firstChild!.textContent)).toEqual([
+      "Double skunk bonus",
+      "Skunk bonus",
+      "Double skunk bonus",
+      "Skunk bonus",
+    ]);
 
     await adjust(user, sheet, "Remove", "50", "refund");
     expect(server.adjustments).toHaveLength(1);
