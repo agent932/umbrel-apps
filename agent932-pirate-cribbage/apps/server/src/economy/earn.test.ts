@@ -168,15 +168,16 @@ describe("doubloons for games", () => {
     for (const reason of ["botWin", "firstWinOfDay"] as const) {
       expect(line(fast, reason)).toBeUndefined();
     }
-    // Using a power pays; First Plunder unlocks but pays only for a game long enough to pay.
+    // Using a power pays; First Plunder waits for a game long enough to pay.
     expect(line(fast, "achievement", "power:spyglass")).toMatchObject({ delta: 50 });
     expect(line(fast, "achievement", "firstWin")).toBeUndefined();
-    expect(fast.unlocked).toEqual(expect.arrayContaining(["firstWin", "power:spyglass"]));
+    expect(fast.unlocked).toContain("power:spyglass");
+    expect(fast.unlocked).not.toContain("firstWin");
     const unlocked = await t.db
       .select({ key: achievements.key })
       .from(achievements)
       .where(eq(achievements.userId, anne));
-    expect(unlocked.map((a) => a.key)).toContain("firstWin");
+    expect(unlocked.map((a) => a.key)).not.toContain("firstWin");
 
     const bonny = await user("Bonny");
     const threeRounds = game();
@@ -185,10 +186,45 @@ describe("doubloons for games", () => {
     expect(few.note).toBe("short");
     expect(line(few, "botWin")).toBeUndefined();
 
-    // A later full game pays the win, but First Plunder is already unlocked.
+    // A later full game pays the win, and unlocks and pays First Plunder.
     const later = await win(anne, null);
     expect(amount(later, "botWin")).toBe(35);
-    expect(line(later, "achievement", "firstWin")).toBeUndefined();
+    expect(line(later, "achievement", "firstWin")).toEqual({
+      reason: "achievement",
+      delta: 50,
+      key: "firstWin",
+    });
+    expect(later.unlocked).toContain("firstWin");
+  });
+
+  it("keeps Gold Captain for a game long enough to pay, however the rating got there", async () => {
+    const anne = await user("Anne");
+    const bonny = await user("Bonny");
+    /** Anne wins a ranked game that takes her from 1240 to 1256 (Gold). */
+    const ranked = (state: GameState, createdAt: Date, forfeitedBy: Seat | null = null) => {
+      const gold = { before: 1240, after: 1256, tier: "silver" };
+      const rest = { before: 1000, after: 984, tier: "bronze" };
+      return recordMatch(
+        t.db,
+        { id: randomUUID(), ...ONLINE, ranked: true, createdAt },
+        seats(state, anne, bonny),
+        state,
+        forfeitedBy,
+        state.winner === 0 ? [gold, rest] : [rest, gold],
+      );
+    };
+    // A quick game, or Bonny forfeiting in the second round, doesn't unlock or pay it.
+    const quick = (await ranked(game(), new Date())).get(anne)!;
+    expect(quick.note).toBe("short");
+    expect(quick.unlocked).not.toContain("gold");
+    const early = (await ranked(forfeitState(playRounds(1, 3), 1), minutesAgo(10), 1)).get(anne)!;
+    expect(early.note).toBe("earlyForfeit");
+    expect(early.unlocked).not.toContain("gold");
+    expect(await ledgerRows(t.db, anne, "achievement")).toEqual([]);
+    // A full game at Gold does.
+    const full = (await ranked(game(), minutesAgo(10))).get(anne)!;
+    expect(full.unlocked).toContain("gold");
+    expect(line(full, "achievement", "gold")).toMatchObject({ delta: 200 });
   });
 
   it("pays nothing for an early forfeit and half for a late one", async () => {
@@ -210,11 +246,16 @@ describe("doubloons for games", () => {
     expect(early.winner.note).toBe("earlyForfeit");
     expect(line(early.winner, "onlineWin")).toBeUndefined();
     expect(line(early.winner, "firstWinOfDay")).toBeUndefined();
+    // First Plunder isn't used up by a win that can't pay it...
     expect(line(early.winner, "achievement", "firstWin")).toBeUndefined();
+    expect(early.winner.unlocked).not.toContain("firstWin");
 
     const late = await forfeit(5, {});
     expect(late.winner.note).toBe("lateForfeit");
     expect(amount(late.winner, "onlineWin")).toBe(25);
+    // ...so the next win that counts unlocks and pays it.
+    expect(amount(late.winner, "achievement")).toBe(50);
+    expect(late.winner.unlocked).toContain("firstWin");
     expect(line(late.winner, "skunk")).toBeUndefined();
     expect(amount(late.winner, "firstWinOfDay")).toBe(50);
     for (const reason of ["onlineWin", "skunk", "firstWinOfDay"] as const) {

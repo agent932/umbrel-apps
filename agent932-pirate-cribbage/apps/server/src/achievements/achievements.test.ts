@@ -16,10 +16,16 @@ async function userId(name: string) {
   return { id: u!.id, cookie };
 }
 
-const record = (state: GameState, players: [string | null, string | null]) =>
+/** Record a bot game that started `minutes` ago (10: long enough to count for wins). */
+const record = (state: GameState, players: [string | null, string | null], minutes = 10) =>
   recordMatch(
     t.db,
-    { id: crypto.randomUUID(), mode: "ai", aiLevel: "easy", createdAt: new Date() },
+    {
+      id: crypto.randomUUID(),
+      mode: "ai",
+      aiLevel: "easy",
+      createdAt: new Date(Date.now() - minutes * 60_000),
+    },
     players,
     state,
   );
@@ -40,6 +46,19 @@ describe("achievements", () => {
     await record(state, [anne.id, bonny.id]);
     expect((await earned(winner.cookie)).filter((k: string) => k === "firstWin")).toHaveLength(1);
     expect(await earned(loser.cookie)).not.toContain("firstWin");
+  }, 30_000);
+
+  it("keeps First Plunder for a win that counts, not a game over in a minute", async () => {
+    const anne = await userId("Anne");
+    const state = playGame();
+    const seats = (state.winner === 0 ? [anne.id, null] : [null, anne.id]) as [
+      string | null,
+      string | null,
+    ];
+    await record(state, seats, 1);
+    expect(await earned(anne.cookie)).not.toContain("firstWin");
+    await record(state, seats);
+    expect(await earned(anne.cookie)).toContain("firstWin");
   }, 30_000);
 
   it("spots a 29 hand and the pirate powers a player used", async () => {

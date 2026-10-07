@@ -1,5 +1,11 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { type GameState, type Seat, powerAchievement, tierFor } from "@pirate/engine";
+import {
+  type GameState,
+  type Seat,
+  WIN_ACHIEVEMENTS,
+  powerAchievement,
+  tierFor,
+} from "@pirate/engine";
 import { achievements, matchPlayers, matches } from "../db/schema.js";
 import type { RatingChange, Tx } from "../games/record.js";
 import type { Db } from "../db/client.js";
@@ -8,7 +14,9 @@ const GOLD_OR_BETTER = new Set(["gold", "platinum", "diamond"]);
 
 /**
  * Give each signed-in player in a just-recorded match the achievements it earned. Already-earned
- * ones are left alone. Returns the newly unlocked keys by user.
+ * ones are left alone. Win-based ones (WIN_ACHIEVEMENTS) unlock only when `longEnough` (the game
+ * was long enough to pay a win), so a quick game can't use them up without paying: they wait for
+ * the player's next game that counts. Returns the newly unlocked keys by user.
  */
 export async function awardAchievements(
   tx: Tx | Db,
@@ -16,12 +24,13 @@ export async function awardAchievements(
   players: [string | null, string | null],
   state: GameState,
   ratings: RatingChange[] | null,
+  longEnough: boolean,
 ): Promise<Map<string, string[]>> {
   const unlocked = new Map<string, string[]>();
   for (const seat of [0, 1] as Seat[]) {
     const userId = players[seat];
     if (!userId) continue;
-    const keys: string[] = [];
+    let keys: string[] = [];
     const won = state.winner === seat;
     if (won) keys.push("firstWin");
     if (won && state.skunk >= 1) keys.push("skunk");
@@ -41,7 +50,7 @@ export async function awardAchievements(
     const after = ratings?.[seat]?.after;
     if (after != null && GOLD_OR_BETTER.has(tierFor(after).key)) keys.push("gold");
 
-    if (won) {
+    if (won && longEnough) {
       const [{ wins }] = (await tx
         .select({ wins: sql<number>`count(*)::int` })
         .from(matchPlayers)
@@ -60,6 +69,7 @@ export async function awardAchievements(
       if (recent.length === 5 && recent.every((m) => m.winner === m.seat)) keys.push("streak5");
     }
 
+    if (!longEnough) keys = keys.filter((key) => !WIN_ACHIEVEMENTS.has(key));
     if (!keys.length) continue;
     const added = await tx
       .insert(achievements)

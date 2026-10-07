@@ -38,8 +38,8 @@ export interface Reward {
   /** For the winner: why the win paid nothing or half. Null for losers and full-pay wins. */
   note: WinNote | null;
   /**
-   * Every achievement this unlocked, paid or not (a win-based one from a game too short to pay
-   * unlocks but pays nothing), so the result screen can list them all.
+   * Every achievement this unlocked, so the result screen can list them all. Each normally has a
+   * line in `lines`; one without (paid already, or unpriced) is still listed.
    */
   unlocked: string[];
 }
@@ -88,13 +88,18 @@ export const ACHIEVEMENT_REWARD: Record<string, number> = {
   "power:belay": 50,
 };
 
-/** Achievements earned by winning. They pay only when the game that unlocked them was long enough. */
+/**
+ * Achievements earned by winning (Gold Captain by winning ranked games). They unlock, and pay, only
+ * in a game long enough to pay a win, so quick games and early forfeits against a second account
+ * can't earn them. They wait for the player's next game that counts.
+ */
 export const WIN_ACHIEVEMENTS: ReadonlySet<string> = new Set([
   "firstWin",
   "wins10",
   "streak5",
   "skunk",
   "doubleSkunk",
+  "gold",
 ]);
 
 /** Doubloons for an achievement; 0 for an unknown key. */
@@ -104,7 +109,8 @@ export function achievementReward(key: string): number {
 
 /**
  * What an achievement pays when a game unlocks it. Win-based ones pay nothing when the game was
- * too short or an early forfeit; the rest pay whatever the game was like.
+ * too short or an early forfeit (the server doesn't unlock them then; this is a safety net); the
+ * rest pay whatever the game was like.
  */
 export function achievementPayout(key: string, longEnoughGame: boolean): number {
   return WIN_ACHIEVEMENTS.has(key) && !longEnoughGame ? 0 : achievementReward(key);

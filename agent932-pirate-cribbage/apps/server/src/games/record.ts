@@ -6,6 +6,7 @@ import {
   type Seat,
   analyzeDiscard,
   cardLabel,
+  longEnough,
 } from "@pirate/engine";
 import type { Db } from "../db/client.js";
 import { matchPlayers, matches, roundPlayers, rounds } from "../db/schema.js";
@@ -52,6 +53,7 @@ export async function recordMatch(
 ): Promise<Map<string, Reward>> {
   // First, before anything that refers to the players (see lockWallets).
   await lockWallets(tx, players);
+  const now = new Date();
   const labels = (cards: Card[]) => cards.map(cardLabel);
   await tx.insert(matches).values({
     id: game.id,
@@ -66,7 +68,7 @@ export async function recordMatch(
     ranked: game.ranked ?? false,
     seasonId: game.seasonId ?? null,
     startedAt: game.createdAt,
-    endedAt: new Date(),
+    endedAt: now,
   });
   await tx.insert(matchPlayers).values(
     ([0, 1] as const).map((seat) => ({
@@ -79,8 +81,10 @@ export async function recordMatch(
       tier: ratings?.[seat]?.tier ?? null,
     })),
   );
-  const unlocked = await awardAchievements(tx, game.id, players, state, ratings);
-  const rewards = await awardDoubloons(tx, game, players, state, forfeitedBy, unlocked);
+  // Whether the game counts for wins: win-based achievements wait for one that does.
+  const counts = longEnough(state, forfeitedBy !== null, now.getTime() - game.createdAt.getTime());
+  const unlocked = await awardAchievements(tx, game.id, players, state, ratings, counts);
+  const rewards = await awardDoubloons(tx, game, players, state, forfeitedBy, unlocked, now);
   if (state.history.length === 0) return rewards;
   await tx.insert(rounds).values(
     state.history.map((r) => ({

@@ -289,13 +289,13 @@ describe("online play", () => {
       a.send({ t: "forfeit", gameId });
       const [won, lost] = await results(a, b);
       expect(won!.seat).toBe(b.latestState()!.seat);
-      // First Plunder unlocks, but pays nothing for an early forfeit.
+      // First Plunder waits for a win that pays.
       expect(won!.reward).toEqual({
         lines: [],
         total: 0,
         balance: 0,
         note: "earlyForfeit",
-        unlocked: ["firstWin"],
+        unlocked: [],
       });
       expect(lost!.reward).toEqual({ lines: [], total: 0, balance: 0, note: null, unlocked: [] });
       await expectLedgerMatches(t.db);

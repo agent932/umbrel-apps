@@ -117,7 +117,8 @@ export async function awardDoubloons(
       }
     }
 
-    // Win-based achievements pay only for a game long enough to pay; the rest always do.
+    // Win-based achievements pay only for a game long enough to pay (awardAchievements doesn't
+    // unlock them otherwise, so this is a safety net); the rest always do.
     const long = longEnough(state, forfeited, durationMs);
     const keys = unlocked.get(userId) ?? [];
     for (const key of keys) {

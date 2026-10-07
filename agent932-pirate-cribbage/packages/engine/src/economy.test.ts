@@ -108,8 +108,10 @@ describe("economy constants", () => {
 
   it("pays win-based achievements only for a game long enough to pay", () => {
     expect([...WIN_ACHIEVEMENTS].sort()).toEqual(
-      ["doubleSkunk", "firstWin", "skunk", "streak5", "wins10"].sort(),
+      ["doubleSkunk", "firstWin", "gold", "skunk", "streak5", "wins10"].sort(),
     );
+    expect(achievementPayout("gold", false)).toBe(0);
+    expect(achievementPayout("gold", true)).toBe(200);
     expect(achievementPayout("firstWin", true)).toBe(50);
     expect(achievementPayout("firstWin", false)).toBe(0);
     expect(achievementPayout("doubleSkunk", false)).toBe(0);
