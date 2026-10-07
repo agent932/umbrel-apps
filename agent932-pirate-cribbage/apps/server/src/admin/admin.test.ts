@@ -1,7 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { matches } from "../db/schema.js";
+import { credit } from "../economy/wallet.js";
 import type { ServerMessage } from "../online/protocol.js";
+import { doubloonsOf, expectLedgerMatches, ledgerRows } from "../test/ledger.js";
 import { signUp, testApp } from "../test/testApp.js";
 import { LONG, matchedPair, playOut } from "../test/wsClient.js";
 
@@ -116,6 +119,157 @@ describe("players", () => {
     expect(ok.statusCode).toBe(200);
     expect(await me(cookie)).not.toBeNull();
     expect((await login("Bonny", "a-new-secret-1")).statusCode).toBe(200);
+  });
+});
+
+describe("doubloons", () => {
+  /** The admin (first account) and a player. */
+  async function crew() {
+    const captain = await signUp(t.app, "Captain");
+    const bonny = await signUp(t.app, "Bonny");
+    return {
+      captain: { ...captain, id: (await me(captain.cookie)).id as string },
+      bonny: { ...bonny, id: (await me(bonny.cookie)).id as string },
+    };
+  }
+  const adjust = (cookie: string, id: string, payload: object) =>
+    api("POST", `/api/admin/users/${id}/doubloons`, cookie, {
+      requestId: randomUUID(),
+      ...payload,
+    });
+
+  it("keeps everyone else out", async () => {
+    const { bonny } = await crew();
+    for (const [method, url, payload] of [
+      ["POST", `/api/admin/users/${bonny.id}/doubloons`, { delta: 5, note: "x" }],
+      ["GET", `/api/admin/users/${bonny.id}/ledger`, undefined],
+    ] as const) {
+      expect((await api(method, url, bonny.cookie, payload)).statusCode).toBe(403);
+      expect((await t.app.inject({ method, url, payload })).statusCode).toBe(401);
+    }
+    expect(await doubloonsOf(t.db, bonny.id)).toBe(0);
+  });
+
+  it("adds and removes doubloons with a reason, but never below zero", async () => {
+    const { captain, bonny } = await crew();
+    const add = await adjust(captain.cookie, bonny.id, { delta: 500, note: "Lost game refund" });
+    expect(add.statusCode).toBe(200);
+    expect(add.json()).toEqual({ doubloons: 500 });
+    const [row] = await ledgerRows(t.db, bonny.id);
+    expect(row).toMatchObject({ reason: "admin", delta: 500, note: "Lost game refund" });
+    expect(row!.actorId).toBe(captain.id);
+    const listed = (await api("GET", "/api/admin/users?q=bonny", captain.cookie)).json().users;
+    expect(listed[0]).toMatchObject({ username: "Bonny", doubloons: 500 });
+
+    const over = await adjust(captain.cookie, bonny.id, { delta: -600, note: "Oops" });
+    expect(over.statusCode).toBe(409);
+    expect(over.json().error).toMatch(/below zero/);
+    expect(await doubloonsOf(t.db, bonny.id)).toBe(500);
+    expect(await ledgerRows(t.db, bonny.id)).toHaveLength(1);
+
+    expect((await adjust(captain.cookie, bonny.id, { delta: -200, note: "Fix" })).json()).toEqual({
+      doubloons: 300,
+    });
+    await expectLedgerMatches(t.db);
+  });
+
+  it("checks the amount, the reason and the request id", async () => {
+    const { captain, bonny } = await crew();
+    for (const payload of [
+      { delta: 0, note: "x" },
+      { delta: 1.5, note: "x" },
+      { delta: 100_001, note: "x" },
+      { delta: -100_001, note: "x" },
+      { delta: 5 },
+      { delta: 5, note: "   " },
+      { delta: 5, note: "x".repeat(201) },
+      { delta: 5, note: "x", requestId: "not-a-uuid" },
+    ]) {
+      const res = await adjust(captain.cookie, bonny.id, payload);
+      expect(res.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+    expect((await adjust(captain.cookie, bonny.id, { delta: 100_000, note: "x" })).statusCode).toBe(
+      200,
+    );
+    expect(await ledgerRows(t.db, bonny.id)).toHaveLength(1);
+  });
+
+  it("says when there's no such player", async () => {
+    const { captain } = await crew();
+    for (const id of [randomUUID(), "not-a-player"]) {
+      expect((await adjust(captain.cookie, id, { delta: 5, note: "x" })).statusCode).toBe(404);
+    }
+    expect((await api("GET", "/api/admin/users/nope/ledger", captain.cookie)).statusCode).toBe(404);
+  });
+
+  it("applies two separate adjustments, but a retried one only once", async () => {
+    const { captain, bonny } = await crew();
+    await adjust(captain.cookie, bonny.id, { delta: 50, note: "Bonus" });
+    await adjust(captain.cookie, bonny.id, { delta: 50, note: "Bonus" });
+    expect(await doubloonsOf(t.db, bonny.id)).toBe(100);
+    const requestId = randomUUID();
+    const first = await adjust(captain.cookie, bonny.id, { delta: 70, note: "Once", requestId });
+    const retry = await adjust(captain.cookie, bonny.id, { delta: 70, note: "Once", requestId });
+    expect(first.json()).toEqual({ doubloons: 170 });
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json()).toEqual({ doubloons: 170 });
+    expect(await ledgerRows(t.db, bonny.id)).toHaveLength(3);
+  });
+
+  it("lets an admin adjust their own doubloons", async () => {
+    const { captain } = await crew();
+    const res = await adjust(captain.cookie, captain.id, { delta: 25, note: "Testing" });
+    expect(res.json()).toEqual({ doubloons: 25 });
+    expect((await me(captain.cookie)).doubloons).toBe(25);
+  });
+
+  it("shows a player's latest 100 ledger rows, newest first, with who made changes", async () => {
+    const { captain, bonny } = await crew();
+    const days = Array.from({ length: 105 }, (_, i) => new Date(Date.UTC(2026, 0, 1 + i)));
+    for (const [i, day] of days.entries()) {
+      await credit(t.db, bonny.id, 10, "daily", day.toISOString().slice(0, 10), { now: day });
+      if (i === 104) {
+        await credit(t.db, bonny.id, -5, "admin", randomUUID(), {
+          note: "Duplicate puzzle",
+          actorId: captain.id,
+          now: new Date(day.getTime() + 1000),
+        });
+      }
+    }
+    const { rows } = (
+      await api("GET", `/api/admin/users/${bonny.id}/ledger`, captain.cookie)
+    ).json();
+    expect(rows).toHaveLength(100);
+    expect(rows[0]).toMatchObject({
+      delta: -5,
+      reason: "admin",
+      note: "Duplicate puzzle",
+      actor: "Captain",
+    });
+    expect(rows[1]).toMatchObject({ reason: "daily", ref: "2026-04-15", actor: null });
+    const times = rows.map((r: { createdAt: string }) => r.createdAt);
+    expect(times).toEqual([...times].sort().reverse());
+  });
+
+  it("shows the doubloons paid out today and the top earners on the overview", async () => {
+    const { captain, bonny } = await crew();
+    const cara = await signUp(t.app, "Cara");
+    const caraId = (await me(cara.cookie)).id;
+    const today = new Date().toISOString().slice(0, 10);
+    await credit(t.db, bonny.id, 25, "daily", today);
+    await credit(t.db, bonny.id, 50, "firstWinOfDay", today);
+    await credit(t.db, caraId, 10, "daily", today);
+    // Admin changes and yesterday's earnings don't count.
+    await adjust(captain.cookie, captain.id, { delta: 1000, note: "Testing" });
+    await credit(t.db, caraId, 500, "botWin", randomUUID(), {
+      now: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    });
+    const overview = (await api("GET", "/api/admin/overview", captain.cookie)).json();
+    expect(overview.doubloonsIssuedToday).toBe(85);
+    expect(overview.topEarnersToday).toEqual([
+      { id: bonny.id, username: "Bonny", doubloons: 75 },
+      { id: caraId, username: "Cara", doubloons: 10 },
+    ]);
   });
 });
 
