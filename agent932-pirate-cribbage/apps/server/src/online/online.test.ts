@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { eq, sql } from "drizzle-orm";
+import { games, matches, walletLedger } from "../db/schema.js";
+import { expectLedgerMatches } from "../test/ledger.js";
 import { signUp, testApp } from "../test/testApp.js";
 import {
   LONG,
   type StateMsg,
+  type TestClient,
   connect,
   matchedPair,
   move,
@@ -222,6 +226,132 @@ describe("online play", () => {
     expect(s.step.view.hand).toEqual(sa.step.view.hand);
     expect([...s.names].sort()).toEqual(["Anne", "Bonny"]);
     await app2.close();
+  });
+
+  describe("doubloons", () => {
+    /** Move a game's start back 10 minutes, so it's long enough to pay. */
+    const backdate = (gameId: string) =>
+      t.db
+        .update(games)
+        .set({ createdAt: sql`now() - interval '10 minutes'` })
+        .where(eq(games.id, gameId));
+    const gameOver = (c: TestClient) =>
+      c.next<StateMsg>((m) => m.t === "state" && m.step.view.phase === "gameOver");
+    /** Both players' final states, winner first. */
+    async function results(a: TestClient, b: TestClient) {
+      const [ea, eb] = [await gameOver(a), await gameOver(b)];
+      return ea.seat === ea.step.view.winner ? [ea, eb] : [eb, ea];
+    }
+    const doubloons = async (cookie: string) =>
+      (await t.app.inject({ url: "/api/auth/me", headers: { cookie } })).json().user.doubloons;
+    const notForAchievements = (s: StateMsg) =>
+      s.reward!.lines.filter((l) => l.reason !== "achievement");
+
+    it("pays the winner, and shows each player only their own reward", async () => {
+      const { gameId, a, b, anne, bonny } = await pair();
+      await backdate(gameId);
+      await playOut(gameId, [a, b]);
+      const [won, lost] = await results(a, b);
+      expect(won!.reward!.lines).toContainEqual({ reason: "onlineWin", delta: 50 });
+      expect(won!.reward!.lines).toContainEqual({ reason: "firstWinOfDay", delta: 50 });
+      expect(won!.reward!.note).toBeNull();
+      expect(notForAchievements(lost!)).toEqual([]);
+      expect(lost!.reward!.note).toBeNull();
+      const paid = await t.db
+        .select()
+        .from(walletLedger)
+        .where(eq(walletLedger.reason, "onlineWin"));
+      expect(paid).toHaveLength(1);
+      // Earlier states never carry a reward.
+      for (const c of [a, b]) {
+        const states = c.messages.filter((m): m is StateMsg => m.t === "state");
+        expect(states.filter((m) => m.reward)).toHaveLength(1);
+      }
+      const [ea, eb] = a.latestState()!.seat === won!.seat ? [won, lost] : [lost, won];
+      expect(await doubloons(anne.cookie)).toBe(ea!.reward!.balance);
+      expect(await doubloons(bonny.cookie)).toBe(eb!.reward!.balance);
+      await expectLedgerMatches(t.db);
+    }, 60_000);
+
+    it("pays a ranked win 60", async () => {
+      t = await testApp(undefined, LONG);
+      const { gameId, a, b } = await matchedPair(t, { variant: "classic", ranked: true });
+      await backdate(gameId);
+      await playOut(gameId, [a, b]);
+      const [won] = await results(a, b);
+      expect(won!.reward!.lines).toContainEqual({ reason: "rankedWin", delta: 60 });
+      await expectLedgerMatches(t.db);
+    }, 60_000);
+
+    it("pays nothing for an early forfeit, to either player", async () => {
+      const { gameId, a, b } = await pair();
+      await backdate(gameId);
+      a.send({ t: "forfeit", gameId });
+      const [won, lost] = await results(a, b);
+      expect(won!.seat).toBe(b.latestState()!.seat);
+      expect(won!.reward).toEqual({ lines: [], total: 0, balance: 0, note: "earlyForfeit" });
+      expect(lost!.reward).toEqual({ lines: [], total: 0, balance: 0, note: null });
+      await expectLedgerMatches(t.db);
+    });
+
+    it("pays nothing for a game under 3 minutes", async () => {
+      const { gameId, a, b } = await pair();
+      await playOut(gameId, [a, b]);
+      const [won] = await results(a, b);
+      expect(won!.reward!.note).toBe("short");
+      expect(notForAchievements(won!)).toEqual([]);
+      await expectLedgerMatches(t.db);
+    }, 60_000);
+
+    it("keeps nothing when paying fails at the end of a game, and carries on", async () => {
+      const { gameId, a, b } = await pair();
+      await backdate(gameId);
+      await t.db.execute(sql`
+        create function boom() returns trigger language plpgsql as $$
+        begin raise exception 'boom'; end $$`);
+      await t.db.execute(
+        sql`create trigger boom before insert on wallet_ledger for each row execute function boom()`,
+      );
+      await expect(playOut(gameId, [a, b])).rejects.toThrow("Something went wrong");
+      expect(await t.db.select().from(matches)).toEqual([]);
+      expect(await t.db.select().from(walletLedger)).toEqual([]);
+      const [game] = await t.db.select().from(games).where(eq(games.id, gameId));
+      expect(game!.finishedAt).toBeNull();
+      expect(game!.state.phase).not.toBe("gameOver");
+      expect((await t.app.inject({ url: "/api/health" })).statusCode).toBe(200);
+
+      // Once the fault is gone, the last move goes through and the game is paid as usual.
+      await t.db.execute(sql`drop trigger boom on wallet_ledger`);
+      await playOut(gameId, [a, b]);
+      const [won] = await results(a, b);
+      expect(won!.reward!.lines).toContainEqual({ reason: "onlineWin", delta: 50 });
+      expect(await t.db.select().from(matches)).toHaveLength(1);
+      await expectLedgerMatches(t.db);
+    }, 60_000);
+
+    it("survives a forfeit that can't be saved while nobody is watching", async () => {
+      const { gameId, a, b } = await pair({
+        turnMs: 60_000,
+        nextRoundMs: 60_000,
+        disconnectMs: 100,
+      });
+      await t.db.execute(sql`
+        create function boom() returns trigger language plpgsql as $$
+        begin raise exception 'boom'; end $$`);
+      await t.db.execute(
+        sql`create trigger boom before insert on matches for each row execute function boom()`,
+      );
+      a.ws.terminate();
+      // The forfeit clock runs out and fails; the server logs it and keeps going.
+      await new Promise((r) => setTimeout(r, 500));
+      expect(b.messages.some((m) => m.t === "forfeit")).toBe(false);
+      const [game] = await t.db.select().from(games).where(eq(games.id, gameId));
+      expect(game!.finishedAt).toBeNull();
+      expect((await t.app.inject({ url: "/api/health" })).statusCode).toBe(200);
+      await expect(
+        move(b, gameId, nextMove(b.latestState()!.step.view, false)!),
+      ).resolves.toBeTruthy();
+    });
   });
 
   describe("emotes", () => {

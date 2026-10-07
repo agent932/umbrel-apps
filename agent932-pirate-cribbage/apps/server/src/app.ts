@@ -130,8 +130,11 @@ export async function buildApp({
   const presence = new Presence();
   // Online games live here; the admin page lists and can end them.
   const notices = new Notices(db, mailer, app.log);
-  const rooms = new RoomManager(db, timing, (userId, opponent, gameId) =>
-    notices.gameWaiting(userId, opponent, gameId),
+  const rooms = new RoomManager(
+    db,
+    timing,
+    (userId, opponent, gameId) => notices.gameWaiting(userId, opponent, gameId),
+    app.log,
   );
   app.addHook("onClose", async () => rooms.close());
   await app.register(onlineRoutes, {

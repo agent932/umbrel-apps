@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { GameEvent, PlayerView, Seat } from "@pirate/engine";
+import type { GameEvent, PlayerView, Reward, Seat } from "@pirate/engine";
 import { ClientAction } from "../games/actions.js";
 
 export const Menu = z.object({
@@ -54,6 +54,8 @@ export type ServerMessage =
       online: [boolean, boolean];
       returnBy: [number | null, number | null];
       nextRoundReady: Seat[];
+      /** This player's doubloons, on the gameOver state sent as the game finishes. */
+      reward?: Reward;
     }
   | { t: "waiting"; gameId: string; for: "nextRound"; ready: Seat[] }
   | {

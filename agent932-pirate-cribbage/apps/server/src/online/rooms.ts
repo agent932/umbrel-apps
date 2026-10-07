@@ -1,8 +1,10 @@
+import type { FastifyBaseLogger } from "fastify";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   type Action,
   type GameEvent,
   type GameState,
+  type Reward,
   type RuleSet,
   type Seat,
   applyAction,
@@ -62,6 +64,20 @@ interface Player {
 
 export class RoomError extends Error {}
 
+/** The game as it stands once `seat` forfeits: the other player wins, with no skunk. */
+export function forfeitState(current: GameState, seat: Seat): GameState {
+  const state = structuredClone(current);
+  state.winner = other(seat);
+  state.skunk = 0;
+  state.phase = "gameOver";
+  state.pegging = null;
+  // An unfinished round isn't in the history yet; keep it so its cards still count for stats.
+  if (state.current && !state.current.complete) {
+    state.history.push(state.current);
+  }
+  return state;
+}
+
 /** One online game in memory. All changes go through `run`, so moves are applied one at a time. */
 class Room {
   readonly clients: [Set<Client>, Set<Client>] = [new Set(), new Set()];
@@ -111,6 +127,8 @@ export class RoomManager {
     private timing: Timing = DEFAULT_TIMING,
     /** Called when a player's clock to come back starts (for the opt-in email notice). */
     private onAway?: (userId: string, opponent: string, gameId: string) => void,
+    /** Where failures in timer-driven moves and forfeits are reported. */
+    private log: Pick<FastifyBaseLogger, "error"> = { error: (e: unknown) => console.error(e) },
   ) {}
 
   /** Start a game between two players. Seats are assigned at random, as is the first dealer. */
@@ -231,7 +249,9 @@ export class RoomManager {
     room.returnBy[seat] = Date.now() + this.timing.disconnectMs;
     this.broadcastPresence(room);
     room.disconnectTimers[seat] = setTimeout(() => {
-      void room.run(() => this.forfeit(room, seat));
+      void room
+        .run(() => this.forfeit(room, seat))
+        .catch((err: unknown) => this.log.error({ err, gameId: room.id }, "forfeit failed"));
     }, this.timing.disconnectMs);
   }
 
@@ -312,6 +332,7 @@ export class RoomManager {
   /** Apply a move (throws IllegalActionError for bad ones), deal if needed, tell everyone, save. */
   private async apply(room: Room, action: Action) {
     const events: GameEvent[] = [];
+    const before = room.state;
     let { state } = room;
     const step = (a: Action) => {
       const result = applyAction(state, a);
@@ -328,14 +349,18 @@ export class RoomManager {
     room.state = state;
 
     const finished = state.phase === "gameOver";
-    await this.db
-      .update(games)
-      .set({ state, updatedAt: new Date(), finishedAt: finished ? new Date() : null })
-      .where(eq(games.id, room.id));
-    if (finished) await this.finish(room, null);
+    // A finished game is saved by finish(), in the same transaction that records and pays it.
+    const rewards = finished ? await this.finish(room, null, before) : null;
+    if (!finished) {
+      await this.db
+        .update(games)
+        .set({ state, updatedAt: new Date(), finishedAt: null })
+        .where(eq(games.id, room.id));
+    }
 
     for (const seat of [0, 1] as Seat[]) {
-      for (const client of room.clients[seat]) this.sendState(room, seat, client, events);
+      const reward = rewards?.get(room.players[seat].userId);
+      for (const client of room.clients[seat]) this.sendState(room, seat, client, events, reward);
     }
     if (!finished) this.schedule(room);
   }
@@ -343,52 +368,69 @@ export class RoomManager {
   /** Give the game to the other player. */
   private async forfeit(room: Room, seat: Seat) {
     if (room.state.phase === "gameOver") return;
-    const state = structuredClone(room.state);
-    state.winner = other(seat);
-    state.skunk = 0;
-    state.phase = "gameOver";
-    state.pegging = null;
-    // An unfinished round isn't in the history yet; keep it so its cards still count for stats.
-    if (state.current && !state.current.complete) {
-      state.history.push(state.current);
-    }
-    room.state = state;
-    await this.db
-      .update(games)
-      .set({ state, updatedAt: new Date(), finishedAt: new Date() })
-      .where(eq(games.id, room.id));
-    await this.finish(room, seat);
+    const before = room.state;
+    room.state = forfeitState(room.state, seat);
+    const rewards = await this.finish(room, seat, before);
     const events: GameEvent[] = [{ type: "gameOver", winner: other(seat), skunk: 0 }];
     for (const s of [0, 1] as Seat[]) {
+      const reward = rewards.get(room.players[s].userId);
       for (const client of room.clients[s]) {
         client.send({ t: "forfeit", gameId: room.id, seat });
-        this.sendState(room, s, client, events);
+        this.sendState(room, s, client, events, reward);
       }
     }
   }
 
-  private async finish(room: Room, forfeitedBy: Seat | null) {
+  /**
+   * Save the finished game (room.state), rate it, record it and pay doubloons, all in one
+   * transaction. If anything fails, nothing is kept: the game goes back to `before` (which is
+   * still what's saved), its clock restarts so play can carry on, and the error is passed on.
+   * Returns what each player earned, by user id.
+   */
+  private async finish(
+    room: Room,
+    forfeitedBy: Seat | null,
+    before: GameState,
+  ): Promise<Map<string, Reward>> {
+    let rewards: Map<string, Reward>;
+    try {
+      rewards = await this.db.transaction(async (tx) => {
+        // The saved start time is the authority (the room's copy is only a fallback).
+        const [g] = await tx
+          .select({ createdAt: games.createdAt })
+          .from(games)
+          .where(eq(games.id, room.id));
+        const ratings = room.ranked ? await this.rate(tx, room) : null;
+        const seasonId = room.ranked ? (await currentSeason(tx)).id : null;
+        const paid = await recordMatch(
+          tx,
+          {
+            id: room.id,
+            mode: "online",
+            aiLevel: null,
+            createdAt: g?.createdAt ?? room.createdAt,
+            ranked: room.ranked,
+            seasonId,
+          },
+          [room.players[0].userId, room.players[1].userId],
+          room.state,
+          forfeitedBy,
+          ratings,
+        );
+        await tx
+          .update(games)
+          .set({ state: room.state, updatedAt: new Date(), finishedAt: new Date() })
+          .where(eq(games.id, room.id));
+        return paid;
+      });
+    } catch (err) {
+      room.state = before;
+      this.schedule(room);
+      throw err;
+    }
     this.clearTimers(room);
-    await this.db.transaction(async (tx) => {
-      const ratings = room.ranked ? await this.rate(tx, room) : null;
-      const seasonId = room.ranked ? (await currentSeason(tx)).id : null;
-      await recordMatch(
-        tx,
-        {
-          id: room.id,
-          mode: "online",
-          aiLevel: null,
-          createdAt: room.createdAt,
-          ranked: room.ranked,
-          seasonId,
-        },
-        [room.players[0].userId, room.players[1].userId],
-        room.state,
-        forfeitedBy,
-        ratings,
-      );
-    });
     this.rooms.delete(room.id);
+    return rewards;
   }
 
   /** Update both players' Elo ratings (rows locked, so two games ending at once can't clash). */
@@ -397,6 +439,7 @@ export class RoomManager {
       .select({ id: users.id, rating: users.rating })
       .from(users)
       .where(or(eq(users.id, room.players[0].userId), eq(users.id, room.players[1].userId)))
+      .orderBy(users.id)
       .for("update");
     const seats = [0, 1] as Seat[];
     const before = seats.map((s) => rows.find((r) => r.id === room.players[s].userId)!.rating);
@@ -436,7 +479,7 @@ export class RoomManager {
             return;
           }
         })
-        .catch(() => undefined);
+        .catch((err: unknown) => this.log.error({ err, gameId: room.id }, "timed move failed"));
     }, ms);
   }
 
@@ -447,7 +490,8 @@ export class RoomManager {
     room.disconnectTimers = [null, null];
   }
 
-  private sendState(room: Room, seat: Seat, client: Client, events: GameEvent[]) {
+  /** `reward` goes only with the gameOver state sent as the game finishes, to that seat. */
+  private sendState(room: Room, seat: Seat, client: Client, events: GameEvent[], reward?: Reward) {
     client.send({
       t: "state",
       gameId: room.id,
@@ -460,6 +504,7 @@ export class RoomManager {
       online: [room.online(0), room.online(1)],
       returnBy: room.returnBy,
       nextRoundReady: [...room.nextRoundVotes],
+      ...(reward && { reward }),
     });
   }
 
