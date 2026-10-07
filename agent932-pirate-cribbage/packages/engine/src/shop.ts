@@ -16,10 +16,14 @@ export interface Cosmetics {
 /** The host's choice, copied into an online game when it starts (server only). */
 export interface TableCosmetics extends Cosmetics {
   hostId: string;
+  /** Something the host uses is a preview (the shop is closed), so the defaults went in its place. */
+  withheld?: true;
 }
 /** What the online state message carries: never the host's user id, only their seat. */
 export interface OnlineCosmetics extends Cosmetics {
   hostSeat: Seat;
+  /** Sent to the host alone: the table draws the defaults in place of their preview items. */
+  withheld?: true;
 }
 
 export const DEFAULT_COSMETICS: Cosmetics = {

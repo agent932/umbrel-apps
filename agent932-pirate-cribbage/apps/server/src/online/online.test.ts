@@ -900,11 +900,15 @@ describe("online play", () => {
       } = await anneHosts((captain) => uses(captain, ANNES), ["Captain", "Bonny"]);
       expect(captain.res.json().user.isAdmin).toBe(true);
       expect(bonny.res.json().user.isAdmin).toBe(false);
-      // A preview only Captain sees: it isn't kept with the game either.
-      for (const s of [sa, sb]) {
-        expect(s.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: sa.seat });
-      }
-      expect(await stored(gameId)).toEqual({ hostId: idOf(captain), ...DEFAULT_COSMETICS });
+      // A preview only Captain sees: it isn't kept with the game either. Only Captain is told
+      // the defaults stand in for his.
+      expect(sa.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: sa.seat, withheld: true });
+      expect(sb.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: sa.seat });
+      expect(await stored(gameId)).toEqual({
+        hostId: idOf(captain),
+        ...DEFAULT_COSMETICS,
+        withheld: true,
+      });
 
       await setShopOpen(t.db, true);
       const [oa, ob] = await watch(await queueAgain(a, b), a, b);
@@ -923,6 +927,51 @@ describe("online play", () => {
       // Bonny waits first this time, so she hosts.
       const [cb, ca] = await watch(await queueAgain(b, a), b, a);
       for (const s of [ca, cb]) expect(s.cosmetics).toEqual({ ...BONNYS, hostSeat: cb.seat });
+      await expectLedgerMatches(t.db);
+      await expectPurchasesMatch(t.db, idOf(bonny));
+    });
+
+    it("keeps what an admin bought in the preview to them while the shop is closed, after they stop being an admin", async () => {
+      const admin = (who: SignedUp, by: SignedUp, isAdmin: boolean) =>
+        post(`/api/admin/users/${idOf(who)}/admin`, by.cookie, { isAdmin });
+      const buy = async (who: SignedUp, itemId: string, price: number) => {
+        expect((await post("/api/shop/buy", who.cookie, { itemId, price })).statusCode).toBe(200);
+        expect((await use(who, itemId)).statusCode).toBe(200);
+      };
+      const { a, b, anne, bonny } = await connected(async (anne, bonny) => {
+        // Anne (the first account) makes Bonny an admin, so Bonny can look round the closed
+        // shop; Bonny buys and uses two items there; then Anne takes the role back.
+        expect((await admin(bonny, anne, true)).statusCode).toBe(200);
+        await credit(t.db, idOf(bonny), 3500, "admin", randomUUID());
+        await buy(bonny, ANNES.board, 1500);
+        await buy(bonny, ANNES.deck, 1000);
+        expect((await admin(bonny, anne, false)).statusCode).toBe(200);
+      });
+      expect(anne.res.json().user.isAdmin).toBe(true);
+      // Bonny waits first, so she hosts: what she bought in the preview still shows only to her.
+      const closed = await queueAgain(b, a);
+      const [cb, ca] = await watch(closed, b, a);
+      expect(cb.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: cb.seat, withheld: true });
+      expect(ca.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: cb.seat });
+      expect(await stored(closed)).toEqual({
+        hostId: idOf(bonny),
+        ...DEFAULT_COSMETICS,
+        withheld: true,
+      });
+
+      // Once the shop opens, everyone sees them.
+      await setShopOpen(t.db, true);
+      const [ob, oa] = await watch(await queueAgain(b, a), b, a);
+      for (const s of [oa, ob]) expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: ob.seat });
+
+      // She buys the Ghost backs while it's open and uses them; then it closes again. The backs
+      // show; the board, bought in the preview, doesn't.
+      await buy(bonny, "deck.ghost", 1000);
+      await setShopOpen(t.db, false);
+      const [pb, pa] = await watch(await queueAgain(b, a), b, a);
+      const mixed = { board: DEFAULT_COSMETICS.board, deck: "deck.ghost" };
+      expect(pb.cosmetics).toEqual({ ...mixed, hostSeat: pb.seat, withheld: true });
+      expect(pa.cosmetics).toEqual({ ...mixed, hostSeat: pb.seat });
       await expectLedgerMatches(t.db);
       await expectPurchasesMatch(t.db, idOf(bonny));
     });

@@ -367,6 +367,9 @@ export const inventory = pgTable(
       .notNull()
       .references(() => shopItems.id, { onDelete: "restrict" }),
     acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Bought by an admin while the shop was closed. While it's closed, a preview shows only to
+     *  its owner (D-32), even once they're no longer an admin. */
+    preview: boolean("preview").notNull().default(false),
   },
   (t) => [primaryKey({ columns: [t.userId, t.itemId] }), index("inventory_item").on(t.itemId)],
 );

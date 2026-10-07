@@ -394,7 +394,15 @@ function GameTable({ game, onExit, onPlayAgain, instant, myAvatar, tutorial, gue
           round={view.round}
           pirate={!!pirate}
           oppName={oppName}
-          hostIsYou={online?.cosmetics ? online.cosmetics.hostSeat === me : undefined}
+          whose={
+            !online?.cosmetics
+              ? undefined
+              : online.cosmetics.hostSeat !== me
+                ? "theirs"
+                : online.cosmetics.withheld
+                  ? "defaults"
+                  : "yours"
+          }
           onExit={onExit}
           onForfeit={online && view.phase !== "gameOver" ? online.forfeit : undefined}
           onReport={

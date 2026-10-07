@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CLASSIC_RULES, type OnlineCosmetics, botAction, other } from "@pirate/engine";
+import {
+  CLASSIC_RULES,
+  DEFAULT_COSMETICS,
+  type OnlineCosmetics,
+  botAction,
+  other,
+} from "@pirate/engine";
 import type { User } from "../api.js";
 import { AuthProvider, useAuth } from "../auth.js";
 import { ViewerCosmetics } from "../brand/cosmetics.js";
@@ -145,6 +151,30 @@ describe("the board and backs at the table", () => {
     expect(ownBack()).toBe("crimson");
     expect(boardSkin()).toBe("serpent-reef");
     expect(fanBacks()).toEqual(Array(6).fill("cribbage-logo"));
+  });
+
+  it("tells a host whose own are a preview that the table has the defaults", async () => {
+    const user = userEvent.setup();
+    // An admin using preview items while the shop is closed: the server sent the defaults.
+    signedIn({ isAdmin: true, equippedBoard: "board.krakens-reef", equippedDeck: "deck.crimson" });
+    const { unmount } = show(onlineGame({ ...DEFAULT_COSMETICS, hostSeat: YOU, withheld: true }));
+    await known();
+    expect(boardSkin()).toBe("serpent-reef");
+    expect(fanBacks()).toEqual(Array(6).fill("cribbage-logo"));
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveTextContent(
+      "Board and card backs: the defaults (what you use shows only to you until the shop opens)",
+    );
+    unmount();
+
+    // Hosting with what they use on the table: theirs.
+    show(onlineGame({ board: "board.krakens-reef", deck: "deck.crimson", hostSeat: YOU }));
+    await known();
+    expect(boardSkin()).toBe("krakens-reef");
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveTextContent(
+      "Board and card backs: yours",
+    );
   });
 
   it("the table menu of a crew game doesn't say whose board it is", async () => {

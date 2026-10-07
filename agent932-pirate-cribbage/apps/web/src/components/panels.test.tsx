@@ -148,28 +148,37 @@ describe("menus close when you're done with them", () => {
 });
 
 describe("the table menu says whose board it is", () => {
-  const menu = (hostIsYou?: boolean) =>
+  const menu = (whose?: "yours" | "theirs" | "defaults") =>
     render(
       <TableMenu
         round={2}
         pirate={false}
         oppName="Anne"
-        hostIsYou={hostIsYou}
+        whose={whose}
         onExit={() => {}}
         onClose={() => {}}
       />,
     );
 
   it("online: yours when you host, otherwise the other player's", () => {
-    const { unmount } = menu(true);
+    const { unmount } = menu("yours");
     expect(screen.getByRole("dialog", { name: "Menu" })).toHaveTextContent(
       "Board and card backs: yours",
     );
     unmount();
-    menu(false);
+    menu("theirs");
     expect(screen.getByRole("dialog", { name: "Menu" })).toHaveTextContent(
       "Board and card backs: Anne's",
     );
+  });
+
+  it("online: the defaults when you host with a preview the shop hasn't opened yet", () => {
+    menu("defaults");
+    const text = screen.getByRole("dialog", { name: "Menu" }).textContent;
+    expect(text).toContain(
+      "Board and card backs: the defaults (what you use shows only to you until the shop opens)",
+    );
+    expect(text).not.toContain("yours");
   });
 
   it("says nothing against the crew, where they're always yours", () => {

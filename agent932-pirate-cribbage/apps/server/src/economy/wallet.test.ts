@@ -141,29 +141,42 @@ describe("the ledger is append-only", () => {
   for (const f of files) f.text = readFileSync(join(src, f.path), "utf8");
   const where = (pattern: RegExp) => files.filter((f) => pattern.test(f.text)).map((f) => f.path);
 
+  // What the scan looks for. A table may be named on its own or through the whole schema
+  // (`schema.inventory`: db/client.ts imports it that way).
+  const LEDGER_INSERT = /insert\((schema\.)?walletLedger\)/;
+  const LEDGER_CHANGE = /(update|delete)\((schema\.)?walletLedger\)/;
+  const LEDGER_SPLICED = /\$\{(schema\.)?walletLedger\}/;
+  const SET_DOUBLOONS = /\.(set|values)\(\s*\{[^}]*\bdoubloons\b/;
+  const INVENTORY_INSERT = /insert\((schema\.)?inventory\)/;
+  const INVENTORY_CHANGE = /(update|delete)\((schema\.)?inventory\)/;
+  const INVENTORY_RAW = /(insert\s+into|update|delete\s+from)\s+"?inventory\b/i;
+  const INVENTORY_SPLICED = /\$\{(schema\.)?inventory\}/;
+
   it("is written only by economy/wallet.ts, and never changed or deleted", () => {
     expect(files.length).toBeGreaterThan(20);
-    expect(where(/insert\(walletLedger\)/)).toEqual(["economy/wallet.ts"]);
-    expect(where(/(update|delete)\(walletLedger\)/)).toEqual([]);
+    expect(where(LEDGER_INSERT)).toEqual(["economy/wallet.ts"]);
+    expect(where(LEDGER_CHANGE)).toEqual([]);
   });
 
   it("has balances set only by economy/wallet.ts, and no raw SQL around it", () => {
-    expect(where(/\.(set|values)\(\s*\{[^}]*\bdoubloons\b/)).toEqual(["economy/wallet.ts"]);
+    expect(where(SET_DOUBLOONS)).toEqual(["economy/wallet.ts"]);
     expect(where(/set\s+"?doubloons"?\s*=/i)).toEqual([]);
     // Raw SQL would have to name the table, or splice it in whole.
     expect(where(/wallet_ledger/)).toEqual(["db/schema.ts"]);
-    expect(where(/\$\{walletLedger\}/)).toEqual([]);
+    expect(where(LEDGER_SPLICED)).toEqual([]);
   });
 
   // A purchase's ledger row is keyed by the item, so each item is charged once, ever. That is
   // only fair while a bought item can't be taken away.
   it("has inventory rows added only by economy/shop.ts, after a wallet lock, and never changed or deleted", () => {
-    expect(where(/insert\(inventory\)/)).toEqual(["economy/shop.ts"]);
-    expect(where(/(update|delete)\(inventory\)/)).toEqual([]);
-    expect(where(/(insert\s+into|update|delete\s+from)\s+"?inventory\b/i)).toEqual([]);
+    expect(where(INVENTORY_INSERT)).toEqual(["economy/shop.ts"]);
+    expect(where(INVENTORY_CHANGE)).toEqual([]);
+    // Raw SQL would have to name the table, or splice it in whole.
+    expect(where(INVENTORY_RAW)).toEqual([]);
+    expect(where(INVENTORY_SPLICED)).toEqual([]);
     // Each insert is inside a transaction that locked the wallet first.
     const shop = files.find((f) => f.path === "economy/shop.ts")!.text;
-    const inserts = [...shop.matchAll(/insert\(inventory\)/g)];
+    const inserts = [...shop.matchAll(new RegExp(INVENTORY_INSERT, "g"))];
     expect(inserts.length).toBeGreaterThan(0);
     for (const m of inserts) {
       const before = shop.slice(0, m.index);
@@ -175,10 +188,20 @@ describe("the ledger is append-only", () => {
 
   it("is checked by these patterns (they catch a direct write)", () => {
     const bad = "await db.update(users).set({ doubloons: sql`0` }); db.delete(walletLedger);";
-    expect(/\.(set|values)\(\s*\{[^}]*\bdoubloons\b/.test(bad)).toBe(true);
-    expect(/(update|delete)\(walletLedger\)/.test(bad)).toBe(true);
-    const careless = 'await tx.delete(inventory); await db.execute(sql`delete from "inventory"`);';
-    expect(/(update|delete)\(inventory\)/.test(careless)).toBe(true);
-    expect(/(insert\s+into|update|delete\s+from)\s+"?inventory\b/i.test(careless)).toBe(true);
+    expect(SET_DOUBLOONS.test(bad)).toBe(true);
+    expect(LEDGER_CHANGE.test(bad)).toBe(true);
+    expect(LEDGER_INSERT.test("await tx.insert(schema.walletLedger).values({});")).toBe(true);
+    expect(LEDGER_CHANGE.test("await tx.update(schema.walletLedger).set({});")).toBe(true);
+    expect(LEDGER_SPLICED.test("await db.execute(sql`delete from ${walletLedger}`);")).toBe(true);
+    expect(INVENTORY_CHANGE.test("await tx.delete(inventory);")).toBe(true);
+    expect(INVENTORY_CHANGE.test("await tx.delete(schema.inventory);")).toBe(true);
+    expect(INVENTORY_INSERT.test("await tx.insert(schema.inventory).values({});")).toBe(true);
+    expect(INVENTORY_RAW.test('await db.execute(sql`delete from "inventory"`);')).toBe(true);
+    expect(
+      INVENTORY_SPLICED.test(
+        "await db.execute(sql`delete from ${inventory} where user_id = ${id}`);",
+      ),
+    ).toBe(true);
+    expect(INVENTORY_SPLICED.test("sql`select count(*) from ${schema.inventory}`")).toBe(true);
   });
 });

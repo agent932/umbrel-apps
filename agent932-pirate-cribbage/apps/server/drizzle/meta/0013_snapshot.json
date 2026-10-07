@@ -434,6 +434,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "preview": {
+          "name": "preview",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {

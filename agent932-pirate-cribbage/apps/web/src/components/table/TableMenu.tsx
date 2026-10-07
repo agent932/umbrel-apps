@@ -9,7 +9,7 @@ export function TableMenu({
   round,
   pirate,
   oppName,
-  hostIsYou,
+  whose,
   onExit,
   onForfeit,
   onReport,
@@ -19,9 +19,10 @@ export function TableMenu({
   round: number;
   pirate: boolean;
   oppName: string;
-  /** Online games: true when you host, so the board and card backs are yours; false when they're
-   *  the other player's. Unset against the crew. */
-  hostIsYou?: boolean;
+  /** Online games: whose board and card backs these are. "yours" when you host, "theirs" when the
+   *  other player does, and "defaults" when you host but what you use is a preview the shop hasn't
+   *  opened yet, so the table draws the defaults. Unset against the crew. */
+  whose?: "yours" | "theirs" | "defaults";
   onExit: () => void;
   /** Online games that are still going. */
   onForfeit?: () => void;
@@ -67,9 +68,14 @@ export function TableMenu({
         )}
       </div>
       {/* Answers "why isn't my board showing?": in quick match the host isn't always you. */}
-      {hostIsYou !== undefined && (
+      {whose && (
         <p className="mt-4 text-parchment/80">
-          Board and card backs: {hostIsYou ? "yours" : `${oppName}'s`}
+          Board and card backs:{" "}
+          {whose === "yours"
+            ? "yours"
+            : whose === "theirs"
+              ? `${oppName}'s`
+              : "the defaults (what you use shows only to you until the shop opens)"}
         </p>
       )}
       <div className="mt-4 border-t border-parchment/15 pt-3">

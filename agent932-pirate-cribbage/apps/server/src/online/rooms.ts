@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   type Action,
   DEFAULT_COSMETICS,
@@ -26,7 +26,7 @@ import {
   viewFor,
 } from "@pirate/engine";
 import type { Db } from "../db/client.js";
-import { games, users } from "../db/schema.js";
+import { games, inventory, users } from "../db/schema.js";
 import type { ClientAction } from "../games/actions.js";
 import { shopIsOpen } from "../economy/shopSwitch.js";
 import { lockWallets } from "../economy/wallet.js";
@@ -194,19 +194,42 @@ export class RoomManager {
   /**
    * The board and card backs the host uses now, read from the database: a Seeker is made when the
    * socket connects, so it can be out of date.
+   *
+   * D-32: while the shop is closed, a preview never reaches other players; the defaults go in its
+   * place. Everything an admin uses then is a preview, and so is an item bought while it was
+   * closed, even once its owner is no longer an admin.
    */
   private async hostCosmetics(hostId: string): Promise<TableCosmetics> {
     const [h] = await this.db
       .select({ board: users.equippedBoard, deck: users.equippedDeck, isAdmin: users.isAdmin })
       .from(users)
       .where(eq(users.id, hostId));
-    // D-32: what an admin uses while the shop is closed is a preview; it never reaches other
-    // players. A player can only own what they bought while it was open, so theirs always show.
-    const own = h && (!h.isAdmin || (await shopIsOpen(this.db))) ? h : null;
+    // The defaults are stored as null: only the rest can be previews.
+    const chosen = [h?.board, h?.deck].filter((id): id is string => !!id);
+    const previews = new Set<string>();
+    if (h && chosen.length > 0 && !(await shopIsOpen(this.db))) {
+      if (h.isAdmin) for (const id of chosen) previews.add(id);
+      else {
+        const bought = await this.db
+          .select({ itemId: inventory.itemId })
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.userId, hostId),
+              eq(inventory.preview, true),
+              inArray(inventory.itemId, chosen),
+            ),
+          );
+        for (const r of bought) previews.add(r.itemId);
+      }
+    }
+    const shown = (id: string | null | undefined) => (id && !previews.has(id) ? id : null);
     return {
       hostId,
-      board: own?.board ?? DEFAULT_COSMETICS.board,
-      deck: own?.deck ?? DEFAULT_COSMETICS.deck,
+      board: shown(h?.board) ?? DEFAULT_COSMETICS.board,
+      deck: shown(h?.deck) ?? DEFAULT_COSMETICS.deck,
+      // So the host's table menu can say why their own aren't on the table.
+      ...(previews.size > 0 && { withheld: true as const }),
     };
   }
 
@@ -683,11 +706,13 @@ export class RoomManager {
       seat,
       names: [room.players[0].username, room.players[1].username],
       avatars: [room.players[0].avatar ?? null, room.players[1].avatar ?? null],
-      // The host's seat, never their account id.
+      // The host's seat, never their account id. Only the host hears that the defaults stand in
+      // for their preview items.
       cosmetics: {
         board: room.cosmetics.board,
         deck: room.cosmetics.deck,
         hostSeat: room.hostSeat,
+        ...(room.cosmetics.withheld && seat === room.hostSeat && { withheld: true as const }),
       },
       ranked: room.ranked,
       step: { events: events.map((e) => redactEvent(e, seat)), view: viewFor(room.state, seat) },

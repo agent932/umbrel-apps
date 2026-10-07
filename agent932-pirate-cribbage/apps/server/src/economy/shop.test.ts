@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { DEFAULT_COSMETICS, SHOP_ITEMS, type ShopItemDef } from "@pirate/engine";
-import { shopItems, users } from "../db/schema.js";
+import { inventory, shopItems, users } from "../db/schema.js";
 import { doubloonsOf, expectLedgerMatches, ledgerRows } from "../test/ledger.js";
 import { expectPurchasesMatch, inventoryOf, setShopOpen } from "../test/shop.js";
 import { signUp, testApp } from "../test/testApp.js";
@@ -51,6 +51,15 @@ const post = (url: string, cookie: string | undefined, payload: object) =>
 const buy = (p: Player, itemId: string, price: number) =>
   post("/api/shop/buy", p.cookie, { itemId, price });
 const use = (p: Player, itemId: string) => post("/api/shop/use", p.cookie, { itemId });
+
+/** A player's items, with whether each was bought in the admin preview (while the shop was closed). */
+async function previews(id: string) {
+  const rows = await t.db
+    .select({ itemId: inventory.itemId, preview: inventory.preview })
+    .from(inventory)
+    .where(eq(inventory.userId, id));
+  return Object.fromEntries(rows.map((r) => [r.itemId, r.preview]));
+}
 
 /** What a player's users row says they use. */
 async function equippedColumns(id: string) {
@@ -153,7 +162,7 @@ describe("GET /api/shop", () => {
 describe("POST /api/shop/buy", () => {
   it("is for admins only while the shop is closed", async () => {
     const anne = await crew("Anne", 2000);
-    await credit(t.db, captain.id, 2000, "admin", randomUUID());
+    await credit(t.db, captain.id, 2500, "admin", randomUUID());
     const refused = await buy(anne, "board.treasure-map", 1500);
     expect(refused.statusCode).toBe(403);
     expect(refused.json()).toEqual({ error: "The shop isn't open yet", code: "closed" });
@@ -163,6 +172,14 @@ describe("POST /api/shop/buy", () => {
 
     expect((await buy(captain, "board.treasure-map", 1500)).statusCode).toBe(200);
     expect(await inventoryOf(t.db, captain.id)).toEqual(["board.treasure-map"]);
+    // Kept a preview, so no other player sees it while the shop is closed, even if Captain stops
+    // being an admin. Bought once it's open, it's an ordinary item.
+    await setShopOpen(t.db, true);
+    expect((await buy(captain, "deck.crimson", 1000)).statusCode).toBe(200);
+    expect(await previews(captain.id)).toEqual({
+      "board.treasure-map": true,
+      "deck.crimson": false,
+    });
   });
 
   it("charges the price and adds the item, without switching it on", async () => {
@@ -184,6 +201,7 @@ describe("POST /api/shop/buy", () => {
       { delta: -1500, refId: "board.treasure-map", note: null, actorId: null },
     ]);
     expect(await inventoryOf(t.db, anne.id)).toEqual(["board.treasure-map"]);
+    expect(await previews(anne.id)).toEqual({ "board.treasure-map": false });
     expect(await equippedColumns(anne.id)).toEqual({ board: null, deck: null });
     expect((await shop(anne.cookie)).json()).toMatchObject({
       doubloons: 1000,
@@ -283,6 +301,33 @@ describe("POST /api/shop/buy", () => {
     const exact = await buy(anne, "board.treasure-map", 1500);
     expect(exact.statusCode).toBe(200);
     expect(exact.json().doubloons).toBe(0);
+  });
+
+  it("gives back an item paid for whose inventory row is missing, without charging again", async () => {
+    // A purchase row with no item, as a repair by hand or a restore could leave behind.
+    await setShopOpen(t.db, true);
+    const anne = await crew("Anne", 3000);
+    await credit(t.db, anne.id, -1500, "purchase", "board.treasure-map");
+    expect(await doubloonsOf(t.db, anne.id)).toBe(1500);
+    expect(await inventoryOf(t.db, anne.id)).toEqual([]);
+
+    const res = await buy(anne, "board.treasure-map", 1500);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      doubloons: 1500,
+      owned: [
+        "board.serpent-reef",
+        "board.treasure-map",
+        "deck.cribbage-logo",
+        "deck.moon-compass",
+      ],
+    });
+    expect(await doubloonsOf(t.db, anne.id)).toBe(1500);
+    expect(await ledgerRows(t.db, anne.id, "purchase")).toMatchObject([
+      { delta: -1500, refId: "board.treasure-map" },
+    ]);
+    expect(await inventoryOf(t.db, anne.id)).toEqual(["board.treasure-map"]);
+    await expectPurchasesMatch(t.db, anne.id);
   });
 
   it("charges once when the same item is bought three times at once (one at a time on PGlite)", async () => {

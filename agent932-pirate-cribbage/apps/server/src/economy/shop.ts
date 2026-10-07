@@ -117,7 +117,8 @@ export async function shopRoutes(app: FastifyInstance, { db }: { db: Db }) {
     if (!user) return;
     const body = parseBody(BuyBody, req.body, reply);
     if (!body) return;
-    if (!user.isAdmin && !(await shopIsOpen(db)))
+    const open = await shopIsOpen(db);
+    if (!user.isAdmin && !open)
       return reply.code(403).send({ error: "The shop isn't open yet", code: "closed" });
     const out = await db
       .transaction(async (tx) => {
@@ -131,10 +132,12 @@ export async function shopRoutes(app: FastifyInstance, { db }: { db: Db }) {
         if (await hasBought(tx, user.id, item.id)) return { kind: "owned", item } as const;
         if (body.price !== item.price) return { kind: "priceChanged", item } as const;
         if (me.doubloons < item.price) return { kind: "short", item, have: me.doubloons } as const;
-        // Grant first: if the row is already there, nothing has been charged.
+        // Grant first: if the row is already there, nothing has been charged. Bought while the
+        // shop is closed (an admin's preview), it's marked so: no other player sees it until the
+        // shop opens, even if its owner stops being an admin.
         const [added] = await tx
           .insert(inventory)
-          .values({ userId: user.id, itemId: item.id })
+          .values({ userId: user.id, itemId: item.id, preview: !open })
           .onConflictDoNothing()
           .returning({ itemId: inventory.itemId });
         if (!added) return { kind: "owned", item } as const;

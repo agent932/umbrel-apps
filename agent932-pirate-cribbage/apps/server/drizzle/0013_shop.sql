@@ -2,6 +2,7 @@ CREATE TABLE "inventory" (
 	"user_id" uuid NOT NULL,
 	"item_id" text NOT NULL,
 	"acquired_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"preview" boolean DEFAULT false NOT NULL,
 	CONSTRAINT "inventory_user_id_item_id_pk" PRIMARY KEY("user_id","item_id")
 );
 --> statement-breakpoint
