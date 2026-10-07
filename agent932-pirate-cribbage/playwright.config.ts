@@ -22,8 +22,28 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] }, metadata: { tag: "C" } },
-    { name: "iphone", use: { ...devices["iPhone 13"] }, metadata: { tag: "W" } },
+    {
+      // The shop as a release ships it: closed to players. One server serves the whole run and
+      // the shop tests open it, so this runs first. It plays in the run's browser: a machine that
+      // runs only the iphone project has only WebKit (E2E_DEVICE=iphone). Its players are the C
+      // crew, whose captain is the admin.
+      name: "shop-closed",
+      testMatch: /shop-closed\.setup\.ts$/,
+      use: { ...devices[process.env.E2E_DEVICE === "iphone" ? "iPhone 13" : "Desktop Chrome"] },
+      metadata: { tag: "C" },
+    },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      metadata: { tag: "C" },
+      dependencies: ["shop-closed"],
+    },
+    {
+      name: "iphone",
+      use: { ...devices["iPhone 13"] },
+      metadata: { tag: "W" },
+      dependencies: ["shop-closed"],
+    },
   ],
   webServer: {
     command: "npm run build -w @pirate/web && tsx e2e/server.ts",

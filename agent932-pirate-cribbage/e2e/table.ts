@@ -27,12 +27,17 @@ async function choose(page: Page, name: RegExp) {
   await expect(radio).toBeChecked();
 }
 
-/** From the harbour: an Easy game against the crew, dealt and ready to throw to the crib. */
-export async function startCrewGame(page: Page, rules: "Classic" | "Pirate" = "Classic") {
+/** From the harbour: set sail against the Easy crew. The cut for deal comes next. */
+export async function setSail(page: Page, rules: "Classic" | "Pirate" = "Classic") {
   await page.goto("/cribbage");
   await choose(page, /^Easy/);
   await choose(page, new RegExp(`^${rules}`));
   await page.getByRole("button", { name: /set sail/i }).click();
+}
+
+/** From the harbour: an Easy game against the crew, dealt and ready to throw to the crib. */
+export async function startCrewGame(page: Page, rules: "Classic" | "Pirate" = "Classic") {
+  await setSail(page, rules);
   await cutForDeal(page);
   await expect(hand(page).getByRole("button")).toHaveCount(6);
 }

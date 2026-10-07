@@ -98,7 +98,9 @@ const UPRIGHT = [
   { name: "iPad Pro 13-inch", width: 1032, height: 1376 },
 ];
 const SIDEWAYS = [
+  { name: "iPhone SE sideways", width: 667, height: 375, project: "iphone" },
   { name: "iPhone 13 sideways", width: 844, height: 390, project: "iphone" },
+  { name: "iPad sideways", width: 1180, height: 820, project: "iphone" },
   { name: "laptop", width: 1280, height: 800, project: "chromium" },
   { name: "desktop", width: 1440, height: 900, project: "chromium" },
 ];
