@@ -12,7 +12,7 @@ import { playGame } from "../test/games.js";
 import { doubloonsOf, expectLedgerMatches, ledgerRows } from "../test/ledger.js";
 import { expectPurchasesMatch, inventoryOf, setShopOpen } from "../test/shop.js";
 import { signUp } from "../test/testApp.js";
-import { credit } from "./wallet.js";
+import { credit, lockWallets } from "./wallet.js";
 
 /**
  * Real Postgres runs transactions side by side, so these check the locks and unique keys that
@@ -269,6 +269,22 @@ describe.skipIf(!url)("doubloon races on real Postgres", () => {
       expect(deleted.statusCode).toBe(200);
       expect([200, 401]).toContain(bought.statusCode);
 
+      // The buy first: it holds the wallet lock, its item and charge written, as /api/shop/buy
+      // does, while the deletion arrives. The deletion waits for it, then the cascades take the
+      // new item and purchase rows with the account.
+      const ivy = await shopper("RaceIvy", 1500);
+      const buying = held(async (tx) => {
+        await lockWallets(tx, [ivy.id]);
+        await tx.insert(inventory).values({ userId: ivy.id, itemId: "board.ghost-ship" });
+        await credit(tx, ivy.id, -1500, "purchase", "board.ghost-ship");
+      });
+      await buying.started;
+      const leaving = deleteAccount(ivy.cookie);
+      await someoneWaits();
+      buying.release();
+      await buying.done;
+      expect((await leaving).statusCode).toBe(200);
+
       // The deletion first: its row lock is held while the buy arrives and waits for it.
       const jem = await shopper("RaceJem", 1500);
       const deleting = held((tx) => tx.delete(users).where(eq(users.id, jem.id)));
@@ -279,7 +295,7 @@ describe.skipIf(!url)("doubloon races on real Postgres", () => {
       await deleting.done;
       expect((await late).statusCode).toBe(401);
 
-      for (const p of [ida, jem]) {
+      for (const p of [ida, ivy, jem]) {
         expect(await doubloonsOf(conn.db, p.id)).toBeUndefined();
         expect(await inventoryOf(conn.db, p.id)).toEqual([]);
         expect(await ledgerRows(conn.db, p.id)).toEqual([]);
