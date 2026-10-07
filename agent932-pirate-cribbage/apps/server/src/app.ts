@@ -167,9 +167,11 @@ export async function buildApp({
         }
       },
     });
-    // Single-page app: unknown non-API routes fall back to index.html.
+    // Single-page app: unknown page routes fall back to index.html. A missing built file is a 404,
+    // never the page: a browser (and its offline cache) would otherwise keep the page as an image.
     app.setNotFoundHandler((req, reply) => {
-      if (req.url.startsWith("/api/")) return reply.code(404).send({ error: "Not found" });
+      const file = ["/api/", "/assets/", "/cinematics/"].some((p) => req.url.startsWith(p));
+      if (file) return reply.code(404).send({ error: "Not found" });
       return reply.sendFile("index.html");
     });
   }
