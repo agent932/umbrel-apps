@@ -12,6 +12,9 @@ import {
 import { parseBody, requireUser } from "../auth/routes.js";
 import type { Db } from "../db/client.js";
 import { achievements, dailyResults } from "../db/schema.js";
+import { payDaily } from "../economy/earn.js";
+import { lockWallets } from "../economy/wallet.js";
+import type { Tx } from "../games/record.js";
 
 /** Best throws in a row that earn Sharp Eye. */
 export const SHARP_EYE_DAYS = 7;
@@ -69,29 +72,29 @@ function judge(day: string, cards: Card[]): DailyResult {
   };
 }
 
+/**
+ * Best throws in a row, ending on `day` or the day before. If `day` was played and missed, the
+ * streak is broken (0); if it hasn't been played yet, yesterday's streak still stands.
+ */
+async function streak(exec: Tx | Db, userId: string, day: string) {
+  const rows = await exec
+    .select({ day: dailyResults.day, best: dailyResults.best })
+    .from(dailyResults)
+    .where(and(eq(dailyResults.userId, userId), lte(dailyResults.day, day)))
+    .orderBy(desc(dailyResults.day))
+    .limit(400);
+  const byDay = new Map(rows.map((r) => [r.day, r.best]));
+  let d = byDay.has(day) ? day : addDays(day, -1);
+  let count = 0;
+  while (byDay.get(d) === true) {
+    count++;
+    d = addDays(d, -1);
+  }
+  return count;
+}
+
 /** The daily discard for signed-in players: one answer a day, kept on the server. */
 export async function dailyRoutes(app: FastifyInstance, { db }: { db: Db }) {
-  /**
-   * Best throws in a row, ending on `day` or the day before. If `day` was played and missed, the
-   * streak is broken (0); if it hasn't been played yet, yesterday's streak still stands.
-   */
-  async function streak(userId: string, day: string) {
-    const rows = await db
-      .select({ day: dailyResults.day, best: dailyResults.best })
-      .from(dailyResults)
-      .where(and(eq(dailyResults.userId, userId), lte(dailyResults.day, day)))
-      .orderBy(desc(dailyResults.day))
-      .limit(400);
-    const byDay = new Map(rows.map((r) => [r.day, r.best]));
-    let d = byDay.has(day) ? day : addDays(day, -1);
-    let count = 0;
-    while (byDay.get(d) === true) {
-      count++;
-      d = addDays(d, -1);
-    }
-    return count;
-  }
-
   async function stored(userId: string, day: string): Promise<DailyResult | null> {
     const [row] = await db
       .select()
@@ -109,11 +112,11 @@ export async function dailyRoutes(app: FastifyInstance, { db }: { db: Db }) {
       if (!user) return;
       // The player's own date when they send it; UTC otherwise.
       const day = req.query.day && isOpenDay(req.query.day) ? req.query.day : utcToday();
-      return { day, result: await stored(user.id, day), streak: await streak(user.id, day) };
+      return { day, result: await stored(user.id, day), streak: await streak(db, user.id, day) };
     },
   );
 
-  /** Throw two cards. The first answer for a day is the one that counts. */
+  /** Throw two cards. The first answer for a day is the one that counts, and pays doubloons. */
   app.post(
     "/api/daily",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
@@ -133,31 +136,36 @@ export async function dailyRoutes(app: FastifyInstance, { db }: { db: Db }) {
         return reply.code(400).send({ error: "Those aren't cards from today's hand" });
       }
       const result = judge(body.day, cards);
-      const added = await db
-        .insert(dailyResults)
-        .values({
-          userId: user.id,
-          day: body.day,
-          card1: result.discard[0],
-          card2: result.discard[1],
-          best: result.best,
-        })
-        .onConflictDoNothing()
-        .returning({ day: dailyResults.day });
-      if (!added.length) {
-        return reply.code(409).send({ error: "You've already played that day's hand" });
-      }
-      const count = await streak(user.id, body.day);
-      const unlocked: string[] = [];
-      if (count >= SHARP_EYE_DAYS) {
-        const won = await db
-          .insert(achievements)
-          .values({ userId: user.id, key: "sharpEye" })
+      // The answer, any achievement and the doubloons are saved together, or not at all.
+      const out = await db.transaction(async (tx) => {
+        await lockWallets(tx, [user.id]);
+        const added = await tx
+          .insert(dailyResults)
+          .values({
+            userId: user.id,
+            day: body.day,
+            card1: result.discard[0],
+            card2: result.discard[1],
+            best: result.best,
+          })
           .onConflictDoNothing()
-          .returning({ key: achievements.key });
-        unlocked.push(...won.map((w) => w.key));
-      }
-      return { result, streak: count, unlocked };
+          .returning({ day: dailyResults.day });
+        if (!added.length) return null;
+        const count = await streak(tx, user.id, body.day);
+        const unlocked: string[] = [];
+        if (count >= SHARP_EYE_DAYS) {
+          const won = await tx
+            .insert(achievements)
+            .values({ userId: user.id, key: "sharpEye" })
+            .onConflictDoNothing()
+            .returning({ key: achievements.key });
+          unlocked.push(...won.map((w) => w.key));
+        }
+        const reward = await payDaily(tx, user.id, body.day, result.best, unlocked);
+        return { count, unlocked, reward };
+      });
+      if (!out) return reply.code(409).send({ error: "You've already played that day's hand" });
+      return { result, streak: out.count, unlocked: out.unlocked, reward: out.reward };
     },
   );
 }

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sql } from "drizzle-orm";
 import { cardLabel, dailyDeal, rankDiscards } from "@pirate/engine";
+import { dailyResults } from "../db/schema.js";
+import { expectLedgerMatches, ledgerRows } from "../test/ledger.js";
 import { signUp, testApp } from "../test/testApp.js";
 import { addDays, isOpenDay } from "./routes.js";
 
@@ -108,6 +111,80 @@ describe("daily discard on the server", () => {
     expect(unlocked[7]).toEqual([]);
     const earned = (await t.app.inject({ url: "/api/achievements", headers: { cookie } })).json();
     expect(earned.achievements.map((a: { key: string }) => a.key)).toEqual(["sharpEye"]);
+  });
+
+  describe("doubloons", () => {
+    const me = async () =>
+      (await t.app.inject({ url: "/api/auth/me", headers: { cookie } })).json().user;
+    const dailyRows = async () => ledgerRows(t.db, (await me()).id, "daily");
+
+    it("pays 10 for playing and 25 for the best throw, once per puzzle", async () => {
+      const played = (await play("2026-10-04", worst("2026-10-04"))).json();
+      expect(played.reward).toEqual({
+        lines: [{ reason: "daily", delta: 10 }],
+        total: 10,
+        balance: 10,
+        note: null,
+      });
+      vi.setSystemTime(new Date("2026-10-05T12:00:00Z"));
+      const top = (await play("2026-10-05", best("2026-10-05"))).json();
+      expect(top.reward.lines).toEqual([{ reason: "daily", delta: 25, key: "best" }]);
+      expect(top.reward.balance).toBe(35);
+      expect((await me()).doubloons).toBe(35);
+
+      const again = await play("2026-10-05", best("2026-10-05"));
+      expect(again.statusCode).toBe(409);
+      expect(again.json()).not.toHaveProperty("reward");
+      expect((await dailyRows()).map((r) => [r.refId, r.delta])).toEqual([
+        ["2026-10-04", 10],
+        ["2026-10-05", 25],
+      ]);
+      await expectLedgerMatches(t.db);
+    });
+
+    it("pays yesterday's, today's and tomorrow's puzzles once each", async () => {
+      for (const day of ["2026-10-03", "2026-10-04", "2026-10-05"]) {
+        const res = (await play(day, worst(day))).json();
+        expect(res.reward.lines).toEqual([{ reason: "daily", delta: 10 }]);
+      }
+      expect((await dailyRows()).map((r) => r.refId).sort()).toEqual([
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+      ]);
+      expect((await me()).doubloons).toBe(30);
+      await expectLedgerMatches(t.db);
+    });
+
+    it("pays for Sharp Eye along with the 7th best throw in a row", async () => {
+      const days = Array.from({ length: 8 }, (_, i) => addDays("2026-10-01", i));
+      const rewards = [];
+      for (const day of days) rewards.push((await playOn(day, best(day))).json().reward);
+      expect(rewards[6].lines).toEqual([
+        { reason: "daily", delta: 25, key: "best" },
+        { reason: "achievement", delta: 150, key: "sharpEye" },
+      ]);
+      expect(rewards[6].total).toBe(175);
+      expect(rewards[7].lines).toEqual([{ reason: "daily", delta: 25, key: "best" }]);
+      expect((await me()).doubloons).toBe(8 * 25 + 150);
+      await expectLedgerMatches(t.db);
+    });
+
+    it("keeps nothing when paying fails, so the throw can be made again", async () => {
+      await t.db.execute(sql`
+        create function boom() returns trigger language plpgsql as $$
+        begin raise exception 'boom'; end $$`);
+      await t.db.execute(
+        sql`create trigger boom before insert on wallet_ledger for each row execute function boom()`,
+      );
+      expect((await play("2026-10-04", best("2026-10-04"))).statusCode).toBe(500);
+      expect(await t.db.select().from(dailyResults)).toEqual([]);
+      await t.db.execute(sql`drop trigger boom on wallet_ledger`);
+      const res = await play("2026-10-04", best("2026-10-04"));
+      expect(res.statusCode).toBe(200);
+      expect(res.json().reward.lines).toEqual([{ reason: "daily", delta: 25, key: "best" }]);
+      await expectLedgerMatches(t.db);
+    });
   });
 
   it("needs you signed in", async () => {
