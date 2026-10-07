@@ -44,12 +44,14 @@ export async function seasonStandings(db: Db, seasonId: number) {
 export async function endSeason(db: Db) {
   return db.transaction(async (tx) => {
     const season = await currentSeason(tx);
+    // Lock every player first, in id order like every other lock on users (see lockWallets), so a
+    // game finishing at the same moment waits its turn instead of deadlocking with this.
+    await tx.select({ id: users.id }).from(users).orderBy(users.id).for("no key update");
     const ranked = await tx
       .select({ id: users.id, rating: users.rating, rankedGames: users.rankedGames })
       .from(users)
       .where(gt(users.rankedGames, 0))
-      .orderBy(desc(users.rating), asc(users.username))
-      .for("update");
+      .orderBy(desc(users.rating), asc(users.username));
     if (ranked.length) {
       await tx.insert(seasonResults).values(
         ranked.map((u, i) => ({
@@ -62,10 +64,7 @@ export async function endSeason(db: Db) {
         })),
       );
     }
-    const everyone = await tx
-      .select({ id: users.id, rating: users.rating })
-      .from(users)
-      .for("update");
+    const everyone = await tx.select({ id: users.id, rating: users.rating }).from(users);
     for (const u of everyone) {
       const rating = seasonReset(u.rating);
       if (rating !== u.rating) await tx.update(users).set({ rating }).where(eq(users.id, u.id));
