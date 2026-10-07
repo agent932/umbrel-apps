@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { signUp, testApp } from "../test/testApp.js";
+import { setShopOpen } from "../test/shop.js";
 import { credit } from "../economy/wallet.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import { userColumns } from "./sessions.js";
 
 let t: Awaited<ReturnType<typeof testApp>>;
 beforeEach(async () => (t = await testApp()));
@@ -109,6 +111,61 @@ describe("auth routes", () => {
     expect(login.json().user.doubloons).toBe(85);
     const me = await t.app.inject({ url: "/api/auth/me", headers: { cookie } });
     expect(me.json().user.doubloons).toBe(85);
+  });
+
+  describe("the board and card back, and the shop switch", () => {
+    const whoAmI = async (cookie?: string) =>
+      (await t.app.inject({ url: "/api/auth/me", headers: cookie ? { cookie } : {} })).json();
+    const logIn = () =>
+      t.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { login: "CaroS", password: "parrots-and-rum" },
+      });
+
+    it("gives the same user on signup, login and /me, using the defaults", async () => {
+      const { res, cookie } = await signUp(t.app);
+      const user = res.json().user;
+      expect(user).toMatchObject({ equippedBoard: null, equippedDeck: null });
+      // Login builds its user by hand, so check it has exactly the session columns.
+      expect(Object.keys(user).sort()).toEqual(Object.keys(userColumns).sort());
+      expect((await logIn()).json().user).toEqual(user);
+      expect((await whoAmI(cookie)).user).toEqual(user);
+    });
+
+    it("shows the back a player chose after logging in and on /me", async () => {
+      const { cookie } = await signUp(t.app);
+      // Moon and Compass is free, so anyone may use it, shop open or not.
+      const use = await t.app.inject({
+        method: "POST",
+        url: "/api/shop/use",
+        headers: { cookie },
+        payload: { itemId: "deck.moon-compass" },
+      });
+      expect(use.statusCode).toBe(200);
+      const chosen = { equippedBoard: null, equippedDeck: "deck.moon-compass" };
+      expect((await whoAmI(cookie)).user).toMatchObject(chosen);
+      expect((await logIn()).json().user).toMatchObject(chosen);
+    });
+
+    it("says on /me whether the shop is open to players, for guests too", async () => {
+      const captain = await signUp(t.app, "Captain");
+      const bonny = await signUp(t.app, "Bonny");
+      expect(bonny.res.json().user.isAdmin).toBe(false);
+      expect(await whoAmI()).toEqual({ user: null, shopOpen: false });
+      // It's the switch, not whether you can see the shop: an admin's preview doesn't open it.
+      expect((await whoAmI(captain.cookie)).shopOpen).toBe(false);
+      expect((await whoAmI(bonny.cookie)).shopOpen).toBe(false);
+
+      await setShopOpen(t.db, true);
+      expect(await whoAmI()).toEqual({ user: null, shopOpen: true });
+      expect((await whoAmI(captain.cookie)).shopOpen).toBe(true);
+      expect((await whoAmI(bonny.cookie)).shopOpen).toBe(true);
+
+      await setShopOpen(t.db, false);
+      expect(await whoAmI()).toEqual({ user: null, shopOpen: false });
+      expect((await whoAmI(bonny.cookie)).shopOpen).toBe(false);
+    });
   });
 
   it("gives the same error for a wrong password and an unknown user", async () => {

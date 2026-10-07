@@ -19,6 +19,9 @@ export interface SessionUser {
   isAdmin: boolean;
   /** Doubloons on hand, as of the start of this request. */
   doubloons: number;
+  /** The board and card back they use (shop item ids), or null for the default. */
+  equippedBoard: string | null;
+  equippedDeck: string | null;
 }
 
 /** The columns a signed-in user (and the browser) gets to see. Never the password hash. */
@@ -31,6 +34,8 @@ export const userColumns = {
   avatar: users.avatar,
   isAdmin: users.isAdmin,
   doubloons: users.doubloons,
+  equippedBoard: users.equippedBoard,
+  equippedDeck: users.equippedDeck,
 };
 
 export async function createSession(

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { isOffensiveName } from "../players/names.js";
 import type { Db } from "../db/client.js";
 import { passwordResets, users } from "../db/schema.js";
+import { shopIsOpen } from "../economy/shopSwitch.js";
 import { hashPassword, needsRehash, verifyPassword } from "./password.js";
 import {
   SESSION_COOKIE,
@@ -174,6 +175,7 @@ export async function authRoutes(
         .where(eq(users.id, row.id));
     }
     const session = await startSession(req, reply, row.id);
+    // Built by hand from the whole row: satisfies makes a missing or extra field a type error.
     return {
       ...session,
       user: {
@@ -185,7 +187,9 @@ export async function authRoutes(
         avatar: row.avatar,
         isAdmin: row.isAdmin,
         doubloons: row.doubloons,
-      },
+        equippedBoard: row.equippedBoard,
+        equippedDeck: row.equippedDeck,
+      } satisfies SessionUser,
     };
   });
 
@@ -303,7 +307,8 @@ export async function authRoutes(
     return { ok: true };
   });
 
-  app.get("/api/auth/me", async (req) => ({ user: req.user }));
+  /** Who you are (null for a guest), and whether the shop is open to players (D-32). */
+  app.get("/api/auth/me", async (req) => ({ user: req.user, shopOpen: await shopIsOpen(db) }));
 
   /** Pick a crew portrait (1-8), or null to go back to your initial. */
   app.post("/api/auth/avatar", async (req, reply) => {

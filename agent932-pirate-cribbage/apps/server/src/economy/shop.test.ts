@@ -330,6 +330,11 @@ describe("POST /api/shop/use", () => {
     });
     expect(await equippedColumns(anne.id)).toEqual({ board: "board.treasure-map", deck: null });
     expect((await shop(anne.cookie)).json().equipped).toEqual(res.json().equipped);
+    const me = await t.app.inject({ url: "/api/auth/me", headers: { cookie: anne.cookie } });
+    expect(me.json().user).toMatchObject({
+      equippedBoard: "board.treasure-map",
+      equippedDeck: null,
+    });
     // Using costs nothing.
     expect(await doubloonsOf(t.db, anne.id)).toBe(0);
   });
