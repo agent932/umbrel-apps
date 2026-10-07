@@ -42,15 +42,18 @@ export function lineLabel(line: Pick<DoubloonLine, "reason" | "key">, level?: Bo
 export const resetTime = (now = new Date()) =>
   nextDailyReset(now).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-/** Why a win paid nothing, or only half, in words. */
+/**
+ * Why a win paid nothing, or only half, in words. Only the win: an achievement unlocked in the
+ * same game can still pay, so these never say the game paid no doubloons at all.
+ */
 export function noteText(note: WinNote, oppName: string, now = new Date()) {
   switch (note) {
     case "short":
-      return `Games under ${MIN_ROUNDS} rounds or ${MIN_GAME_MS / 60_000} minutes don't pay doubloons.`;
+      return `Games under ${MIN_ROUNDS} rounds or ${MIN_GAME_MS / 60_000} minutes pay no win bounty.`;
     case "earlyForfeit":
-      return "Early forfeits don't pay doubloons.";
+      return "Early forfeits pay no win bounty.";
     case "lateForfeit":
-      return "Half bounty: your opponent abandoned ship.";
+      return "Half bounty for a forfeit win.";
     case "botCap":
       return `Daily bot bounty reached (${BOT_WIN_CAP} wins). Online wins still pay. Resets at ${resetTime(now)}.`;
     case "onlineCap":

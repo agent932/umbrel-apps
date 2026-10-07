@@ -32,9 +32,9 @@ describe("why a win paid nothing or half", () => {
 
   it("explains every note", () => {
     const text = (note: WinNote) => noteText(note, "Bonny", now);
-    expect(text("short")).toBe("Games under 4 rounds or 3 minutes don't pay doubloons.");
-    expect(text("earlyForfeit")).toBe("Early forfeits don't pay doubloons.");
-    expect(text("lateForfeit")).toBe("Half bounty: your opponent abandoned ship.");
+    expect(text("short")).toBe("Games under 4 rounds or 3 minutes pay no win bounty.");
+    expect(text("earlyForfeit")).toBe("Early forfeits pay no win bounty.");
+    expect(text("lateForfeit")).toBe("Half bounty for a forfeit win.");
     expect(text("botCap")).toBe(
       `Daily bot bounty reached (10 wins). Online wins still pay. Resets at ${at}.`,
     );

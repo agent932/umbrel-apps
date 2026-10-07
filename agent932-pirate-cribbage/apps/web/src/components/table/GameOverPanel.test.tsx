@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import type { BotLevel, Reward, Seat } from "@pirate/engine";
 import { resetTime } from "../../economy.js";
+import type { OnlineInfo } from "../../game/types.js";
 import { GameOverPanel } from "./GameOverPanel.js";
 
 /** The panel on its own, props only: no AuthProvider (the game screen's tests have none). */
@@ -9,14 +10,18 @@ function renderPanel({
   winner = 0,
   reward,
   guest = false,
+  tutorial = false,
   level = "medium",
   ranked = true,
+  online,
 }: {
   winner?: Seat;
   reward?: Reward | null;
   guest?: boolean;
+  tutorial?: boolean;
   level?: BotLevel | null;
   ranked?: boolean;
+  online?: OnlineInfo;
 }) {
   return render(
     <GameOverPanel
@@ -26,17 +31,36 @@ function renderPanel({
       skunk={0}
       show={[]}
       cut={null}
-      names={["You", "Bosun Barnaby"]}
+      names={["You", online ? "Bonny" : "Bosun Barnaby"]}
+      online={online}
       ranked={ranked}
       instant
       reward={reward}
       guest={guest}
-      level={level}
+      tutorial={tutorial}
+      level={online ? null : level}
       onPlayAgain={() => {}}
       onExit={() => {}}
     />,
   );
 }
+
+/** An online game that `forfeitedBy` abandoned. */
+const forfeited = (forfeitedBy: Seat): OnlineInfo => ({
+  deadline: null,
+  online: [true, false],
+  avatars: [null, null],
+  ranked: false,
+  emote: null,
+  sendEmote: () => {},
+  rematch: "none",
+  requestRematch: () => {},
+  rematchGameId: null,
+  returnBy: [null, null],
+  nextRoundReady: [],
+  forfeit: () => {},
+  forfeitedBy,
+});
 
 const reward = (r: Partial<Reward>): Reward => ({
   lines: [],
@@ -84,12 +108,45 @@ describe("doubloons at the end of a game", () => {
     expect(screen.getAllByText("First Plunder")).toHaveLength(1);
   });
 
-  it("lists an achievement a short game unlocked without paying for it, and says why", () => {
+  it("lists an achievement that paid nothing without an amount, and says why the win didn't pay", () => {
     renderPanel({ reward: reward({ note: "short", unlocked: ["firstWin"] }) });
     const status = screen.getByRole("status");
     expect(status).not.toHaveTextContent(/\+\d/);
     expect(items("New achievements")).toEqual(["New achievement: First Plunder"]);
-    expect(status).toHaveTextContent("Games under 4 rounds or 3 minutes don't pay doubloons.");
+    expect(status).toHaveTextContent("Games under 4 rounds or 3 minutes pay no win bounty.");
+  });
+
+  it("says only the win paid nothing when an achievement in a short game paid", () => {
+    renderPanel({
+      reward: reward({
+        lines: [{ reason: "achievement", delta: 50, key: "power:spyglass" }],
+        total: 50,
+        balance: 50,
+        note: "short",
+        unlocked: ["power:spyglass"],
+      }),
+    });
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("+50 doubloons");
+    expect(items("New achievements")).toEqual([expect.stringMatching(/Spyglass.*\+50$/)]);
+    expect(status).toHaveTextContent("Games under 4 rounds or 3 minutes pay no win bounty.");
+    expect(status).not.toHaveTextContent(/don't pay doubloons|no doubloons/);
+  });
+
+  it("says a forfeit paid half without saying the opponent left twice", () => {
+    renderPanel({
+      online: forfeited(1),
+      ranked: false,
+      reward: reward({
+        lines: [{ reason: "onlineWin", delta: 25 }],
+        total: 25,
+        balance: 25,
+        note: "lateForfeit",
+      }),
+    });
+    expect(screen.getAllByText(/abandoned ship/)).toHaveLength(1);
+    expect(screen.getByText("Bonny abandoned ship.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Half bounty for a forfeit win.");
   });
 
   it("says when the daily bot bounty is reached, and when it resets", () => {
@@ -136,6 +193,15 @@ describe("guests", () => {
       "href",
       "/login",
     );
+  });
+
+  it("promises no amount after the tutorial, which pays nothing even when signed in", () => {
+    renderPanel({ guest: true, tutorial: true, ranked: false, level: "easy" });
+    expect(screen.getByRole("link", { name: "Sign in to earn doubloons" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(document.body).not.toHaveTextContent(/wins like this/);
   });
 
   it("shows nothing about doubloons in a signed-in player's tutorial", () => {

@@ -27,6 +27,7 @@ export function GameOverPanel({
   instant,
   reward,
   guest,
+  tutorial,
   level,
   onReveal,
   onPlayAgain,
@@ -46,6 +47,8 @@ export function GameOverPanel({
   reward?: Reward | null;
   /** Playing as a guest: doubloons need an account, so say so. */
   guest?: boolean;
+  /** Learn to play, which pays nothing even when signed in (so a guest isn't promised an amount). */
+  tutorial?: boolean;
   /** The computer's level, for games against it. */
   level?: BotLevel | null;
   /** How many hands have been counted out, so the board can move their pegs. */
@@ -73,7 +76,10 @@ export function GameOverPanel({
           <RewardSummary reward={reward} level={level} oppName={oppName} className="mb-3" />
         )}
         {guest && (
-          <EarnHint amount={winner === me && level ? BOT_WIN[level] : undefined} className="mb-3" />
+          <EarnHint
+            amount={winner === me && level && !tutorial ? BOT_WIN[level] : undefined}
+            className="mb-3"
+          />
         )}
         {show.length > 0 && <ShowList show={show} cut={cut} names={label} />}
         {ranked && !reward && <NewAchievements />}

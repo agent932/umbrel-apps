@@ -401,6 +401,7 @@ export function GameScreen({
           instant={instant}
           reward={game.reward ?? null}
           guest={!!guest}
+          tutorial={!!tutorial}
           level={game.level}
           onReveal={shown.reveal}
           onPlayAgain={onPlayAgain}
