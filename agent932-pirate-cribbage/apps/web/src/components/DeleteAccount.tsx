@@ -31,8 +31,9 @@ export function DeleteAccount() {
     <section className="flex flex-col gap-3 rounded-lg border border-red-400/30 p-4">
       <h2 className="font-pirate text-2xl text-red-200">Delete account</h2>
       <p className="text-sm text-parchment/80">
-        Removes your account, friends, stats, achievements and unfinished games for good. Finished
-        matches stay in your opponents' history without your name. This can't be undone.
+        Removes your account, friends, stats, achievements and unfinished games for good. Your
+        doubloons go too. Finished matches stay in your opponents' history without your name. This
+        can't be undone.
       </p>
       {!open ? (
         <button
