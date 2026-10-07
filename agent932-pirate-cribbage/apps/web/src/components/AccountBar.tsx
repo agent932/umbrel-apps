@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "../auth.js";
+import { SHOP } from "../routes.js";
 import { DoubloonIcon } from "./Doubloons.js";
 import { SettingsButton } from "./SettingsButton.js";
 
@@ -16,11 +17,23 @@ function HomeLink() {
 }
 
 /**
- * Who's signed in, and links to the crew, the Ship's Log and the account. Shared by every game;
- * inside a game, `home` adds a link back to the Deckhand Games hub.
+ * The shop, once it's open to players. Admins always see it: while it's closed it's their preview.
+ */
+function ShopLink({ preview }: { preview: boolean }) {
+  return (
+    <Link href={SHOP} className="text-parchment hover:text-gold">
+      {preview ? "Shop (preview)" : "Shop"}
+    </Link>
+  );
+}
+
+/**
+ * Who's signed in, and links to the shop, the crew, the Ship's Log and the account. Shared by
+ * every game; inside a game, `home` adds a link back to the Deckhand Games hub.
  */
 export function AccountBar({ home = false }: { home?: boolean }) {
-  const { user, logout } = useAuth();
+  const { user, logout, shopOpen } = useAuth();
+  const preview = !shopOpen && !!user?.isAdmin;
   // On phones the greeting gets its own row and the links sit underneath.
   return (
     <nav
@@ -52,6 +65,7 @@ export function AccountBar({ home = false }: { home?: boolean }) {
               Admin
             </Link>
           )}
+          {(shopOpen || preview) && <ShopLink preview={preview} />}
           <Link href="/friends" className="text-parchment hover:text-gold">
             Crew
           </Link>
@@ -75,6 +89,7 @@ export function AccountBar({ home = false }: { home?: boolean }) {
             <SettingsButton />
           </span>
           {home && <HomeLink />}
+          {shopOpen && <ShopLink preview={false} />}
           <Link href="/login" className="text-parchment hover:text-gold">
             Log in
           </Link>

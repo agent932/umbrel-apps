@@ -24,6 +24,20 @@ describe("doubloon lines", () => {
     expect(label("achievement", "noSuchThing")).toBe("Achievement");
     expect(label("admin")).toBe("Adjustment");
   });
+
+  it("names what a purchase bought", () => {
+    expect(lineLabel({ reason: "purchase", key: "board.treasure-map" })).toBe(
+      "Bought Treasure Map",
+    );
+    expect(lineLabel({ reason: "purchase", key: "deck.ships-wheel" })).toBe("Bought Ship's Wheel");
+    // An item from a newer server than this build.
+    expect(lineLabel({ reason: "purchase", key: "board.sea-serpent" })).toBe("Bought a shop item");
+    expect(lineLabel({ reason: "purchase" })).toBe("Bought a shop item");
+  });
+
+  it("calls a reason this build doesn't know plain doubloons", () => {
+    expect(lineLabel({ reason: "refund" as LedgerReason })).toBe("Doubloons");
+  });
 });
 
 describe("why a win paid nothing or half", () => {

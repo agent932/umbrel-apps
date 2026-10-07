@@ -8,6 +8,7 @@ import {
   botAction,
   createDeck,
   hostAction,
+  SHOP_ITEMS,
   newGame,
   redactEvent,
   seededRandom,
@@ -283,4 +284,27 @@ describe("doubloons for a signed-in game vs the computer", () => {
     await waitFor(() => expect(calls.filter((c) => c === "POST /api/games")).toHaveLength(2));
     expect(calls.filter((c) => c === "GET /api/auth/me")).toHaveLength(2);
   }, 30_000);
+});
+
+describe("the shop", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is a link away from the harbour once it's open, for guests too", async () => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+    const items = SHOP_ITEMS.map(({ sort: _sort, ...i }) => ({ ...i, available: true }));
+    vi.stubGlobal("fetch", async (url: string) =>
+      url === "/api/auth/me"
+        ? json({ user: null, shopOpen: true })
+        : url === "/api/shop"
+          ? json({ open: true, items })
+          : json({ error: "Not found" }, 404),
+    );
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/cribbage");
+    render(<App />);
+    await user.click(await screen.findByRole("link", { name: "Shop: boards and card backs" }));
+    expect(window.location.pathname).toBe("/shop");
+    expect(screen.getByRole("heading", { level: 1, name: "Shop" })).toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: "Treasure Map" })).toBeInTheDocument();
+  });
 });

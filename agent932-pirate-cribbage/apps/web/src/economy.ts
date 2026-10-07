@@ -9,6 +9,7 @@ import {
   SAME_OPPONENT_CAP,
   type WinNote,
   nextDailyReset,
+  shopItemName,
 } from "@pirate/engine";
 import { BOT_CREW } from "./brand/botCrew.js";
 
@@ -16,7 +17,10 @@ import { BOT_CREW } from "./brand/botCrew.js";
 export const achievementName = (key: string) =>
   ACHIEVEMENTS.find((a) => a.key === key)?.name ?? "Achievement";
 
-/** What one line of doubloons was paid for, e.g. "Beat Bosun Barnaby" or "Double skunk bonus". */
+/**
+ * What one line of doubloons was paid for, e.g. "Beat Bosun Barnaby", "Double skunk bonus" or
+ * "Bought Treasure Map". A reason this build doesn't know (from a newer server) is "Doubloons".
+ */
 export function lineLabel(line: Pick<DoubloonLine, "reason" | "key">, level?: BotLevel | null) {
   switch (line.reason) {
     case "botWin":
@@ -35,6 +39,10 @@ export function lineLabel(line: Pick<DoubloonLine, "reason" | "key">, level?: Bo
       return line.key ? achievementName(line.key) : "Achievement";
     case "admin":
       return "Adjustment";
+    case "purchase":
+      return `Bought ${shopItemName(line.key ?? "") ?? "a shop item"}`;
+    default:
+      return "Doubloons";
   }
 }
 

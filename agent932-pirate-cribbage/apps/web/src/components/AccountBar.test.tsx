@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -86,5 +86,65 @@ describe("doubloons in the account bar", () => {
     renderBar();
     expect(await screen.findByRole("link", { name: "Log in" })).toBeInTheDocument();
     expect(screen.queryByTitle("Doubloons")).toBeNull();
+  });
+});
+
+describe("the shop link", () => {
+  /** /api/auth/me answers with this user (or a guest) and the shop switch. */
+  function stubAuth(user: User | null, shopOpen: boolean) {
+    vi.stubGlobal(
+      "fetch",
+      async () => new Response(JSON.stringify({ user, shopOpen }), { status: 200 }),
+    );
+  }
+  const links = () =>
+    within(screen.getByRole("navigation", { name: "Account" }))
+      .getAllByRole("link")
+      .map((a) => a.textContent);
+
+  it("shows once the shop is open, before Crew, and leaves the balance as it was", async () => {
+    stubAuth(player(85), true);
+    renderBar();
+    expect(await screen.findByRole("link", { name: "Shop" })).toHaveAttribute("href", "/shop");
+    expect(links()).toEqual(["Shop", "Crew", "Ship's Log", "Account"]);
+    expect(screen.getByTitle("Doubloons")).toHaveTextContent(/^85 doubloons$/);
+  });
+
+  it("is hidden from players while the shop is closed", async () => {
+    stubAuth(player(85), false);
+    renderBar();
+    expect(await screen.findByTitle("Doubloons")).toBeInTheDocument();
+    expect(links()).toEqual(["Crew", "Ship's Log", "Account"]);
+  });
+
+  it("shows admins a preview while the shop is closed, and the shop once it's open", async () => {
+    stubAuth({ ...player(85), isAdmin: true }, false);
+    renderBar();
+    expect(await screen.findByRole("link", { name: "Shop (preview)" })).toHaveAttribute(
+      "href",
+      "/shop",
+    );
+    expect(links()).toEqual(["Admin", "Shop (preview)", "Crew", "Ship's Log", "Account"]);
+  });
+
+  it("shows admins the plain link once the shop is open", async () => {
+    stubAuth({ ...player(85), isAdmin: true }, true);
+    renderBar();
+    expect(await screen.findByRole("link", { name: "Shop" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Shop (preview)" })).toBeNull();
+  });
+
+  it("shows guests the open shop, before Log in", async () => {
+    stubAuth(null, true);
+    renderBar();
+    expect(await screen.findByRole("link", { name: "Shop" })).toBeInTheDocument();
+    expect(links()).toEqual(["Shop", "Log in", "Sign up"]);
+  });
+
+  it("is hidden from guests while the shop is closed", async () => {
+    stubAuth(null, false);
+    renderBar();
+    expect(await screen.findByRole("link", { name: "Log in" })).toBeInTheDocument();
+    expect(links()).toEqual(["Log in", "Sign up"]);
   });
 });

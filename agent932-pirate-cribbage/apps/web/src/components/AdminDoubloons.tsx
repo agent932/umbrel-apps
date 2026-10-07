@@ -31,10 +31,11 @@ const signed = (n: number) => `${n > 0 ? "+" : "−"}${Math.abs(n).toLocaleStrin
 /**
  * The line key a ledger row was paid under (see DoubloonLine). Rows don't keep it, but the amount
  * tells: a best throw pays more than a played one, and a double skunk more than a single (even
- * at half pay in a 61-point game, 13 against 5).
+ * at half pay in a 61-point game, 13 against 5). A purchase's ref is the item id. A reason this
+ * build doesn't know has no key.
  */
 function rowKey(row: LedgerRow): string | undefined {
-  if (row.reason === "achievement") return row.ref;
+  if (row.reason === "achievement" || row.reason === "purchase") return row.ref;
   if (row.reason === "daily" && row.delta > DAILY_PLAYED) return "best";
   if (row.reason === "skunk" && row.delta > SKUNK_BONUS) return "double";
   return undefined;

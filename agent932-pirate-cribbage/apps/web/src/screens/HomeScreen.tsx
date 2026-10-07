@@ -8,6 +8,7 @@ import { BOT_CREW } from "../brand/botCrew.js";
 import { POWER_ART } from "../brand/powerArt.js";
 import { AccountBar } from "../components/AccountBar.js";
 import type { MenuChoice } from "../game/menu.js";
+import { SHOP } from "../routes.js";
 
 interface Props {
   /** Start a practice game where Peggy explains each step. */
@@ -79,7 +80,9 @@ export function HomeScreen({
   error,
   children,
 }: Props) {
-  const { user } = useAuth();
+  const { user, shopOpen } = useAuth();
+  // Admins see the shop while it's closed to players: their preview.
+  const shopPreview = !shopOpen && !!user?.isAdmin;
   const [level, setLevel] = useState<BotLevel>("medium");
   const [mode, setMode] = useState<"classic" | "pirate">("pirate");
   const [cost, setCost] = useState<"free" | "plunder">("free");
@@ -120,6 +123,11 @@ export function HomeScreen({
       <Link href="/cribbage/daily" className="btn-secondary text-center">
         Daily discard: which two would you throw?
       </Link>
+      {(shopOpen || shopPreview) && (
+        <Link href={SHOP} className="btn-secondary text-center">
+          {shopPreview ? "Shop (preview): boards and card backs" : "Shop: boards and card backs"}
+        </Link>
+      )}
 
       <section className="panel flex flex-col gap-5 p-5">
         <h2 className="font-pirate text-2xl text-gold">Play the crew</h2>

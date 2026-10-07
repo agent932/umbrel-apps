@@ -202,6 +202,22 @@ describe("admin: doubloons", () => {
     expect(server.calls.filter((c) => c.endsWith(`${ANNE}/ledger`))).toHaveLength(2);
   });
 
+  it("names purchases by what they bought, and reasons this build doesn't know", async () => {
+    stubServer([
+      ledgerRow(0, { reason: "purchase", delta: -1500, ref: "board.treasure-map" }),
+      // An item from a newer server, and a reason this build doesn't know.
+      ledgerRow(1, { reason: "purchase", delta: -1000, ref: "deck.mermaid" }),
+      ledgerRow(2, { reason: "refund" as LedgerRow["reason"], delta: 1000, ref: "x" }),
+    ]);
+    const { sheet } = await openWallet("Anne");
+    const history = await within(sheet).findByRole("list", { name: "Doubloon history" });
+    const rows = within(history).getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent(new RegExp(`^Bought Treasure Map.*−${num(1500)}$`));
+    expect(within(rows[0]!).getByText(`−${num(1500)}`)).toHaveClass("text-red-300");
+    expect(rows[1]).toHaveTextContent(new RegExp(`^Bought a shop item.*−${num(1000)}$`));
+    expect(rows[2]).toHaveTextContent(new RegExp(`^Doubloons.*\\+${num(1000)}$`));
+  });
+
   it("sends nothing until the amount and the reason make sense", async () => {
     const server = stubServer();
     const { user, sheet } = await openWallet("Anne");

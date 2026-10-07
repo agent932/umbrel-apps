@@ -1,14 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavBar } from "../components/NavBar.js";
 import { Link } from "wouter";
-import { ApiError, api } from "../api.js";
+import { itemType } from "@pirate/engine";
+import { ApiError, type ShopResponse, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { AvatarPicker } from "../components/AvatarPicker.js";
 import { BlockedPlayers } from "../components/BlockedPlayers.js";
 import { ChangeEmail } from "../components/ChangeEmail.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
 import { NoticeSettings } from "../components/NoticeSettings.js";
-import { CRIBBAGE_HOME } from "../routes.js";
+import { CRIBBAGE_HOME, SHOP } from "../routes.js";
+
+/** Whether these items hold a choice: more than one board, or more than one card back. */
+function canChoose(owned: string[]) {
+  const counts = new Map<string, number>();
+  for (const id of owned) {
+    const type = itemType(id);
+    if (type) counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
+  return [...counts.values()].some((n) => n > 1);
+}
+
+/**
+ * A link to your boards and card backs, whenever there's a choice to make: the shop is open to you,
+ * or you own more than one of a kind (a free extra back, or items bought while the shop was open),
+ * so you can still switch after it closes.
+ */
+function ShopLink() {
+  const { user, loading, shopOpen } = useAuth();
+  const visible = shopOpen || !!user?.isAdmin;
+  const [choice, setChoice] = useState(false);
+  useEffect(() => {
+    if (loading || visible) return;
+    let live = true;
+    // A server without the shop (or no server) leaves the link out.
+    api<ShopResponse>("/api/shop").then(
+      (r) => live && setChoice(canChoose(r.owned ?? [])),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [loading, visible]);
+  if (!visible && !choice) return null;
+  return (
+    <Link href={SHOP} className="btn-secondary text-center">
+      Boards and card backs
+    </Link>
+  );
+}
 
 /** Pick your portrait, change your password (e.g. after an admin gave you a temporary one) or email. */
 export function AccountScreen() {
@@ -55,6 +95,7 @@ export function AccountScreen() {
           Signed in as <b className="text-gold">{user?.username}</b> ({user?.email})
         </p>
         <AvatarPicker />
+        <ShopLink />
         <NoticeSettings />
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <h2 className="font-pirate text-2xl text-gold">Change password</h2>

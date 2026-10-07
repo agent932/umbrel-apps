@@ -25,7 +25,8 @@ import { LeaderboardScreen } from "./screens/LeaderboardScreen.js";
 import { GameScreen } from "./screens/GameScreen.js";
 import { HomeScreen } from "./screens/HomeScreen.js";
 import { StatsScreen } from "./screens/StatsScreen.js";
-import { CRIBBAGE_HOME } from "./routes.js";
+import { ShopScreen } from "./screens/ShopScreen.js";
+import { CRIBBAGE_HOME, SHOP } from "./routes.js";
 import { HubScreen } from "./screens/HubScreen.js";
 import { ForgotScreen, ResetScreen } from "./screens/PasswordResetScreens.js";
 import { DailyDiscardScreen } from "./screens/DailyDiscardScreen.js";
@@ -253,6 +254,10 @@ function Routes({ botDelay }: { botDelay?: number }) {
       </Route>
       <Route path="/cribbage/daily">
         <DailyDiscardScreen />
+      </Route>
+      {/* Not gated: guests may look around once it's open (it says so while it's closed). */}
+      <Route path={SHOP}>
+        <ShopScreen />
       </Route>
       <Route path="/support">
         <SupportScreen />
