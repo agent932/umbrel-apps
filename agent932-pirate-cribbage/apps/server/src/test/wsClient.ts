@@ -166,7 +166,7 @@ export async function move(c: TestClient, gameId: string, action: ClientAction) 
 }
 
 /** The latest round-summary readiness this client has heard about. */
-function readyForNext(c: TestClient, s: StateMsg) {
+export function readyForNext(c: TestClient, s: StateMsg) {
   const last = c.messages.filter((m) => m.t === "waiting" || m.t === "state").at(-1);
   const ready = last?.t === "waiting" ? last.ready : s.nextRoundReady;
   return ready.includes(s.seat);

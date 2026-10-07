@@ -33,6 +33,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
       r("Started as pone", (s) => s.startAsPone),
       r("Skunks given", (s) => s.skunksGiven),
       r("Times skunked", (s) => s.skunksTaken),
+      r("Forfeits", (s) => s.forfeits ?? null),
     ],
   },
   {

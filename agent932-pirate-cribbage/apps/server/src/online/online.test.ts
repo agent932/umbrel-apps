@@ -12,6 +12,7 @@ import {
   move,
   nextMove,
   playOut,
+  readyForNext,
 } from "../test/wsClient.js";
 import type { ServerMessage } from "./protocol.js";
 import type { Timing } from "./rooms.js";
@@ -215,6 +216,73 @@ describe("online play", () => {
     a.send({ t: "forfeit", gameId });
     const f = await b.next<Extract<ServerMessage, { t: "forfeit" }>>((m) => m.t === "forfeit");
     expect(f.seat).toBe(sa.seat);
+  });
+
+  describe("ranked forfeits", () => {
+    const me = async (cookie: string) =>
+      (await t.app.inject({ url: "/api/auth/me", headers: { cookie } })).json().user;
+    const online = async (cookie: string) =>
+      (await t.app.inject({ url: "/api/stats", headers: { cookie } }))
+        .json()
+        .buckets.find((x: { key: string }) => x.key === "online").stats;
+    const over = (c: TestClient) =>
+      c.next((m) => m.t === "state" && m.step.view.phase === "gameOver");
+
+    /** Both players play on until `n` rounds are complete and the next is dealt. */
+    async function playRounds(gameId: string, clients: TestClient[], n: number) {
+      for (let i = 0; i < 4000; i++) {
+        const [g] = await t.db
+          .select({ state: games.state })
+          .from(games)
+          .where(eq(games.id, gameId));
+        if (g!.state.phase === "discard" && g!.state.history.filter((r) => r.complete).length >= n)
+          return;
+        let moved = false;
+        for (const c of clients) {
+          const s = c.latestState();
+          const action = s && nextMove(s.step.view, readyForNext(c, s));
+          if (!action) continue;
+          await move(c, gameId, action);
+          moved = true;
+        }
+        if (!moved) await new Promise((r) => setTimeout(r, 5));
+      }
+      throw new Error(`Didn't reach ${n} rounds`);
+    }
+
+    it("moves nobody's rating for an early one, and the Ship's Log counts it", async () => {
+      t = await testApp(undefined, LONG);
+      const { gameId, a, b, anne, bonny } = await matchedPair(t, {
+        variant: "classic",
+        ranked: true,
+      });
+      a.send({ t: "forfeit", gameId });
+      await over(b);
+      for (const who of [anne, bonny])
+        expect(await me(who.cookie)).toMatchObject({ rating: 1000, rankedGames: 0 });
+      expect((await online(anne.cookie)).forfeits).toBe(1);
+      expect((await online(bonny.cookie)).forfeits).toBe(0);
+      const [row] = await t.db.select().from(matches).where(eq(matches.id, gameId));
+      expect(row!.ranked).toBe(true);
+    });
+
+    it("costs rating like any loss once the game is long enough", async () => {
+      t = await testApp(undefined, LONG);
+      const { gameId, a, b, anne, bonny } = await matchedPair(t, {
+        variant: "classic",
+        ranked: true,
+      });
+      await playRounds(gameId, [a, b], 4);
+      await t.db
+        .update(games)
+        .set({ createdAt: sql`now() - interval '10 minutes'` })
+        .where(eq(games.id, gameId));
+      a.send({ t: "forfeit", gameId });
+      await over(b);
+      expect(await me(anne.cookie)).toMatchObject({ rating: 984, rankedGames: 1 });
+      expect(await me(bonny.cookie)).toMatchObject({ rating: 1016, rankedGames: 1 });
+      expect((await online(anne.cookie)).forfeits).toBe(1);
+    }, 60_000);
   });
 
   it("resumes a game after a server restart", async () => {

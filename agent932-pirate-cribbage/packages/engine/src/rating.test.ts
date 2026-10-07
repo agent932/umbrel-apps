@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { START_RATING, expectedScore, rateGame, seasonReset, tierFor } from "./index.js";
+import {
+  START_RATING,
+  expectedScore,
+  rankedRatings,
+  rateGame,
+  seasonReset,
+  tierFor,
+} from "./index.js";
 
 describe("ratings", () => {
   it("gives even players even chances and moves 16 points", () => {
@@ -22,6 +29,13 @@ describe("ratings", () => {
     expect(tierFor(1450).key).toBe("platinum");
     expect(tierFor(2000).key).toBe("diamond");
     expect(tierFor(-50).key).toBe("bronze");
+  });
+
+  it("rates a ranked game by seat, but not one forfeited early", () => {
+    expect(rankedRatings([1000, 1000], 0, false)).toEqual([1016, 984]);
+    expect(rankedRatings([1000, 1400], 1, false)).toEqual([997, 1403]);
+    // Nobody loses or gains: a second account can't feed wins by leaving at once.
+    expect(rankedRatings([1000, 1200], 1, true)).toEqual([1000, 1200]);
   });
 
   it("pulls ratings halfway back to 1000 for a new season", () => {

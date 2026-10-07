@@ -32,6 +32,21 @@ export function rateGame(
   return { winner: winner + delta, loser: loser - delta };
 }
 
+/**
+ * A ranked game's new ratings, by seat. An early forfeit (before the game was long enough to
+ * count; see longEnough) moves nobody: the player who left loses nothing, and the winner gains
+ * nothing, so a second account can't feed someone wins. The forfeit still shows in the Ship's Log.
+ */
+export function rankedRatings(
+  before: readonly [number, number],
+  winner: 0 | 1,
+  earlyForfeit: boolean,
+): [number, number] {
+  if (earlyForfeit) return [before[0], before[1]];
+  const r = rateGame(before[winner], before[winner === 0 ? 1 : 0]);
+  return winner === 0 ? [r.winner, r.loser] : [r.loser, r.winner];
+}
+
 /** Start-of-season reset: everyone moves halfway back toward the starting rating. */
 export function seasonReset(rating: number): number {
   return Math.round(START_RATING + (rating - START_RATING) / 2);

@@ -14,8 +14,9 @@ import {
   newGame,
   cryptoRandom,
   other,
+  longEnough,
   playsScene,
-  rateGame,
+  rankedRatings,
   redactEvent,
   shuffle,
   tierFor,
@@ -509,7 +510,8 @@ export class RoomManager {
           .from(games)
           .where(eq(games.id, room.id));
         const rated = room.ranked && present.size === 2;
-        const ratings = rated ? await this.rate(tx, room) : null;
+        const startedAt = g?.createdAt ?? room.createdAt;
+        const ratings = rated ? await this.rate(tx, room, forfeitedBy, startedAt) : null;
         const seasonId = room.ranked ? (await currentSeason(tx)).id : null;
         const paid = await recordMatch(
           tx,
@@ -517,7 +519,7 @@ export class RoomManager {
             id: room.id,
             mode: "online",
             aiLevel: null,
-            createdAt: g?.createdAt ?? room.createdAt,
+            createdAt: startedAt,
             ranked: room.ranked,
             seasonId,
           },
@@ -558,7 +560,12 @@ export class RoomManager {
    * Update both players' Elo ratings (rows locked, so two games ending at once can't clash). The
    * caller has locked them already (lockWallets); the same lock here keeps that true on its own.
    */
-  private async rate(tx: Tx, room: Room): Promise<RatingChange[]> {
+  private async rate(
+    tx: Tx,
+    room: Room,
+    forfeitedBy: Seat | null,
+    startedAt: Date,
+  ): Promise<RatingChange[]> {
     const rows = await tx
       .select({ id: users.id, rating: users.rating })
       .from(users)
@@ -567,18 +574,22 @@ export class RoomManager {
       .for("no key update");
     const seats = [0, 1] as Seat[];
     const before = seats.map((s) => rows.find((r) => r.id === room.players[s].userId)!.rating);
-    const w = room.state.winner!;
-    const result = rateGame(before[w]!, before[other(w)]!);
-    const after = seats.map((s) => (s === w ? result.winner : result.loser));
-    for (const s of seats) {
-      await tx
-        .update(users)
-        .set({ rating: after[s]!, rankedGames: sql`${users.rankedGames} + 1` })
-        .where(eq(users.id, room.players[s].userId));
+    // Leaving early (before a game long enough to count) costs nobody anything: the game isn't
+    // rated, isn't counted as a ranked game, and the forfeit just shows in the Ship's Log.
+    const early =
+      forfeitedBy !== null && !longEnough(room.state, true, Date.now() - startedAt.getTime());
+    const after = rankedRatings([before[0]!, before[1]!], room.state.winner!, early);
+    if (!early) {
+      for (const s of seats) {
+        await tx
+          .update(users)
+          .set({ rating: after[s], rankedGames: sql`${users.rankedGames} + 1` })
+          .where(eq(users.id, room.players[s].userId));
+      }
     }
     return seats.map((s) => ({
       before: before[s]!,
-      after: after[s]!,
+      after: after[s],
       tier: tierFor(before[s]!).key,
     }));
   }

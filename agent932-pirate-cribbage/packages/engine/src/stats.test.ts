@@ -93,6 +93,16 @@ describe("computeStats", () => {
     expect(s.skunksTaken).toBe(1);
   });
 
+  it("counts the games you forfeited, not the ones your opponent left", () => {
+    const s = computeStats([
+      match({ winner: 1, forfeitedBy: 0 }),
+      match({ winner: 0, forfeitedBy: 1 }),
+      match({ winner: 1 }),
+      match({ mySeat: 1, winner: 0, forfeitedBy: 1 }),
+    ]);
+    expect(s.forfeits).toBe(2);
+  });
+
   it("splits round, pegging, hand and crib points by dealer and pone", () => {
     const s = computeStats([
       match({

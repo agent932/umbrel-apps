@@ -11,6 +11,8 @@ export interface MatchForStats {
   rounds: RoundRecord[];
   /** Hand analyzer score (0–100) per round per seat, when known. */
   analyzer?: ([number | null, number | null] | null)[];
+  /** The seat that forfeited (left or ran out of time), if anyone did. */
+  forfeitedBy?: Seat | null;
 }
 
 export interface SplitStat {
@@ -42,6 +44,8 @@ export interface PlayerStats {
   skunksGiven: number;
   /** Matches where you were skunked. */
   skunksTaken: number;
+  /** Matches you forfeited (left, or ran out of time to come back). */
+  forfeits: number;
   roundsPlayed: number;
   round: SplitStat;
   pegging: SplitStat;
@@ -170,6 +174,7 @@ export function computeStats(matches: readonly MatchForStats[]): PlayerStats {
     startAsPone: startPone.length,
     skunksGiven: ordered.filter((m) => won(m) && m.skunk > 0).length,
     skunksTaken: ordered.filter((m) => !won(m) && m.skunk > 0).length,
+    forfeits: ordered.filter((m) => m.forfeitedBy === m.mySeat).length,
     roundsPlayed: rounds.length,
     round: split(rounds),
     pegging: split(pegs),
