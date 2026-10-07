@@ -1,16 +1,36 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_COSMETICS, SHOP_ITEMS, itemType } from "@pirate/engine";
 import {
   DEFAULT_BOARD_SKIN,
   HOLES_PER_LANE,
+  boardRatio,
   boardSkinErrors,
   getBoardSkin,
   holePoint,
+  listBoards,
+  resolveBoard,
 } from "./boardSkins.js";
 import { classicSerpentLanes, serpentReefLanes } from "./boardTrack.js";
 import classicSerpent from "./boards/classic-serpent.json";
+import ghostShip from "./boards/ghost-ship.json";
+import krakensReef from "./boards/krakens-reef.json";
+import royalNavy from "./boards/royal-navy.json";
 import serpentReef from "./boards/serpent-reef.json";
+import treasureMap from "./boards/treasure-map.json";
 
 const copy = () => structuredClone(classicSerpent) as typeof classicSerpent;
+
+/** Every board on Serpent Reef's shape: the default and the four in the shop. */
+const REEF_BOARDS = [serpentReef, treasureMap, krakensReef, ghostShip, royalNavy];
+
+/** A bundled WebP's size in pixels, read from its VP8X header (the canvas size minus one). */
+function webpSize(file: string): [number, number] {
+  const bytes = readFileSync(resolve(__dirname, "../assets/table", file));
+  expect(bytes.toString("ascii", 12, 16)).toBe("VP8X");
+  return [bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1];
+}
 
 describe("board skins", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -30,8 +50,80 @@ describe("board skins", () => {
     expect(classicSerpent.upright.lanes[0]!.holes).toEqual(left);
     expect(classicSerpent.upright.lanes[1]!.holes).toEqual(right);
     const [outer, inner] = serpentReefLanes();
-    expect(serpentReef.upright.lanes[0]!.holes).toEqual(outer);
-    expect(serpentReef.upright.lanes[1]!.holes).toEqual(inner);
+    for (const board of REEF_BOARDS) {
+      expect(board.upright.lanes[0]!.holes).toEqual(outer);
+      expect(board.upright.lanes[1]!.holes).toEqual(inner);
+    }
+  });
+
+  it("the shop's boards are Serpent Reef with other art: same size, holes, radii and pegs", () => {
+    const { id: _id, name: _name, upright, ...rest } = serpentReef;
+    const { image: _image, ...layout } = upright;
+    for (const board of REEF_BOARDS) {
+      expect(boardSkinErrors(board)).toEqual([]);
+      expect(board).toEqual({
+        ...rest,
+        id: board.id,
+        name: board.name,
+        upright: { ...layout, image: board.upright.image },
+      });
+      // The art really is the size the map is laid out for.
+      expect(webpSize(board.upright.image)).toEqual(board.upright.size);
+    }
+  });
+
+  it("finds a board by item id or by skin id, and lists every board by item id", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(resolveBoard("board.treasure-map")).toEqual({
+      skin: getBoardSkin("treasure-map"),
+      fallback: false,
+    });
+    expect(getBoardSkin("board.treasure-map")).toBe(getBoardSkin("treasure-map"));
+    expect(getBoardSkin(DEFAULT_COSMETICS.board)).toBe(getBoardSkin());
+    const boards = listBoards();
+    expect(boards.map((b) => b.key)).toEqual([
+      "board.serpent-reef",
+      "board.treasure-map",
+      "board.krakens-reef",
+      "board.ghost-ship",
+      "board.royal-navy",
+      "board.classic-serpent",
+    ]);
+    // Each registry key is its JSON's id (a mismatch would draw the default under that key).
+    for (const { key, skin } of boards) {
+      expect(itemType(key)).toBe("board");
+      expect(key).toBe(`board.${skin.id}`);
+    }
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("draws every board in the shop, by its shop name, on Serpent Reef's shape", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const boards = SHOP_ITEMS.filter((item) => item.type === "board");
+    expect(boards.length).toBeGreaterThan(1);
+    for (const item of boards) {
+      const { skin, fallback } = resolveBoard(item.id);
+      expect(fallback).toBe(false);
+      expect(skin.name).toBe(item.name);
+      // The table layout is tuned to this shape (index.css); another needs its own layout first.
+      expect(boardRatio(skin)).toBe(2.917);
+    }
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("an unknown board gives the default and says so once, however often it's drawn", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (let i = 0; i < 2; i++) {
+      const { skin, fallback } = resolveBoard("board.nope");
+      expect(skin.id).toBe(DEFAULT_BOARD_SKIN);
+      expect(fallback).toBe(true);
+    }
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0]![0]).toContain('"board.nope"');
+    // A malformed key or one of another type falls back the same way.
+    expect(resolveBoard("deck.crimson").fallback).toBe(true);
+    expect(resolveBoard("").fallback).toBe(true);
+    expect(log).toHaveBeenCalledTimes(3);
   });
 
   it("allows one game hole shared by both lanes, but only when the skin says so", () => {

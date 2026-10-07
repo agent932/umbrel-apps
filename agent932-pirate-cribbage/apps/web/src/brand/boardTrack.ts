@@ -1,6 +1,6 @@
 // Lays out one player's lane as a classic continuous cribbage track: up one column, a U-turn at
 // the top, back down the other column. Used to build a board skin's hole map (see boardSkins.ts);
-// `scripts/board-default-skin.ts` writes the default skin's JSON with it.
+// `scripts/board-skins.ts` writes the skins' JSON with it.
 
 /** A hole, as fractions of the board image: x right, y down. */
 export type HolePoint = [number, number];

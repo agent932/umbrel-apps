@@ -2,11 +2,20 @@
 // gives each player's lane 122 holes (index = score: 0 is the start pocket, 121 the game hole) as
 // fractions of the image, and the hole and peg sizes as fractions of the image's width.
 // A skin that fails validation falls back to the default board.
+// A board's key is its shop item id ("board.treasure-map") or its bare skin id ("treasure-map").
 import type { HolePoint } from "./boardTrack.js";
 import classicSerpent from "./boards/classic-serpent.json";
+import ghostShip from "./boards/ghost-ship.json";
+import krakensReef from "./boards/krakens-reef.json";
+import royalNavy from "./boards/royal-navy.json";
 import serpentReef from "./boards/serpent-reef.json";
+import treasureMap from "./boards/treasure-map.json";
 import classicSerpentBoardUrl from "../assets/table/board.webp";
+import ghostShipBoardUrl from "../assets/table/board-ghost-ship.webp";
+import krakensReefBoardUrl from "../assets/table/board-krakens-reef.webp";
+import royalNavyBoardUrl from "../assets/table/board-royal-navy.webp";
 import serpentReefBoardUrl from "../assets/table/board-serpent.webp";
+import treasureMapBoardUrl from "../assets/table/board-treasure-map.webp";
 import pegBlueUrl from "../assets/table/peg-blue.webp";
 import pegRedUrl from "../assets/table/peg-red.webp";
 
@@ -66,18 +75,36 @@ export interface ResolvedBoardSkin extends BoardSkin {
 export const HOLES_PER_LANE = 122;
 export const DEFAULT_BOARD_SKIN = "serpent-reef";
 
-/** Every board the app ships: the JSON map and the bundled art it names. */
+/** The art of a board with Serpent Reef's standing pegs. */
+const withPegs = (file: string, url: string) => ({
+  [file]: url,
+  "peg-blue.webp": pegBlueUrl,
+  "peg-red.webp": pegRedUrl,
+});
+
+/** Every board the app ships, keyed by its JSON id: the map and the bundled art it names.
+ *  Classic Serpent isn't sold; it stays for AnimationLab. */
 const REGISTRY: Record<string, { json: unknown; images: Record<string, string> }> = {
   "serpent-reef": {
     json: serpentReef,
-    images: {
-      "board-serpent.webp": serpentReefBoardUrl,
-      "peg-blue.webp": pegBlueUrl,
-      "peg-red.webp": pegRedUrl,
-    },
+    images: withPegs("board-serpent.webp", serpentReefBoardUrl),
   },
+  "treasure-map": {
+    json: treasureMap,
+    images: withPegs("board-treasure-map.webp", treasureMapBoardUrl),
+  },
+  "krakens-reef": {
+    json: krakensReef,
+    images: withPegs("board-krakens-reef.webp", krakensReefBoardUrl),
+  },
+  "ghost-ship": { json: ghostShip, images: withPegs("board-ghost-ship.webp", ghostShipBoardUrl) },
+  "royal-navy": { json: royalNavy, images: withPegs("board-royal-navy.webp", royalNavyBoardUrl) },
   "classic-serpent": { json: classicSerpent, images: { "board.webp": classicSerpentBoardUrl } },
 };
+
+const PREFIX = "board.";
+/** The skin id for a key: "board.treasure-map" and "treasure-map" are the same board. */
+const skinId = (key: string) => (key.startsWith(PREFIX) ? key.slice(PREFIX.length) : key);
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const isPair = (v: unknown): v is [number, number] =>
@@ -188,23 +215,52 @@ export function resolveBoardSkin(
 }
 
 const cache = new Map<string, ResolvedBoardSkin>();
+/** Keys already reported, so a board drawn on every render (and every peg hop) logs once. */
+const reported = new Set<string>();
 
-/** The board skin to draw. An unknown or broken skin logs why and gives the default board. */
-export function getBoardSkin(id: string = DEFAULT_BOARD_SKIN): ResolvedBoardSkin {
+/**
+ * The board to draw for a key. An unknown or broken skin (say, an item from a newer server that
+ * this build lacks) gives the default board with `fallback: true`, and logs why once per key.
+ */
+export function resolveBoard(key: string): { skin: ResolvedBoardSkin; fallback: boolean } {
+  const id = skinId(key);
   const hit = cache.get(id);
-  if (hit) return hit;
+  if (hit) return { skin: hit, fallback: false };
   const entry = REGISTRY[id];
   const result = entry
     ? resolveBoardSkin(entry.json, entry.images)
     : { skin: null, errors: ["no such skin"] };
   if (result.skin) {
     cache.set(id, result.skin);
-    return result.skin;
+    return { skin: result.skin, fallback: false };
   }
   if (id === DEFAULT_BOARD_SKIN)
     throw new Error(`The default board skin is broken: ${result.errors.join("; ")}`);
-  console.error(`Board skin "${id}" can't be used, so the default board is shown:`, result.errors);
-  return getBoardSkin(DEFAULT_BOARD_SKIN);
+  if (!reported.has(key)) {
+    reported.add(key);
+    console.error(
+      `Board skin "${key}" can't be used, so the default board is shown:`,
+      result.errors,
+    );
+  }
+  return { skin: resolveBoard(DEFAULT_BOARD_SKIN).skin, fallback: true };
+}
+
+/** The board skin to draw. An unknown or broken skin gives the default board. */
+export function getBoardSkin(key: string = DEFAULT_BOARD_SKIN): ResolvedBoardSkin {
+  return resolveBoard(key).skin;
+}
+
+/** Every board the app ships, keyed by item id (AnimationLab; Classic Serpent isn't sold). */
+export function listBoards(): { key: string; skin: ResolvedBoardSkin }[] {
+  return Object.keys(REGISTRY).map((id) => ({ key: PREFIX + id, skin: resolveBoard(id).skin }));
+}
+
+/** A board's height over its width, to 3 places (Serpent Reef: 2.917). The table layout is tuned
+ *  to Serpent Reef's shape, so every board for sale must have its ratio. */
+export function boardRatio(skin: BoardSkin): number {
+  const [w, h] = skin.upright.size;
+  return Math.round((h / w) * 1000) / 1000;
 }
 
 /** Where a peg at `score` stands on a lane, in the art's pixels. Scores clamp to 0..121. */

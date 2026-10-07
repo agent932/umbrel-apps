@@ -33,23 +33,31 @@ write("classic-serpent", {
   },
 });
 
+// Serpent Reef and every board in the shop share one shape (793 x 2313), so they share its hole
+// map, radii and standing pegs; only the art differs. The table layout is tuned to that shape.
 const [outer, inner] = serpentReefLanes();
-write("serpent-reef", {
-  id: "serpent-reef",
-  name: "Serpent Reef",
-  version: 1,
-  author: "Deckhand Games",
-  upright: {
-    image: "board-serpent.webp",
-    size: SERPENT_REEF.size,
-    lanes: [
-      { name: "outer", holes: outer },
-      { name: "inner", holes: inner },
-    ],
-    sharedGameHole: true,
-    holeRadius: 0.0125,
-    pegRadius: 0.02,
-    pegSprite: { me: "peg-blue.webp", opponent: "peg-red.webp", size: [72, 199], height: 0.18 },
-    safeBox: [0.08, 0.03, 0.92, 0.96],
-  },
-});
+const reefBoard = (id: string, name: string, image: string) =>
+  write(id, {
+    id,
+    name,
+    version: 1,
+    author: "Deckhand Games",
+    upright: {
+      image,
+      size: SERPENT_REEF.size,
+      lanes: [
+        { name: "outer", holes: outer },
+        { name: "inner", holes: inner },
+      ],
+      sharedGameHole: true,
+      holeRadius: 0.0125,
+      pegRadius: 0.02,
+      pegSprite: { me: "peg-blue.webp", opponent: "peg-red.webp", size: [72, 199], height: 0.18 },
+      safeBox: [0.08, 0.03, 0.92, 0.96],
+    },
+  });
+reefBoard("serpent-reef", "Serpent Reef", "board-serpent.webp");
+reefBoard("treasure-map", "Treasure Map", "board-treasure-map.webp");
+reefBoard("krakens-reef", "Kraken's Reef", "board-krakens-reef.webp");
+reefBoard("ghost-ship", "Ghost Ship", "board-ghost-ship.webp");
+reefBoard("royal-navy", "Royal Navy", "board-royal-navy.webp");
