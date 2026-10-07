@@ -1100,6 +1100,15 @@ html[data-nav="pop"]::view-transition-old(root) {
     --port: min(22cqh, 14cqw);
   }
 }
+/* A small phone held sideways (an iPhone SE) with powers down the right edge: the status line is
+   only about 225px wide, so a prompt like "Throw two cards to Swabbie Sal's crib" takes two lines
+   and would reach the pile, deck and crib. That row starts lower; there's room above your hand. */
+@container table (orientation: landscape) and (max-width: 740px) {
+  .table-grid.rail-one,
+  .table-grid.rail-two {
+    --play-top: 42cqh;
+  }
+}
 
 /* Portrait: last, so it overrides the landscape rules above. Top band: menu, the opponent's fan
    and porthole; then the board lying across; the status line; deck, pile and crib; your plaque and
