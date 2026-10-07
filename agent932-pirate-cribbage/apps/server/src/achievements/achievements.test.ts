@@ -1,40 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import {
-  CLASSIC_RULES,
-  PIRATE_RULES,
-  type GameState,
-  type RuleSet,
-  applyAction,
-  botAction,
-  createDeck,
-  hostAction,
-  newGame,
-  shuffle,
-} from "@pirate/engine";
+import { PIRATE_RULES, type GameState } from "@pirate/engine";
 import { users } from "../db/schema.js";
 import { recordMatch } from "../games/record.js";
+import { playGame } from "../test/games.js";
 import { signUp, testApp } from "../test/testApp.js";
 
 let t: Awaited<ReturnType<typeof testApp>>;
 beforeEach(async () => (t = await testApp()));
 afterEach(async () => t.close());
-
-/** A whole game between two bots. */
-function playGame(rules: RuleSet = CLASSIC_RULES): GameState {
-  let s = newGame(rules);
-  for (let i = 0; i < 10_000 && s.phase !== "gameOver"; i++) {
-    const action =
-      s.phase === "roundEnd"
-        ? { type: "nextRound" as const }
-        : (hostAction(s, () => shuffle(createDeck())) ??
-          botAction(s, 0, "medium") ??
-          botAction(s, 1, "medium"));
-    if (!action) throw new Error(`Nobody can act in ${s.phase}`);
-    s = applyAction(s, action).state;
-  }
-  return s;
-}
 
 async function userId(name: string) {
   const { cookie } = await signUp(t.app, name);

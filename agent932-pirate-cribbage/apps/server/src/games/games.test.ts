@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { eq, sql } from "drizzle-orm";
 import { type PlayerView, cardLabel, chooseDiscard, choosePlay } from "@pirate/engine";
+import { games, matches, users, walletLedger } from "../db/schema.js";
+import { expectLedgerMatches } from "../test/ledger.js";
 import { signUp, testApp } from "../test/testApp.js";
 import type { ClientAction } from "./actions.js";
 import type { GameResponse } from "./aiGames.js";
@@ -54,22 +57,44 @@ async function cutIn(cookie: string, res: GameResponse): Promise<GameResponse> {
   throw new Error("Cut for deal never finished");
 }
 
-async function playWholeGame(cookie: string, variant: "classic" | "pirate", level = "medium") {
-  let res = (await post("/api/games", cookie, { level, variant })).json() as GameResponse;
-  const gameId = res.gameId;
+async function startGame(cookie: string, variant: "classic" | "pirate", level = "medium") {
+  return (await post("/api/games", cookie, { level, variant })).json() as GameResponse;
+}
+
+/** Play a started game to the end. `final` is the response that finished it. */
+async function playFrom(cookie: string, start: GameResponse) {
+  const gameId = start.gameId;
+  let res = start;
+  let lastMove: ClientAction | null = null;
   const seen: string[] = [];
   for (let i = 0; i < 1000; i++) {
     const view = res.steps.at(-1)!.view;
     seen.push(JSON.stringify(res));
-    if (view.phase === "gameOver") return { gameId, view, seen };
+    if (view.phase === "gameOver") return { gameId, view, seen, final: res, lastMove: lastMove! };
     const move = nextMove(view);
     if (!move) throw new Error(`Stuck in ${view.phase}`);
     const r = await post(`/api/games/${gameId}/actions`, cookie, move);
     expect(r.statusCode, r.body).toBe(200);
     res = r.json();
+    lastMove = move;
   }
   throw new Error("Game did not finish");
 }
+
+async function playWholeGame(cookie: string, variant: "classic" | "pirate", level = "medium") {
+  return playFrom(cookie, await startGame(cookie, variant, level));
+}
+
+/** Move a game's start back 10 minutes, so it's long enough to pay doubloons. */
+const backdate = (gameId: string) =>
+  t.db
+    .update(games)
+    .set({ createdAt: sql`now() - interval '10 minutes'` })
+    .where(eq(games.id, gameId));
+
+const ledgerCount = async () => (await t.db.select().from(walletLedger)).length;
+const doubloons = async (cookie: string) =>
+  (await t.app.inject({ url: "/api/auth/me", headers: { cookie } })).json().user.doubloons;
 
 describe("games vs the computer", () => {
   it("needs an account", async () => {
@@ -219,6 +244,85 @@ describe("games vs the computer", () => {
     active = (await t.app.inject({ url: "/api/games/active", headers: { cookie } })).json();
     expect(active.game).toBeNull();
   });
+});
+
+describe("doubloons vs the computer", () => {
+  it("pays a win on the response that finishes the game, once", async () => {
+    const { cookie } = await signUp(t.app);
+    const start = await startGame(cookie, "classic");
+    await backdate(start.gameId);
+    const { view, seen, final, lastMove } = await playFrom(cookie, start);
+    // Only the finishing response carries the reward.
+    expect(seen.slice(0, -1).some((s) => s.includes('"reward"'))).toBe(false);
+    const reward = final.reward!;
+    expect(reward).toBeDefined();
+    expect(reward.note).toBeNull();
+    if (view.winner === 0) {
+      expect(reward.lines).toContainEqual({ reason: "botWin", delta: 35 });
+      expect(reward.lines).toContainEqual({ reason: "firstWinOfDay", delta: 50 });
+    } else {
+      expect(reward.lines.filter((l) => l.reason !== "achievement")).toEqual([]);
+    }
+    expect(await doubloons(cookie)).toBe(reward.balance);
+
+    // Sending the last move again finds the game finished, and pays nothing more.
+    const rows = await ledgerCount();
+    const again = await post(`/api/games/${start.gameId}/actions`, cookie, lastMove);
+    expect(again.statusCode).toBe(404);
+    expect(await ledgerCount()).toBe(rows);
+    await expectLedgerMatches(t.db);
+  }, 60_000);
+
+  it("pays nothing for a win in under 3 minutes", async () => {
+    const { cookie } = await signUp(t.app);
+    const { view, final } = await playWholeGame(cookie, "classic", "easy");
+    const reward = final.reward!;
+    expect(reward.note).toBe(view.winner === 0 ? "short" : null);
+    expect(reward.lines.some((l) => l.reason === "botWin")).toBe(false);
+    expect(await doubloons(cookie)).toBe(reward.balance);
+    await expectLedgerMatches(t.db);
+  }, 60_000);
+
+  it("pays nothing for games abandoned or replaced", async () => {
+    const { cookie } = await signUp(t.app);
+    const first = await startGame(cookie, "classic");
+    await backdate(first.gameId);
+    await startGame(cookie, "pirate");
+    const second = (await t.app.inject({ url: "/api/games/active", headers: { cookie } })).json();
+    await post(`/api/games/${second.game.gameId}/abandon`, cookie);
+    expect(await ledgerCount()).toBe(0);
+    expect(await doubloons(cookie)).toBe(0);
+  });
+
+  it("keeps nothing from a game whose recording fails", async () => {
+    const { cookie } = await signUp(t.app);
+    await t.db.execute(sql`
+      create function boom() returns trigger language plpgsql as $$
+      begin raise exception 'boom'; end $$`);
+    await t.db.execute(
+      sql`create trigger boom before insert on rounds for each row execute function boom()`,
+    );
+    let res = await startGame(cookie, "classic");
+    const gameId = res.gameId;
+    await backdate(gameId);
+    let failed: Awaited<ReturnType<typeof post>> | null = null;
+    for (let i = 0; i < 1000 && !failed; i++) {
+      const r = await post(
+        `/api/games/${gameId}/actions`,
+        cookie,
+        nextMove(res.steps.at(-1)!.view)!,
+      );
+      if (r.statusCode === 200) res = r.json();
+      else failed = r;
+    }
+    expect(failed?.statusCode).toBe(500);
+    expect(await ledgerCount()).toBe(0);
+    expect(await t.db.select().from(matches)).toEqual([]);
+    const [me] = await t.db.select({ doubloons: users.doubloons }).from(users);
+    expect(me!.doubloons).toBe(0);
+    const [game] = await t.db.select().from(games).where(eq(games.id, gameId));
+    expect(game!.finishedAt).toBeNull();
+  }, 60_000);
 });
 
 describe("health", () => {

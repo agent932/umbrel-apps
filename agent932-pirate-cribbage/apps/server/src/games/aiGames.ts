@@ -5,6 +5,7 @@ import {
   type GameEvent,
   type GameState,
   type PlayerView,
+  type Reward,
   type RuleSet,
   type Seat,
   applyAction,
@@ -38,6 +39,8 @@ export interface GameResponse {
   gameId: string;
   level: BotLevel;
   steps: Step[];
+  /** The person's doubloons for the game, on the response whose steps finish it. */
+  reward?: Reward;
 }
 
 export class GameNotFoundError extends Error {}
@@ -140,14 +143,17 @@ export async function actInAiGame(
       .update(games)
       .set({ state, updatedAt: new Date(), finishedAt: finished ? new Date() : null })
       .where(eq(games.id, gameId));
-    if (finished)
-      await recordMatch(
+    let reward: Reward | undefined;
+    if (finished) {
+      const rewards = await recordMatch(
         tx,
         { id: row.id, mode: "ai", aiLevel: row.aiLevel, createdAt: row.createdAt },
         [userId, null],
         state,
       );
-    return { gameId, level, steps };
+      reward = rewards.get(userId);
+    }
+    return { gameId, level, steps, ...(reward && { reward }) };
   });
 }
 

@@ -1,6 +1,7 @@
 import {
   type Card,
   type GameState,
+  type Reward,
   type RoundSeatRecord,
   type Seat,
   analyzeDiscard,
@@ -9,6 +10,8 @@ import {
 import type { Db } from "../db/client.js";
 import { matchPlayers, matches, roundPlayers, rounds } from "../db/schema.js";
 import { awardAchievements } from "../achievements/award.js";
+import { awardDoubloons } from "../economy/earn.js";
+import { lockWallets } from "../economy/wallet.js";
 
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -18,28 +21,37 @@ export interface RatingChange {
   tier: string;
 }
 
+/** The finished game being recorded. */
+export interface MatchInfo {
+  id: string;
+  mode: "ai" | "online";
+  aiLevel: "easy" | "medium" | "hard" | null;
+  /** When the game started (games.created_at). */
+  createdAt: Date;
+  ranked?: boolean;
+  seasonId?: number | null;
+}
+
 /** Hand analyzer score for one player's discard, or null if they never discarded this round. */
 export function analyzerScore(seat: RoundSeatRecord, isDealer: boolean): number | null {
   if (!seat.atDiscard) return null;
   return analyzeDiscard(seat.atDiscard.hand, seat.atDiscard.discarded, isDealer).score;
 }
 
-/** Write a finished game into the stats tables. */
+/**
+ * Write a finished game into the stats tables, award achievements and pay doubloons. Returns
+ * what each signed-in player earned, by user id.
+ */
 export async function recordMatch(
   tx: Tx | Db,
-  game: {
-    id: string;
-    mode: "ai" | "online";
-    aiLevel: "easy" | "medium" | "hard" | null;
-    createdAt: Date;
-    ranked?: boolean;
-    seasonId?: number | null;
-  },
+  game: MatchInfo,
   players: [string | null, string | null],
   state: GameState,
   forfeitedBy: Seat | null = null,
   ratings: RatingChange[] | null = null,
-) {
+): Promise<Map<string, Reward>> {
+  // First, before anything that refers to the players (see lockWallets).
+  await lockWallets(tx, players);
   const labels = (cards: Card[]) => cards.map(cardLabel);
   await tx.insert(matches).values({
     id: game.id,
@@ -67,8 +79,9 @@ export async function recordMatch(
       tier: ratings?.[seat]?.tier ?? null,
     })),
   );
-  await awardAchievements(tx, game.id, players, state, ratings);
-  if (state.history.length === 0) return;
+  const unlocked = await awardAchievements(tx, game.id, players, state, ratings);
+  const rewards = await awardDoubloons(tx, game, players, state, forfeitedBy, unlocked);
+  if (state.history.length === 0) return rewards;
   await tx.insert(rounds).values(
     state.history.map((r) => ({
       matchId: game.id,
@@ -98,4 +111,5 @@ export async function recordMatch(
       })),
     ),
   );
+  return rewards;
 }
