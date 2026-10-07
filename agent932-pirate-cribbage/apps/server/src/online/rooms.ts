@@ -94,6 +94,8 @@ class Room {
   /** When each seat last called out an emote (rate limit). */
   lastEmote: [number, number] = [0, 0];
   turnTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped whenever the move clock restarts or stops, so an outdated timer does nothing. */
+  clock = 0;
   deadline: number | null = null;
   disconnectTimers: [ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null] = [
     null,
@@ -244,9 +246,7 @@ export class RoomManager {
     void room.run(async () => {
       for (const seat of [0, 1] as Seat[]) {
         if (!room.clients[seat].delete(client)) continue;
-        // Nobody left on this seat to carry on past the scene: stop waiting for them.
-        if (!room.canCarryOn(seat) && room.sceneWaits.delete(seat) && !room.sceneWaits.size)
-          this.resume(room);
+        this.releaseScene(room);
         if (!room.online(seat)) this.awayClock(room, seat);
       }
     });
@@ -336,6 +336,23 @@ export class RoomManager {
     });
   }
 
+  /** A game screen closed (the socket stays open for challenges): scenes stop waiting for it. */
+  leftTable(gameId: string, client: Client) {
+    const room = this.rooms.get(gameId);
+    if (!room) return;
+    void room.run(async () => {
+      room.carriesOn.delete(client);
+      this.releaseScene(room);
+    });
+  }
+
+  /** Stop waiting at the scene for a seat with no app left that can carry on. */
+  private releaseScene(room: Room) {
+    if (!room.sceneWaits.size) return;
+    for (const seat of [0, 1] as Seat[]) if (!room.canCarryOn(seat)) room.sceneWaits.delete(seat);
+    if (!room.sceneWaits.size) this.resume(room);
+  }
+
   /** Nobody is watching the scene any more: the move clock starts again and both are told. */
   private resume(room: Room) {
     room.sceneWaits.clear();
@@ -422,10 +439,6 @@ export class RoomManager {
     room.state = state;
 
     const finished = state.phase === "gameOver";
-    // A pirate scene stops play until each player carries on. The show already waits for both
-    // players, and a finished game has nothing left to wait for.
-    const scene = !finished && state.phase !== "roundEnd" && events.some(playsScene);
-    room.sceneWaits = new Set(scene ? ([0, 1] as Seat[]).filter((s) => room.canCarryOn(s)) : []);
     // A finished game is saved by finish(), in the same transaction that records and pays it.
     const rewards = finished ? await this.finish(room, null, before) : null;
     if (!finished) {
@@ -434,6 +447,12 @@ export class RoomManager {
         .set({ state, updatedAt: new Date(), finishedAt: null })
         .where(eq(games.id, room.id));
     }
+    // A pirate scene stops play until both players carry on, when both apps have the button (an
+    // older iPhone build plays on by itself, so it isn't held up either). The show already waits
+    // for both players, and a finished game has nothing left to wait for.
+    const scene = !finished && state.phase !== "roundEnd" && events.some(playsScene);
+    const bothCan = room.canCarryOn(0) && room.canCarryOn(1);
+    room.sceneWaits = new Set(scene && bothCan ? [0, 1] : []);
 
     for (const seat of [0, 1] as Seat[]) {
       const reward = rewards?.get(room.players[seat].userId);
@@ -447,6 +466,7 @@ export class RoomManager {
     if (room.state.phase === "gameOver") return;
     const before = room.state;
     room.state = forfeitState(room.state, seat);
+    room.sceneWaits.clear();
     const rewards = await this.finish(room, seat, before);
     const events: GameEvent[] = [{ type: "gameOver", winner: other(seat), skunk: 0 }];
     for (const s of [0, 1] as Seat[]) {
@@ -569,9 +589,12 @@ export class RoomManager {
     const waitingOnRound = room.state.phase === "roundEnd";
     const ms = waitingOnRound ? this.timing.nextRoundMs : this.timing.turnMs;
     room.deadline = Date.now() + ms;
+    const clock = ++room.clock;
     room.turnTimer = setTimeout(() => {
       void room
         .run(async () => {
+          // A move got in first (it was queued while this timer fired) and restarted the clock.
+          if (clock !== room.clock) return;
           if (room.state.phase === "gameOver") return;
           // A scene left up too long: carry on for whoever hasn't, and the move clock restarts.
           if (room.sceneWaits.size) return this.resume(room);
@@ -590,6 +613,7 @@ export class RoomManager {
   }
 
   private clearTimers(room: Room) {
+    room.clock++;
     if (room.turnTimer) clearTimeout(room.turnTimer);
     for (const t of room.disconnectTimers) if (t) clearTimeout(t);
     room.turnTimer = null;

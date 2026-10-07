@@ -185,6 +185,9 @@ export async function onlineRoutes(
           case "carryOn":
             await rooms.carryOn(msg.gameId, user.id);
             break;
+          case "leftTable":
+            rooms.leftTable(msg.gameId, client);
+            break;
           case "rematch":
             await matchmaker.rematch(seeker, msg.gameId);
             break;

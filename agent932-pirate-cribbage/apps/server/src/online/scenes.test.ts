@@ -10,19 +10,18 @@ afterEach(async () => t?.close());
 const isState = (m: ServerMessage): m is StateMsg => m.t === "state";
 
 /**
- * A pirate game (free powers) played up to the discard. `carryOn`: both players' apps have the
- * Carry on button; older iPhone builds don't say so.
+ * A pirate game (free powers) played up to the discard. `carryOn`: which players' apps have the
+ * Carry on button (older iPhone builds don't say so).
  */
-async function atTheDiscard(timing: Timing = LONG, carryOn = true) {
+async function atTheDiscard(timing: Timing = LONG, carryOn: [boolean, boolean] = [true, true]) {
   t = await testApp(undefined, timing);
   const pair = await matchedPair(t, { variant: "pirate", powerCost: 0 });
   const { gameId, a, b } = pair;
-  if (carryOn) {
-    for (const c of [a, b]) {
-      const mark = c.messages.length;
-      c.send({ t: "watch", gameId, carryOn: true });
-      await c.after(mark, isState);
-    }
+  for (const [i, c] of [a, b].entries()) {
+    if (!carryOn[i]) continue;
+    const mark = c.messages.length;
+    c.send({ t: "watch", gameId, carryOn: true });
+    await c.after(mark, isState);
   }
   for (let i = 0; i < 50; i++) {
     const views = [a, b].map((c) => c.latestState()!.step.view);
@@ -71,10 +70,28 @@ describe("pirate scenes online", () => {
     expect(await move(b, gameId, discard(b))).toMatchObject({ t: "state" });
   });
 
-  it("don't wait for an app without the Carry on button", async () => {
-    const { gameId, a, b } = await atTheDiscard(LONG, false);
+  it("don't hold up apps without the Carry on button", async () => {
+    const { gameId, a, b } = await atTheDiscard(LONG, [false, false]);
     expect(await move(a, gameId, { type: "spyglass" })).toMatchObject({ sceneWaits: [] });
     expect(await move(b, gameId, discard(b))).toMatchObject({ t: "state" });
+  });
+
+  it("don't hold up an older app playing a newer one", async () => {
+    // The older app plays on once its scene fades; it mustn't be told to wait for the other.
+    const { gameId, a, b } = await atTheDiscard(LONG, [true, false]);
+    expect(await move(a, gameId, { type: "spyglass" })).toMatchObject({ sceneWaits: [] });
+    expect(await move(b, gameId, discard(b))).toMatchObject({ t: "state" });
+  });
+
+  it("stop waiting for a player whose game screen closed", async () => {
+    const { gameId, a, b } = await atTheDiscard();
+    await move(a, gameId, { type: "spyglass" });
+    a.send({ t: "carryOn", gameId });
+    await b.next((m) => m.t === "waiting");
+    // Back to the harbour: the socket stays open for challenges, but nobody is watching.
+    const mark = a.messages.length;
+    b.send({ t: "leftTable", gameId });
+    expect(await a.after(mark, isState)).toMatchObject({ sceneWaits: [] });
   });
 
   it("carry on by themselves when the move clock runs out", async () => {
@@ -88,10 +105,13 @@ describe("pirate scenes online", () => {
     expect(await b.after(mark, (m) => isState(m) && m.sceneWaits.length === 0, 4000)).toBeTruthy();
   });
 
-  it("ignore a Carry on after the game has ended (a skunk's scene)", async () => {
+  it("end with a forfeit, and a Carry on after the game ended is ignored", async () => {
     const { gameId, a } = await atTheDiscard();
+    await move(a, gameId, { type: "spyglass" });
     a.send({ t: "forfeit", gameId });
-    await a.next((m) => isState(m) && m.step.view.phase === "gameOver");
+    expect(await a.next((m) => isState(m) && m.step.view.phase === "gameOver")).toMatchObject({
+      sceneWaits: [],
+    });
     const mark = a.messages.length;
     a.send({ t: "carryOn", gameId });
     a.send({ t: "nonsense" });

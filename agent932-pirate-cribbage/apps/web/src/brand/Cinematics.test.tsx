@@ -150,6 +150,24 @@ describe("Cinematics", () => {
     expect(screen.getByRole("button", { name: "Play again" })).toHaveFocus();
   });
 
+  it("gives focus back to what had it, and keeps it in the scene while you wait", () => {
+    const names: [string, string] = ["You", "Bonny"];
+    const table = (events: GameEvent[], waits: (0 | 1)[]) => (
+      <>
+        <button type="button">5 of hearts</button>
+        <Cinematics events={events} names={names} me={0} online={{ waits, carryOn() {} }} />
+      </>
+    );
+    const { rerender } = render(table([], []));
+    screen.getByRole("button", { name: "5 of hearts" }).focus();
+    rerender(table(kraken, [0, 1]));
+    expect(screen.getByRole("button", { name: "Carry on" })).toHaveFocus();
+    carryOn();
+    expect(scene()).toHaveFocus();
+    rerender(table(kraken, []));
+    expect(screen.getByRole("button", { name: "5 of hearts" })).toHaveFocus();
+  });
+
   it("online, closes at once when your opponent carried on first", () => {
     const names: [string, string] = ["You", "Bonny"];
     render(

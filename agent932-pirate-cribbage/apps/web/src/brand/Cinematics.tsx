@@ -109,6 +109,9 @@ export function sceneFor(
 
 /* ---------- Characters and props, drawn in a 400×240 scene ---------- */
 
+/** Numbers each scene, so two arriving together can't be mistaken for one. */
+let sceneCount = 0;
+
 /**
  * Plays the pirate scene for the latest game events. It stays up until the player taps Carry on,
  * and play waits behind it (`onActive` tells the table). Online, the scene stays until both
@@ -150,7 +153,7 @@ export function Cinematics({
   useEffect(() => {
     const next = sceneFor(events, names, me);
     if (!next) return;
-    const scene = { ...next, key: Date.now() };
+    const scene = { ...next, key: ++sceneCount };
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setQueue((q) => [...q, scene]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,10 +204,15 @@ function ScenePanel({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useDialog(panel, { onTop: true });
+  // Once you've carried on, the button gives way to "Waiting for…": focus stays in the scene.
+  useEffect(() => {
+    if (waitingFor) panel.current?.focus();
+  }, [waitingFor]);
   return (
     <div
       ref={panel}
-      className="fixed inset-0 z-40 grid place-items-center bg-night/60 p-4 backdrop-blur-[2px]"
+      tabIndex={-1}
+      className="fixed inset-0 z-40 grid place-items-center bg-night/60 p-4 outline-none backdrop-blur-[2px]"
       {...dialogProps(scene.effect ? `${scene.caption} ${scene.effect.text}` : scene.caption)}
       style={{ animation: "cin-fade 300ms ease-out both" }}
     >
@@ -221,7 +229,7 @@ function ScenePanel({
           </p>
         )}
         {waitingFor ? (
-          <p role="status" className="min-h-11 py-2 text-parchment/80">
+          <p role="status" className="min-h-11 rounded-full bg-night/85 px-5 py-2 text-parchment">
             Waiting for {waitingFor}…
           </p>
         ) : (

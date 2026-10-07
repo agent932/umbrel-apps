@@ -33,6 +33,8 @@ export type ClientMessage =
   | { t: "emote"; gameId: string; emote: Emote }
   /** Done watching the pirate scene. */
   | { t: "carryOn"; gameId: string }
+  /** The game screen closed (the socket stays open for challenges): don't wait for it at scenes. */
+  | { t: "leftTable"; gameId: string }
   | { t: "rematch"; gameId: string }
   | { t: "acceptChallenge"; challengeId: string }
   | { t: "declineChallenge"; challengeId: string };

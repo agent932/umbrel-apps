@@ -5,6 +5,7 @@ import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import {
   CLASSIC_RULES,
+  type GameEvent,
   applyAction,
   createDeck,
   createGame,
@@ -159,6 +160,76 @@ describe("online game screen", () => {
     await user.click(screen.getByRole("button", { name: "Forfeit" }));
     expect(ws.sent.at(-1)).toEqual({ t: "forfeit", gameId });
   });
+  it("carries on past a pirate scene with the server, and says when the table closes", async () => {
+    const user = userEvent.setup();
+    const gameId = "55555555-5555-4555-8555-555555555555";
+    const { unmount } = render(<OnlineTable gameId={gameId} />);
+    await opened();
+    const ws = FakeSocket.last!;
+    const state = applyAction(createGame(0, CLASSIC_RULES), {
+      type: "deal",
+      deck: shuffle(createDeck()),
+    }).state;
+    const message = (sceneWaits: (0 | 1)[], events: GameEvent[] = []): ServerMessage => ({
+      t: "state",
+      gameId,
+      seat: 1,
+      names: ["Anne", "Bonny"],
+      avatars: [null, null],
+      ranked: false,
+      step: { events, view: viewFor(state, 1) },
+      deadline: Date.now() + 60_000,
+      online: [true, true],
+      returnBy: [null, null],
+      nextRoundReady: [],
+      sceneWaits,
+    });
+    ws.push(message([0, 1], [{ type: "kraken", seat: 0, points: -4, hole: 45 }]));
+    const scene = screen.getByRole("dialog", { name: /The Kraken drags Anne back!/ });
+    await user.click(within(scene).getByRole("button", { name: "Carry on" }));
+    expect(ws.sent.at(-1)).toEqual({ t: "carryOn", gameId });
+    expect(within(scene).getByRole("status")).toHaveTextContent("Waiting for Anne…");
+    ws.push({ t: "waiting", gameId, for: "scene", ready: [1] });
+    expect(screen.getByRole("dialog", { name: /Kraken/ })).toBeInTheDocument();
+    ws.push(message([]));
+    expect(screen.queryByRole("dialog", { name: /Kraken/ })).toBeNull();
+
+    unmount();
+    expect(ws.sent.at(-1)).toEqual({ t: "leftTable", gameId });
+  });
+
+  it("sends an older server (no scene waits) nothing it wouldn't know", async () => {
+    const user = userEvent.setup();
+    const gameId = "66666666-6666-4666-8666-666666666666";
+    const { unmount } = render(<OnlineTable gameId={gameId} />);
+    await opened();
+    const ws = FakeSocket.last!;
+    const state = applyAction(createGame(0, CLASSIC_RULES), {
+      type: "deal",
+      deck: shuffle(createDeck()),
+    }).state;
+    ws.push({
+      t: "state",
+      gameId,
+      seat: 1,
+      names: ["Anne", "Bonny"],
+      avatars: [null, null],
+      ranked: false,
+      step: {
+        events: [{ type: "kraken", seat: 0, points: -4, hole: 45 }],
+        view: viewFor(state, 1),
+      },
+      deadline: null,
+      online: [true, true],
+      returnBy: [null, null],
+      nextRoundReady: [],
+    });
+    await user.click(screen.getByRole("button", { name: "Carry on" }));
+    expect(screen.queryByRole("dialog", { name: /Kraken/ })).toBeNull();
+    unmount();
+    expect(ws.sent.filter((m) => m.t === "carryOn" || m.t === "leftTable")).toEqual([]);
+  });
+
   it("calls out to the other player, and offers a rematch when the game is over", async () => {
     const user = userEvent.setup();
     const gameId = "44444444-4444-4444-8444-444444444444";

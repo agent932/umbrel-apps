@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Reward, Seat } from "@pirate/engine";
 import { initialPresentation, present } from "../game/present.js";
 import type { GameController, Presentation, UiAction } from "../game/types.js";
@@ -49,6 +49,9 @@ export function useOnlineGame(
     reward: null,
     error: null,
   });
+  // Whether this server holds play at pirate scenes (its states say who it's waiting on). An
+  // older one would answer a Carry on with an error, so it isn't sent one.
+  const serverWaits = useRef(false);
 
   useEffect(() => {
     const release = socket.use();
@@ -61,6 +64,7 @@ export function useOnlineGame(
       if ("gameId" in m && m.gameId !== gameId) return;
       switch (m.t) {
         case "state":
+          serverWaits.current = Array.isArray(m.sceneWaits);
           setS((prev) => {
             const names = namesFor(m);
             const base = prev.p ?? initialPresentation(m.step.view);
@@ -110,10 +114,15 @@ export function useOnlineGame(
     // Subscribe now and after every reconnect; the server answers with the full current state.
     const stopOpen = socket.onOpen(() => socket.send({ t: "watch", gameId, carryOn: true }));
     return () => {
+      // Off to the harbour: the socket may stay open for challenges, but nobody is watching.
+      if (serverWaits.current) socket.send({ t: "leftTable", gameId });
       stopOpen();
       stopListening();
       release();
     };
+  }, [gameId]);
+  const carryOn = useCallback(() => {
+    if (serverWaits.current) socket.send({ t: "carryOn", gameId });
   }, [gameId]);
 
   if (!s.p) return { loading: true, error: s.error };
@@ -138,7 +147,7 @@ export function useOnlineGame(
       returnBy: s.returnBy,
       nextRoundReady: s.nextRoundReady,
       sceneWaits: s.sceneWaits,
-      carryOn: () => socket.send({ t: "carryOn", gameId }),
+      carryOn,
       forfeitedBy: s.forfeitedBy,
       forfeit: () => socket.send({ t: "forfeit", gameId }),
     },

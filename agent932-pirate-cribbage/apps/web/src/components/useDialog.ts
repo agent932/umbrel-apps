@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -60,6 +60,13 @@ export function useDialog(
     onTop = false,
   }: DialogOptions = {},
 ) {
+  // What had focus before the dialog opened (read while it first renders, before a button in it
+  // takes focus with autoFocus), so focus can go back there when it closes.
+  const [before] = useState(() =>
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   // The latest onClose, without re-adding the listeners every render.
   const close = useRef(onClose);
   useEffect(() => {
@@ -70,7 +77,6 @@ export function useDialog(
     const panelEl = panel.current;
     if (!panelEl) return;
     const openerEl = opener?.current ?? null;
-    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     // Everything on the table behind it goes quiet (not a table holding the panel itself).
     const behind = modal
@@ -137,7 +143,7 @@ export function useDialog(
         if (back?.isConnected) back.focus();
       }
     };
-  }, [panel, opener, dismissOutside, modal, focusPanel, onTop]);
+  }, [panel, opener, dismissOutside, modal, focusPanel, onTop, before]);
 }
 
 /** The attributes a dialog's panel carries. */

@@ -32,6 +32,8 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("emote"), gameId: z.string().uuid(), emote: Emote }),
   /** Done watching the pirate scene; play goes on once both players are. */
   z.object({ t: z.literal("carryOn"), gameId: z.string().uuid() }),
+  /** The game screen closed (the socket stays open for challenges): don't wait for it at scenes. */
+  z.object({ t: z.literal("leftTable"), gameId: z.string().uuid() }),
   /** Play the same opponent again with the same rules (unranked games only). */
   z.object({ t: z.literal("rematch"), gameId: z.string().uuid() }),
 ]);
