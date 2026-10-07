@@ -142,6 +142,22 @@ describe("board skins", () => {
     );
   });
 
+  it("brands the shop's boards on their foot plate, clear of every hole", () => {
+    for (const board of [serpentReef, ...REEF_BOARDS]) {
+      const [left, top, right, bottom] = board.upright.brand as [number, number, number, number];
+      for (const lane of board.upright.lanes) {
+        for (const [x, y] of lane.holes as [number, number][]) {
+          expect(x > left && x < right && y > top && y < bottom).toBe(false);
+        }
+      }
+    }
+    const skin = copy();
+    (skin.upright as { brand?: number[] }).brand = [0.7, 0.9, 0.3, 0.95];
+    expect(boardSkinErrors(skin)).toContain(
+      "upright.brand must be [left, top, right, bottom] inside the board",
+    );
+  });
+
   it("rejects a lane that's short of holes", () => {
     const skin = copy();
     skin.upright.lanes[1]!.holes.pop();

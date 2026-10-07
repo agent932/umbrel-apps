@@ -44,6 +44,9 @@ export interface BoardLayout {
   sharedGameHole?: boolean;
   /** Standing pegs drawn from art (side view, tip at the bottom) instead of round pegs. */
   pegSprite?: PegSprite;
+  /** The blank of the foot plate, where the Pirate Cribbage logo is drawn: [left, top, right,
+   *  bottom] fractions of the upright art. A board without one carries no logo. */
+  brand?: [number, number, number, number];
 }
 
 export interface PegSprite {
@@ -120,6 +123,16 @@ function layoutErrors(raw: unknown, where: string): string[] {
   for (const key of ["holeRadius", "pegRadius"] as const) {
     const v = l[key];
     if (!isNum(v) || v <= 0 || v > 0.25) errors.push(`${where}.${key} must be between 0 and 0.25`);
+  }
+  if (l.brand !== undefined) {
+    const b = l.brand as unknown;
+    const brand =
+      Array.isArray(b) && b.length === 4 && b.every(isNum)
+        ? (b as [number, number, number, number])
+        : null;
+    const [left, top, right, bottom] = brand ?? [0, 0, 0, 0];
+    if (!brand || left < 0 || top < 0 || right > 1 || bottom > 1 || left >= right || top >= bottom)
+      errors.push(`${where}.brand must be [left, top, right, bottom] inside the board`);
   }
   const box = l.safeBox ?? [0, 0, 1, 1];
   if (!Array.isArray(box) || box.length !== 4 || !box.every(isNum))

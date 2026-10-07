@@ -137,6 +137,22 @@ describe("PaintedBoard", () => {
     expect(pegAt(container, "me-back")).toBe(translate(holePoint(layout, 1, 0)));
   });
 
+  it("draws the Pirate Cribbage logo on the foot plate", () => {
+    const { container } = render(
+      <PaintedBoard
+        scores={[0, 0]}
+        backPegs={[0, 0]}
+        rules={CLASSIC_RULES}
+        names={["You", "Anne"]}
+        me={0}
+        upright
+        instant
+      />,
+    );
+    const logo = container.querySelector("image[data-brand]")!;
+    expect(Number(logo.getAttribute("y"))).toBeCloseTo(0.911 * layout.size[1]);
+  });
+
   it("keeps you in the right lane from seat 1, and lays the board on its side in portrait", () => {
     const { container } = render(
       <PaintedBoard

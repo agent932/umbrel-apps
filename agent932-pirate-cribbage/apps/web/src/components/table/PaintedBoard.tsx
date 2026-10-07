@@ -3,6 +3,7 @@ import { KRAKEN_HOLES, TREASURE_HOLES, type RuleSet } from "@pirate/engine";
 import { type HolePoint, getBoardSkin, holePoint } from "../../brand/boardSkins.js";
 import { PEG_COLORS } from "../../brand/powerArt.js";
 import { pegTick } from "../../sound.js";
+import logoUrl from "../../assets/ui/logo-a.webp";
 
 interface PaintedBoardProps {
   scores: [number, number];
@@ -172,6 +173,19 @@ export function PaintedBoard({
         height={artH}
         transform={upright ? undefined : `translate(0 ${artW}) rotate(-90)`}
       />
+      {layout.brand && (
+        // The Pirate Cribbage logo on the foot plate, turned with the board.
+        <image
+          href={logoUrl}
+          data-brand=""
+          x={layout.brand[0] * artW}
+          y={layout.brand[1] * artH}
+          width={(layout.brand[2] - layout.brand[0]) * artW}
+          height={(layout.brand[3] - layout.brand[1]) * artH}
+          preserveAspectRatio="xMidYMid meet"
+          transform={upright ? undefined : `translate(0 ${artW}) rotate(-90)`}
+        />
+      )}
       {LANES.map((lane) => (
         <g key={lane}>
           {layout.lanes[lane].holes.map((_, n) => {
