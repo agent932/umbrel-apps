@@ -1,0 +1,4 @@
+Sound effects from Kenney's "Casino Audio" (card-*, peg) and "RPG Audio" (coins) packs,
+by Kenney Vleugels (https://kenney.nl). License: Creative Commons Zero (CC0),
+http://creativecommons.org/publicdomain/zero/1.0/ — free for personal and commercial use.
+Converted to mono MP3; the shuffle is trimmed to 1.3 s with a fade-out.

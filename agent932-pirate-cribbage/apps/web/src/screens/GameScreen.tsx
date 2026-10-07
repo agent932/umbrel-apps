@@ -20,6 +20,7 @@ import { ScorePops } from "../components/table/ScorePops.js";
 import { TableBoard } from "../components/table/TableBoard.js";
 import { TableMenu } from "../components/table/TableMenu.js";
 import { PlayerSheet } from "../components/PlayerSheet.js";
+import { countWinForRating, requestAppReview } from "../rating.js";
 import {
   LAST_PLAY_MS,
   RESET_HOLD_MS,
@@ -160,6 +161,19 @@ export function GameScreen({
   const holdMs = online
     ? LAST_PLAY_MS
     : Math.max(2000, Math.round(LAST_PLAY_MS * SPEED_FACTOR[speed]));
+  // A win in the iPhone app counts toward Apple's rating prompt, shown once the win has sunk in.
+  const countedWin = useRef(false);
+  useEffect(() => {
+    if (view.phase !== "gameOver") {
+      countedWin.current = false;
+      return;
+    }
+    if (countedWin.current || instant || view.winner !== me) return;
+    countedWin.current = true;
+    if (!countWinForRating()) return;
+    const t = setTimeout(requestAppReview, 2500);
+    return () => clearTimeout(t);
+  }, [view.phase, view.winner, me, instant]);
   const lastPlay = useLastPlay(livePile, count, !!view.pegging, p.lastEvents, !!instant, holdMs);
   // A run that ended on 31 or a Go stays up for a moment too, so its last card is seen.
   const resetMs = online ? RESET_HOLD_MS : Math.round(RESET_HOLD_MS * SPEED_FACTOR[speed]);
