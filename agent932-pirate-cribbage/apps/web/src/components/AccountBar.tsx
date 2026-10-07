@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "../auth.js";
+import { DoubloonIcon } from "./Doubloons.js";
 import { SettingsButton } from "./SettingsButton.js";
 
 /** Back to the Deckhand Games hub. */
@@ -31,6 +32,15 @@ export function AccountBar({ home = false }: { home?: boolean }) {
           <span className="flex w-full items-center gap-2 text-parchment/80 sm:mr-auto sm:w-auto">
             <SettingsButton />
             Ahoy, <b className="text-gold">{user.username}</b>
+            {/* Your doubloons (read again from the server after each game and daily puzzle). */}
+            <span
+              className="ml-1 inline-flex items-center gap-1 font-semibold text-gold tabular-nums"
+              title="Doubloons"
+            >
+              <DoubloonIcon className="h-4 w-4" />
+              {(user.doubloons ?? 0).toLocaleString()}
+              <span className="sr-only"> doubloons</span>
+            </span>
           </span>
           {home && <HomeLink />}
           {user.isAdmin && (
