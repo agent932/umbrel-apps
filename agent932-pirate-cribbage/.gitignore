@@ -5,3 +5,8 @@ dist/
 .env.local
 coverage/
 .DS_Store
+
+# Browser tests
+e2e/.auth/
+playwright-report/
+test-results/

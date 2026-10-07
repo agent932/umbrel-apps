@@ -43,8 +43,32 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Real browsers (Chromium, and WebKit on an iPhone-sized screen) playing the production build.
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: agent932-pirate-cribbage/.nvmrc
+          cache: npm
+          cache-dependency-path: agent932-pirate-cribbage/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run e2e
+      - name: Keep the report, screenshots and traces of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            agent932-pirate-cribbage/playwright-report
+            agent932-pirate-cribbage/test-results
+          retention-days: 14
+
   image:
-    needs: test
+    needs: [test, e2e]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
