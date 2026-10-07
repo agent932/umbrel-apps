@@ -2,9 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { SupportScreen } from "./SupportScreen.js";
 
-vi.mock("../auth.js", () => ({ useAuth: () => ({ user: null }) }));
+/** A guest; tests flip `shopOpen` as /api/auth/me would. */
+const auth = vi.hoisted(() => ({ user: null, shopOpen: false }));
+vi.mock("../auth.js", () => ({ useAuth: () => auth }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  auth.shopOpen = false;
+});
 
 /** Answers /api/email/enabled with `enabled`; anything else is a plain ok. */
 function stubEmail(enabled: boolean) {
@@ -32,7 +37,7 @@ describe("support FAQ: I forgot my password", () => {
 });
 
 describe("support FAQ", () => {
-  it("groups fifteen questions under Playing, Online and your account, and Help", async () => {
+  it("groups eighteen questions under Playing, Online and your account, and Help", async () => {
     stubEmail(true);
     render(<SupportScreen />);
     const faq = screen.getByRole("region", { name: "Common questions" });
@@ -60,5 +65,45 @@ describe("support FAQ", () => {
     expect(document.getElementById("contact")).toHaveAccessibleName("Contact us");
     // The delete button's real label.
     expect(screen.getByText("Delete my account")).toBeInTheDocument();
+  });
+});
+
+describe("support FAQ: the shop", () => {
+  /** The text of the answer under this question. */
+  function answer(q: string): string {
+    const details = screen.getByText(q, { selector: "summary" }).closest("details");
+    return details?.querySelector("div")?.textContent ?? "";
+  }
+
+  it("says there's nothing to buy and the shop is on its way while it's closed", () => {
+    stubEmail(true);
+    render(<SupportScreen />);
+    expect(answer("Is it free?")).toContain("with no ads and no purchases. An account");
+    const doubloons = answer("What are doubloons, and how do I earn them?");
+    expect(doubloons).toContain(
+      "turned into money. A shop of new boards and card backs to spend them on is on its way.",
+    );
+    expect(doubloons).not.toContain("nothing is random");
+    expect(screen.queryByRole("link", { name: "Shop" })).toBeNull();
+  });
+
+  it("points to the Shop once it's open, with nothing for real money", () => {
+    auth.shopOpen = true;
+    stubEmail(true);
+    render(<SupportScreen />);
+    const free = answer("Is it free?");
+    expect(free).toContain("with no ads and nothing to buy with real money. An account");
+    expect(free).not.toContain("no purchases");
+    const doubloons = answer("What are doubloons, and how do I earn them?");
+    expect(doubloons).toContain(
+      "turned into money. Spend them in the Shop on new boards and card backs. Every price is " +
+        "fixed and you see exactly what you get: nothing is random.",
+    );
+    expect(doubloons).not.toContain("on its way");
+    expect(screen.getByRole("link", { name: "Shop" })).toHaveAttribute("href", "/shop");
+    // The same questions in the same places: only the wording changes.
+    const faq = screen.getByRole("region", { name: "Common questions" });
+    expect(faq.querySelectorAll("details")).toHaveLength(18);
+    expect(faq.querySelectorAll("details ul")).toHaveLength(3);
   });
 });

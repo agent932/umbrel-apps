@@ -9,7 +9,7 @@ export function PrivacyScreen() {
       <NavBar title="Privacy policy" back={{ to: "/", label: "Deckhand Games" }} />
       <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-5 px-4 pt-2 pb-6 text-parchment/90">
         <h1 className="text-center font-pirate text-4xl text-gold">Privacy policy</h1>
-        <p className="text-center text-sm text-parchment/60">Last updated 4 October 2026</p>
+        <p className="text-center text-sm text-parchment/60">Last updated 7 October 2026</p>
 
         <p>
           Deckhand Games is a small, self-hosted card game site. It has no ads, does not track you
@@ -26,6 +26,13 @@ export function PrivacyScreen() {
             <li>
               <b>Your games:</b> match results, scores, hands and plays, ratings and ranks, and
               achievements. These power your stats, the Ship's Log and the leaderboard.
+            </li>
+            <li>
+              <b>Doubloons and the shop:</b> your doubloon balance, a record of each change to it
+              (what paid it and what you bought), and the boards and card backs you own and use.
+              Doubloons are game points: they have no cash value and can't be bought, sold or
+              exchanged for money. They are earned by playing (the site owner may add some to put a
+              problem right).
             </li>
             <li>
               <b>Friends:</b> who you've added and pending requests.
@@ -56,8 +63,9 @@ export function PrivacyScreen() {
           <h2 className={h2}>Who else sees it</h2>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <b>Other players</b> see your username, portrait, rank and rating, and in-game moves
-              and emotes. Your email address is never shown to other players.
+              <b>Other players</b> see your username, portrait, rank and rating, the board and card
+              backs you use when you start an online game, and in-game moves and emotes. Your email
+              address is never shown to other players.
             </li>
             <li>
               <b>Email delivery:</b> if the site owner has turned email on, invites, password resets
@@ -85,9 +93,9 @@ export function PrivacyScreen() {
           <h2 className={h2}>Deleting your account</h2>
           <p>
             Sign in, open <b>Account</b>, and choose <b>Delete account</b>. Your account, friends,
-            stats, achievements and unfinished games are removed straight away. Finished matches
-            stay in your opponents' history without your name. You can also change your password or
-            turn off email notices there at any time.
+            stats, achievements, doubloons, shop items and unfinished games are removed straight
+            away. Finished matches stay in your opponents' history without your name. You can also
+            change your password or turn off email notices there at any time.
           </p>
         </section>
 

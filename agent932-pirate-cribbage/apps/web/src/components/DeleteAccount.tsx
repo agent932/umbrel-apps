@@ -32,8 +32,8 @@ export function DeleteAccount() {
       <h2 className="font-pirate text-2xl text-red-200">Delete account</h2>
       <p className="text-sm text-parchment/80">
         Removes your account, friends, stats, achievements and unfinished games for good. Your
-        doubloons go too. Finished matches stay in your opponents' history without your name. This
-        can't be undone.
+        doubloons and the boards and card backs you've bought go too. Finished matches stay in your
+        opponents' history without your name. This can't be undone.
       </p>
       {!open ? (
         <button

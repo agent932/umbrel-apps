@@ -101,6 +101,39 @@ Data linked to the user, used for **App Functionality** only, **not** used for t
 No usage data or diagnostics are collected by the app, and there's no third-party advertising or
 analytics in it.
 
+## For 1.1
+
+1.1 is the first build with the Shop: boards and card backs that players buy with doubloons. App
+Review has to be able to reach it, so before submitting:
+
+1. The server release with the Shop is live at deckhand.games, and the shop is open to players
+   (Admin → Shop → **Open the shop to players**).
+2. The App Review demo account has 2,500 doubloons (Admin → Players → that account → doubloons,
+   note "App Review"), so the reviewer can buy something.
+3. The archive is built from the release commit the server runs, or a later one.
+
+Then, in App Store Connect:
+
+- **Review notes:** keep the test-account line above, and add:
+
+  > New in 1.1: a Shop of boards and card backs bought with doubloons. Tap Shop at the top of the
+  > screen, next to Crew, or "Shop: boards and card backs" on the Pirate Cribbage screen. Players
+  > earn doubloons only by playing: wins, the daily discard and achievements. Doubloons can't be
+  > bought and have no cash value; the app has no in-app purchases. The demo account has 2,500
+  > doubloons so you can buy and use an item.
+
+- **Promotional text and description:** say "no ads and no real-money purchases" rather than "no
+  purchases" (in the description: "free to play with no ads and no real-money purchases"). The
+  doubloon shop isn't In-App Purchase: nothing in it costs money, so App Store Connect still lists
+  no in-app purchases.
+- **Age rating:** unchanged. Prices are fixed, nothing random is for sale (no loot boxes), and
+  doubloons can only be earned.
+- **App Privacy:** keep the answers above. "Gameplay Content" now also covers a player's doubloons
+  (the balance and each change to it) and the boards and card backs they own and use. Nothing goes
+  under Purchases, because nothing costs money; check Apple's wording for that category at
+  submission.
+- **What's New** and a Shop question for the support page are written with the release.
+
 ## Notes
 
 - **Why bundled, not a web wrapper:** App Review Guideline 4.2 rejects apps that only show a

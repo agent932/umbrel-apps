@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { ApiError, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { useEmailEnabled } from "../email.js";
-import { CRIBBAGE_HOME } from "../routes.js";
+import { CRIBBAGE_HOME, SHOP } from "../routes.js";
 
 /** Same keys as the server's SUPPORT_TOPICS. */
 export const SUPPORT_TOPICS = {
@@ -40,8 +40,8 @@ const FAQ: { group: string; items: Entry[] }[] = [
         q: "Is it free?",
         a: (
           <p>
-            Yes. Pirate Cribbage is free on the web and on iPhone, with no ads and no purchases. An
-            account is free too.
+            Yes. Pirate Cribbage is free on the web and on iPhone, with no ads and <NoPurchases />.
+            An account is free too.
           </p>
         ),
       },
@@ -52,8 +52,7 @@ const FAQ: { group: string; items: Entry[] }[] = [
             <p>
               Doubloons are the game's pirate coins. You earn them by playing with a free account
               (guest games don't earn), and your balance shows beside your name in the harbour. They
-              can't be bought or turned into money. A shop of new boards and card decks to spend
-              them on is on its way.
+              can't be bought or turned into money. <SpendThem />
             </p>
             <ul className="mt-1 list-disc pl-5">
               <li>A win against the crew: 20 on Easy, 35 on Medium, 50 on Hard.</li>
@@ -289,6 +288,24 @@ const FAQ: { group: string; items: Entry[] }[] = [
     ],
   },
 ];
+
+/** "…with no ads and no purchases", until the shop opens. The shop's wording follows the server's
+ *  switch, so opening the shop needs no new release. */
+function NoPurchases() {
+  return useAuth().shopOpen ? "nothing to buy with real money" : "no purchases";
+}
+
+/** The doubloons answer's last sentence: where to spend them. */
+function SpendThem() {
+  return useAuth().shopOpen ? (
+    <>
+      Spend them in the <Link href={SHOP}>Shop</Link> on new boards and card backs. Every price is
+      fixed and you see exactly what you get: nothing is random.
+    </>
+  ) : (
+    "A shop of new boards and card backs to spend them on is on its way."
+  );
+}
 
 /** The reset link only exists when this server can send email; otherwise we reset it by hand. */
 function ForgotPasswordAnswer() {
