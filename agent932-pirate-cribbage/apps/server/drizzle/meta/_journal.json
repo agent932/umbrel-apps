@@ -92,6 +92,13 @@
       "when": 1791332315553,
       "tag": "0012_wallet",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791377844805,
+      "tag": "0013_shop",
+      "breakpoints": true
     }
   ]
 }

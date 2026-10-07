@@ -14,7 +14,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { GameState, LedgerReason, PowerUse, RuleSet } from "@pirate/engine";
+import type {
+  GameState,
+  ItemType,
+  LedgerReason,
+  PowerUse,
+  RuleSet,
+  TableCosmetics,
+} from "@pirate/engine";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
@@ -41,6 +48,9 @@ export const users = pgTable(
     isAdmin: boolean("is_admin").notNull().default(false),
     /** Doubloons on hand: a cache of sum(wallet_ledger.delta). Only economy/wallet.ts changes it. */
     doubloons: integer("doubloons").notNull().default(0),
+    /** The board and back the player uses; null means the default. Only economy/shop.ts sets them. */
+    equippedBoard: text("equipped_board").references(() => shopItems.id, { onDelete: "restrict" }),
+    equippedDeck: text("equipped_deck").references(() => shopItems.id, { onDelete: "restrict" }),
     /** Disabled accounts can't sign in. */
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -50,6 +60,14 @@ export const users = pgTable(
     uniqueIndex("users_username_lower").on(sql`lower(${t.username})`),
     uniqueIndex("users_email_lower").on(sql`lower(${t.email})`),
     check("users_doubloons_nonneg", sql`${t.doubloons} >= 0`),
+    check(
+      "users_equipped_board_type",
+      sql`${t.equippedBoard} is null or ${t.equippedBoard} like 'board.%'`,
+    ),
+    check(
+      "users_equipped_deck_type",
+      sql`${t.equippedDeck} is null or ${t.equippedDeck} like 'deck.%'`,
+    ),
   ],
 );
 
@@ -152,6 +170,9 @@ export const games = pgTable(
     /** Seat 1's player in online games (`userId` is seat 0). Null against the computer. */
     user2Id: uuid("user2_id").references(() => users.id, { onDelete: "cascade" }),
     ranked: boolean("ranked").notNull().default(false),
+    /** Online games: the host's board and back, copied when the game starts (D-23). Null for games
+     *  vs the computer and for games started before the shop: draw the defaults. */
+    cosmetics: jsonb("cosmetics").$type<TableCosmetics>(),
     state: jsonb("state").$type<GameState>().notNull(),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -254,7 +275,6 @@ export const achievements = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
 );
 
-/** Server settings an admin can change in the app (e.g. "email": the Resend key and sender). */
 /** Daily discard answers: one per player per day, ranked by the server. */
 export const dailyResults = pgTable(
   "daily_results",
@@ -300,9 +320,58 @@ export const walletLedger = pgTable(
       .on(t.actorId)
       .where(sql`${t.actorId} is not null`),
     check("wallet_ledger_delta_nonzero", sql`${t.delta} <> 0`),
+    // A sign slip in a purchase can never pay the player.
+    check("wallet_ledger_purchase_negative", sql`${t.reason} <> 'purchase' or ${t.delta} < 0`),
   ],
 );
 
+/** Everything the shop sells, and the free items. Rows are never deleted or renamed. */
+export const shopItems = pgTable(
+  "shop_items",
+  {
+    /** Also the web's skin key: "board.treasure-map". Never renamed. */
+    id: text("id").primaryKey(),
+    type: text("type").$type<ItemType>().notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    /** In doubloons. 0 = free: owned by everyone (the defaults and any free extra). */
+    price: integer("price").notNull(),
+    /** Used when nothing else is chosen (null in users.equipped_*). One per type, always free. */
+    isDefault: boolean("is_default").notNull().default(false),
+    /** Off: hidden from the shop and can't be bought, but owners keep using it. */
+    available: boolean("available").notNull().default(true),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("shop_items_type", sql`${t.type} in ('board', 'deck')`),
+    // The API's id format, with the prefix equal to the type.
+    check("shop_items_id_format", sql`${t.id} ~ ('^' || ${t.type} || '\\.[a-z0-9-]+$')`),
+    check("shop_items_price", sql`${t.price} >= 0 and (not ${t.isDefault} or ${t.price} = 0)`),
+    uniqueIndex("shop_items_one_default")
+      .on(t.type)
+      .where(sql`${t.isDefault}`),
+  ],
+);
+
+/** Items a player has bought. Rows go only with the account (cascade): code never updates or
+ *  deletes them, and a refund never removes the item. Every insert runs after
+ *  lockWallets(tx, [userId]) in the same transaction. */
+export const inventory = pgTable(
+  "inventory",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemId: text("item_id")
+      .notNull()
+      .references(() => shopItems.id, { onDelete: "restrict" }),
+    acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] }), index("inventory_item").on(t.itemId)],
+);
+
+/** Server settings an admin can change in the app (e.g. "email": the Resend key and sender). */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),
