@@ -1,7 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
+import { DEFAULT_COSMETICS, type Seat } from "@pirate/engine";
 import { games, matchPlayers, matches, users, walletLedger } from "../db/schema.js";
+import { credit } from "../economy/wallet.js";
 import { expectLedgerMatches } from "../test/ledger.js";
+import { expectPurchasesMatch, giveAndUse, setShopOpen } from "../test/shop.js";
 import { signUp, testApp } from "../test/testApp.js";
 import {
   LONG,
@@ -632,6 +636,295 @@ describe("online play", () => {
       expect(await guest.next((m) => m.t === "error")).toMatchObject({
         message: expect.stringMatching(/expired/),
       });
+    });
+  });
+
+  describe("the host's board and card backs", () => {
+    type SignedUp = Awaited<ReturnType<typeof signUp>>;
+    type Prepare = (anne: SignedUp, bonny: SignedUp) => Promise<void>;
+    type Matched = Extract<ServerMessage, { t: "matched" }>;
+    const CLASSIC = { variant: "classic" };
+    /** What Anne uses in most of these tests. */
+    const ANNES = { board: "board.treasure-map", deck: "deck.crimson" };
+    /** What Bonny uses, when she uses anything. */
+    const BONNYS = { board: "board.ghost-ship", deck: "deck.ghost" };
+    const idOf = (p: SignedUp) => p.res.json().user.id as string;
+    const post = (url: string, cookie: string, payload: object = {}) =>
+      t.app.inject({ method: "POST", url, headers: { cookie }, payload });
+    const use = (p: SignedUp, itemId: string) => post("/api/shop/use", p.cookie, { itemId });
+
+    /** Give a player a board and backs, and have them use both. */
+    async function uses(p: SignedUp, items: { board: string; deck: string }) {
+      await giveAndUse(t.db, idOf(p), items.board);
+      await giveAndUse(t.db, idOf(p), items.deck);
+    }
+
+    /**
+     * Anne uses Treasure Map and Crimson. She signs up first, so she's an admin: the shop is
+     * opened, or what she uses would be a preview only she sees.
+     */
+    async function anneUsesHers(anne: SignedUp) {
+      await setShopOpen(t.db, true);
+      await uses(anne, ANNES);
+    }
+
+    /** Anne and Bonny through Quick Match, after `prepare`. Anne waits first, so she hosts. */
+    async function anneHosts(prepare: Prepare = anneUsesHers, names?: string[]) {
+      t = await testApp(undefined, LONG);
+      return matchedPair(t, CLASSIC, names, undefined, prepare);
+    }
+
+    /** Anne and Bonny signed up (Anne first) and connected, after `prepare`. */
+    async function connected(prepare: Prepare) {
+      t = await testApp(undefined, LONG);
+      const anne = await signUp(t.app, "Anne");
+      const bonny = await signUp(t.app, "Bonny");
+      await prepare(anne, bonny);
+      const a = await connect(t.app, anne.cookie);
+      const b = await connect(t.app, bonny.cookie);
+      await a.next((m) => m.t === "hello");
+      await b.next((m) => m.t === "hello");
+      return { a, b, anne, bonny };
+    }
+
+    /** Quick Match again, `first` waiting first. Nobody watches the new game yet. */
+    async function queueAgain(first: TestClient, second: TestClient) {
+      first.send({ t: "queue", menu: CLASSIC });
+      await first.next((m) => m.t === "queued");
+      second.send({ t: "queue", menu: CLASSIC });
+      const { gameId } = await first.next<Matched>((m) => m.t === "matched");
+      await second.next((m) => m.t === "matched");
+      return gameId;
+    }
+
+    /** Quick Match again (`first` waiting first) until `first` sits in `seat`. */
+    async function hostAt(seat: Seat, first: TestClient, second: TestClient, firstId: string) {
+      for (let i = 0; i < 40; i++) {
+        const gameId = await queueAgain(first, second);
+        // Seat 0 is the game row's first player.
+        const [g] = await t.db
+          .select({ userId: games.userId })
+          .from(games)
+          .where(eq(games.id, gameId));
+        if ((g!.userId === firstId ? 0 : 1) === seat) return gameId;
+      }
+      throw new Error(`Never got seat ${seat}`);
+    }
+
+    /** Both clients watch the game: their first states of it. */
+    async function watch(gameId: string, x: TestClient, y: TestClient) {
+      const first = (c: TestClient) =>
+        c.next<StateMsg>((m) => m.t === "state" && m.gameId === gameId);
+      x.send({ t: "watch", gameId });
+      y.send({ t: "watch", gameId });
+      return [await first(x), await first(y)] as const;
+    }
+
+    /** What the game row keeps. */
+    async function stored(gameId: string) {
+      const [g] = await t.db
+        .select({ cosmetics: games.cosmetics })
+        .from(games)
+        .where(eq(games.id, gameId));
+      return g!.cosmetics;
+    }
+
+    it("shows both players the host's, whichever seat the host gets", async () => {
+      const { a, b, sa, sb, anne } = await anneHosts();
+      for (const s of [sa, sb]) expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: sa.seat });
+      expect(await stored(sa.gameId)).toEqual({ hostId: idOf(anne), ...ANNES });
+
+      // Seats are shuffled: another game, with Anne in the other seat.
+      const other = (1 - sa.seat) as Seat;
+      const [sa2, sb2] = await watch(await hostAt(other, a, b, idOf(anne)), a, b);
+      expect(sa2.seat).toBe(other);
+      for (const s of [sa2, sb2]) expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: other });
+    });
+
+    it("never shows the other player's", async () => {
+      const { sa, sb } = await anneHosts(async (_anne, bonny) => {
+        await setShopOpen(t.db, true);
+        await uses(bonny, BONNYS);
+      });
+      for (const s of [sa, sb]) {
+        expect(s.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: sa.seat });
+      }
+    });
+
+    it("shows the inviter's for an invite", async () => {
+      const { a, b } = await connected(async (anne, bonny) => {
+        await anneUsesHers(anne);
+        await uses(bonny, BONNYS);
+      });
+      // Bonny sends the invite; Anne (who signed up first) joins it.
+      b.send({ t: "createInvite", menu: CLASSIC });
+      const { code } = await b.next<Extract<ServerMessage, { t: "invite" }>>(
+        (m) => m.t === "invite",
+      );
+      a.send({ t: "joinInvite", code });
+      const { gameId } = await a.next<Matched>((m) => m.t === "matched");
+      const [sa, sb] = await watch(gameId, a, b);
+      for (const s of [sa, sb]) expect(s.cosmetics).toEqual({ ...BONNYS, hostSeat: sb.seat });
+    });
+
+    it("shows the challenger's for a challenge", async () => {
+      const { a, b, anne, bonny } = await connected(async (anne, bonny) => {
+        await anneUsesHers(anne);
+        await uses(bonny, BONNYS);
+        // Only friends can challenge.
+        await post("/api/friends/requests", anne.cookie, { username: "Bonny" });
+        await post(`/api/friends/requests/${idOf(anne)}/accept`, bonny.cookie);
+      });
+      a.send({ t: "challenge", friendId: idOf(bonny), menu: CLASSIC });
+      const c = await b.next<Extract<ServerMessage, { t: "challenge" }>>(
+        (m) => m.t === "challenge",
+      );
+      b.send({ t: "acceptChallenge", challengeId: c.challengeId });
+      const { gameId } = await b.next<Matched>((m) => m.t === "matched");
+      const [sa, sb] = await watch(gameId, a, b);
+      for (const s of [sa, sb]) expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: sa.seat });
+      expect(await stored(gameId)).toEqual({ hostId: idOf(anne), ...ANNES });
+    });
+
+    it("keeps what the host used at the start when they switch mid-game", async () => {
+      const { gameId, a, b, sa, anne } = await anneHosts();
+      await use(anne, "board.serpent-reef");
+      const switched = await use(anne, "deck.cribbage-logo");
+      expect(switched.json()).toEqual({ equipped: DEFAULT_COSMETICS });
+
+      const mark = b.messages.length;
+      expect(await move(a, gameId, nextMove(sa.step.view, false)!)).toMatchObject({ t: "state" });
+      const next = [a.latestState()!, await b.after<StateMsg>(mark, (m) => m.t === "state")];
+      for (const s of next) {
+        expect(s.step.events.length).toBeGreaterThan(0);
+        expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: sa.seat });
+      }
+    });
+
+    it("keeps them after a server restart, not what the host uses now", async () => {
+      const { gameId, sa, sb, anne, bonny } = await anneHosts();
+      // Anne goes back to the default board; the game keeps the copy made when it started.
+      await use(anne, "board.serpent-reef");
+      const app2 = await t.restart();
+      try {
+        for (const [who, seat] of [
+          [anne, sa.seat],
+          [bonny, sb.seat],
+        ] as const) {
+          const c = await connect(app2, who.cookie);
+          c.send({ t: "watch", gameId });
+          const s = await c.next<StateMsg>((m) => m.t === "state");
+          expect(s.seat).toBe(seat);
+          expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: sa.seat });
+        }
+      } finally {
+        await app2.close();
+      }
+    });
+
+    it("draws the defaults for a game started before the shop", async () => {
+      const { gameId, anne, bonny } = await anneHosts();
+      await t.db.update(games).set({ cosmetics: null }).where(eq(games.id, gameId));
+      const app2 = await t.restart();
+      try {
+        for (const who of [anne, bonny]) {
+          const c = await connect(app2, who.cookie);
+          c.send({ t: "watch", gameId });
+          const s = await c.next<StateMsg>((m) => m.t === "state");
+          // With no record of the host, the game row's first player (seat 0) is taken as host.
+          expect(s.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: 0 });
+        }
+      } finally {
+        await app2.close();
+      }
+    });
+
+    it("keeps the host for a rematch the other player asks for first, with what they use now", async () => {
+      const { gameId: first, a, b, sa, anne } = await anneHosts();
+      // Anne hosts from seat 1, so a rematch that put seat 0 first would make Bonny the host.
+      const gameId = sa.seat === 1 ? first : await hostAt(1, a, b, idOf(anne));
+      if (gameId !== first) await watch(gameId, a, b);
+      await playOut(gameId, [a, b]);
+      // Between the games, Anne starts using another board.
+      await giveAndUse(t.db, idOf(anne), BONNYS.board);
+
+      b.send({ t: "rematch", gameId });
+      await b.next((m) => m.t === "rematchWaiting");
+      await a.next((m) => m.t === "rematchOffer");
+      a.send({ t: "rematch", gameId });
+      const { gameId: next } = await a.next<Matched>((m) => m.t === "matched");
+      await b.next((m) => m.t === "matched");
+      const [ra, rb] = await watch(next, a, b);
+      const now = { board: BONNYS.board, deck: ANNES.deck };
+      for (const s of [ra, rb]) expect(s.cosmetics).toEqual({ ...now, hostSeat: ra.seat });
+      expect(await stored(next)).toEqual({ hostId: idOf(anne), ...now });
+    }, 60_000);
+
+    it("adds only the board, the backs and the host's seat to the state message", async () => {
+      // Build 4 of the iPhone app reads every other field just as it was.
+      const { sa, sb, anne, bonny } = await anneHosts();
+      for (const s of [sa, sb]) {
+        expect(s).toEqual({
+          t: "state",
+          gameId: sa.gameId,
+          seat: s.seat,
+          names: [expect.any(String), expect.any(String)],
+          avatars: [null, null],
+          cosmetics: { ...ANNES, hostSeat: sa.seat },
+          ranked: false,
+          step: {
+            events: [],
+            view: expect.objectContaining({ phase: "cutForDeal", seat: s.seat }),
+          },
+          deadline: expect.any(Number),
+          online: [expect.any(Boolean), expect.any(Boolean)],
+          returnBy: [null, null],
+          nextRoundReady: [],
+          sceneWaits: [],
+        });
+        // The host is a seat, never an account id.
+        for (const id of [idOf(anne), idOf(bonny)]) expect(JSON.stringify(s)).not.toContain(id);
+      }
+      expect(new Set([sa.seat, sb.seat])).toEqual(new Set([0, 1]));
+    });
+
+    it("draws the defaults for an admin host while the shop is closed, and theirs once it opens", async () => {
+      const {
+        gameId,
+        a,
+        b,
+        sa,
+        sb,
+        anne: captain,
+        bonny,
+      } = await anneHosts((captain) => uses(captain, ANNES), ["Captain", "Bonny"]);
+      expect(captain.res.json().user.isAdmin).toBe(true);
+      expect(bonny.res.json().user.isAdmin).toBe(false);
+      // A preview only Captain sees: it isn't kept with the game either.
+      for (const s of [sa, sb]) {
+        expect(s.cosmetics).toEqual({ ...DEFAULT_COSMETICS, hostSeat: sa.seat });
+      }
+      expect(await stored(gameId)).toEqual({ hostId: idOf(captain), ...DEFAULT_COSMETICS });
+
+      await setShopOpen(t.db, true);
+      const [oa, ob] = await watch(await queueAgain(a, b), a, b);
+      for (const s of [oa, ob]) expect(s.cosmetics).toEqual({ ...ANNES, hostSeat: oa.seat });
+
+      // Bonny buys and uses Ghost Ship and the Ghost backs while it's open; then it closes again.
+      await credit(t.db, idOf(bonny), 2500, "admin", randomUUID());
+      for (const [itemId, price] of [
+        [BONNYS.board, 1500],
+        [BONNYS.deck, 1000],
+      ] as const) {
+        expect((await post("/api/shop/buy", bonny.cookie, { itemId, price })).statusCode).toBe(200);
+        expect((await use(bonny, itemId)).statusCode).toBe(200);
+      }
+      await setShopOpen(t.db, false);
+      // Bonny waits first this time, so she hosts.
+      const [cb, ca] = await watch(await queueAgain(b, a), b, a);
+      for (const s of [ca, cb]) expect(s.cosmetics).toEqual({ ...BONNYS, hostSeat: cb.seat });
+      await expectLedgerMatches(t.db);
+      await expectPurchasesMatch(t.db, idOf(bonny));
     });
   });
 });

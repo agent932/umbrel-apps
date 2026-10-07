@@ -1,12 +1,25 @@
 import { expect } from "vitest";
 import { and, eq } from "drizzle-orm";
+import { itemType } from "@pirate/engine";
 import type { Db } from "../db/client.js";
-import { inventory, walletLedger } from "../db/schema.js";
+import { inventory, users, walletLedger } from "../db/schema.js";
 import { saveShopSwitch } from "../economy/shopSwitch.js";
 
 /** Open or close the shop to players, as Admin → Shop does. */
 export async function setShopOpen(db: Db, open: boolean) {
   await saveShopSwitch(db, open);
+}
+
+/**
+ * Give a player an item and have them use it, without the shop: no doubloons and no purchase row
+ * (so not where expectPurchasesMatch runs). For tests about where the item shows.
+ */
+export async function giveAndUse(db: Db, userId: string, itemId: string) {
+  await db.insert(inventory).values({ userId, itemId }).onConflictDoNothing();
+  await db
+    .update(users)
+    .set(itemType(itemId) === "board" ? { equippedBoard: itemId } : { equippedDeck: itemId })
+    .where(eq(users.id, userId));
 }
 
 /** The item ids in a player's inventory, sorted. */

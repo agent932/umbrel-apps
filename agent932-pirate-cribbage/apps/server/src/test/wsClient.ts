@@ -6,6 +6,7 @@ import type { Timing } from "../online/rooms.js";
 import { signUp, type testApp } from "./testApp.js";
 
 type TestApp = Awaited<ReturnType<typeof testApp>>;
+type SignedUp = Awaited<ReturnType<typeof signUp>>;
 
 export type StateMsg = Extract<ServerMessage, { t: "state" }>;
 
@@ -95,9 +96,12 @@ export async function matchedPair(
   names = ["Anne", "Bonny"],
   /** Crew portraits to pick before connecting. */
   avatars?: [number | null, number | null],
+  /** Run after both have signed up, before either queues (e.g. to give them a board to use). */
+  prepare?: (anne: SignedUp, bonny: SignedUp) => Promise<void>,
 ) {
   const anne = await signUp(t.app, names[0]);
   const bonny = await signUp(t.app, names[1]);
+  await prepare?.(anne, bonny);
   if (avatars) {
     for (const [i, who] of [anne, bonny].entries()) {
       await t.app.inject({

@@ -2,11 +2,13 @@ import type { FastifyBaseLogger } from "fastify";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   type Action,
+  DEFAULT_COSMETICS,
   type GameEvent,
   type GameState,
   type Reward,
   type RuleSet,
   type Seat,
+  type TableCosmetics,
   applyAction,
   botAction,
   createDeck,
@@ -26,6 +28,7 @@ import {
 import type { Db } from "../db/client.js";
 import { games, users } from "../db/schema.js";
 import type { ClientAction } from "../games/actions.js";
+import { shopIsOpen } from "../economy/shopSwitch.js";
 import { lockWallets } from "../economy/wallet.js";
 import { type RatingChange, type Tx, recordMatch } from "../games/record.js";
 import { toEngineAction } from "../games/toEngine.js";
@@ -114,6 +117,8 @@ class Room {
     public state: GameState,
     readonly createdAt: Date,
     readonly ranked: boolean,
+    /** The host's board and card backs, copied when the game started: both players see them. */
+    readonly cosmetics: TableCosmetics,
   ) {}
 
   run<T>(fn: () => Promise<T>): Promise<T> {
@@ -126,6 +131,11 @@ class Room {
     if (this.players[0].userId === userId) return 0;
     if (this.players[1].userId === userId) return 1;
     return null;
+  }
+
+  /** The seat of the player who started the match (seats are shuffled, so it isn't always 0). */
+  get hostSeat(): Seat {
+    return this.seatOf(this.cosmetics.hostId) ?? 0;
   }
 
   online(seat: Seat) {
@@ -150,9 +160,14 @@ export class RoomManager {
     private log: Pick<FastifyBaseLogger, "error"> = { error: (e: unknown) => console.error(e) },
   ) {}
 
-  /** Start a game between two players. Seats are assigned at random, as is the first dealer. */
-  async create(a: Player, b: Player, rules: RuleSet, ranked = false): Promise<string> {
-    const players: [Player, Player] = cryptoRandom() < 0.5 ? [a, b] : [b, a];
+  /**
+   * Start a game between two players. `host` started the match (waiting first in Quick Match, the
+   * inviter, the challenger, or the last game's host for a rematch): both players see the host's
+   * board and card backs. Seats are assigned at random, as is the first dealer.
+   */
+  async create(host: Player, guest: Player, rules: RuleSet, ranked = false): Promise<string> {
+    const cosmetics = await this.hostCosmetics(host.userId);
+    const players: [Player, Player] = cryptoRandom() < 0.5 ? [host, guest] : [guest, host];
     // Both players cut the deck to see who deals first; the house shuffles for them.
     let state = newGame(rules);
     state = applyAction(
@@ -167,12 +182,32 @@ export class RoomManager {
         mode: "online",
         state,
         ranked,
+        cosmetics,
       })
       .returning({ id: games.id, createdAt: games.createdAt });
-    const room = new Room(row!.id, players, state, row!.createdAt, ranked);
+    const room = new Room(row!.id, players, state, row!.createdAt, ranked, cosmetics);
     this.rooms.set(room.id, room);
     this.schedule(room);
     return room.id;
+  }
+
+  /**
+   * The board and card backs the host uses now, read from the database: a Seeker is made when the
+   * socket connects, so it can be out of date.
+   */
+  private async hostCosmetics(hostId: string): Promise<TableCosmetics> {
+    const [h] = await this.db
+      .select({ board: users.equippedBoard, deck: users.equippedDeck, isAdmin: users.isAdmin })
+      .from(users)
+      .where(eq(users.id, hostId));
+    // D-32: what an admin uses while the shop is closed is a preview; it never reaches other
+    // players. A player can only own what they bought while it was open, so theirs always show.
+    const own = h && (!h.isAdmin || (await shopIsOpen(this.db))) ? h : null;
+    return {
+      hostId,
+      board: own?.board ?? DEFAULT_COSMETICS.board,
+      deck: own?.deck ?? DEFAULT_COSMETICS.deck,
+    };
   }
 
   /** Find a room in memory, or reload an unfinished one from the database (e.g. after a restart). */
@@ -199,6 +234,9 @@ export class RoomManager {
       row.state,
       row.createdAt,
       row.ranked,
+      // Never the host's choice now: the copy made at the start. A game started before the shop
+      // has none, and draws the defaults.
+      row.cosmetics ?? { hostId: row.userId, ...DEFAULT_COSMETICS },
     );
     this.rooms.set(room.id, room);
     this.schedule(room);
@@ -362,7 +400,11 @@ export class RoomManager {
       for (const client of room.clients[seat]) this.sendState(room, seat, client, []);
   }
 
-  /** Who played a finished online game and how, for a rematch. Null if it isn't one. */
+  /**
+   * Who played a finished online game and how, for a rematch. Null if it isn't one. The players
+   * come host first, so the rematch keeps the same host (a game from before the shop has no
+   * record of one: its first player is taken as the host).
+   */
   async rematchInfo(gameId: string) {
     const [row] = await this.db
       .select()
@@ -377,8 +419,10 @@ export class RoomManager {
       const p = people.find((x) => x.id === id);
       return { userId: id, username: p?.username ?? "Pirate", avatar: p?.avatar ?? null };
     };
+    const [hostId, guestId]: [string, string] =
+      row.cosmetics?.hostId === row.user2Id ? [row.user2Id, row.userId] : [row.userId, row.user2Id];
     return {
-      players: [player(row.userId), player(row.user2Id)] as const,
+      players: [player(hostId), player(guestId)] as const,
       rules: row.state.rules,
       ranked: row.ranked,
     };
@@ -639,6 +683,12 @@ export class RoomManager {
       seat,
       names: [room.players[0].username, room.players[1].username],
       avatars: [room.players[0].avatar ?? null, room.players[1].avatar ?? null],
+      // The host's seat, never their account id.
+      cosmetics: {
+        board: room.cosmetics.board,
+        deck: room.cosmetics.deck,
+        hostSeat: room.hostSeat,
+      },
       ranked: room.ranked,
       step: { events: events.map((e) => redactEvent(e, seat)), view: viewFor(room.state, seat) },
       deadline: room.state.phase === "gameOver" ? null : room.deadline,

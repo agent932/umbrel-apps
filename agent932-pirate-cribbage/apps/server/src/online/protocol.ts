@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { GameEvent, PlayerView, Reward, Seat } from "@pirate/engine";
+import type { GameEvent, OnlineCosmetics, PlayerView, Reward, Seat } from "@pirate/engine";
 import { ClientAction } from "../games/actions.js";
 
 export const Menu = z.object({
@@ -52,6 +52,8 @@ export type ServerMessage =
       names: [string, string];
       /** Each player's crew portrait (1-8), or null for their initial. */
       avatars: [number | null, number | null];
+      /** The board and card backs both players see: the host's, copied when the game started. */
+      cosmetics: OnlineCosmetics;
       ranked: boolean;
       step: { events: GameEvent[]; view: PlayerView };
       /** When the server will move for whoever is holding things up (ms since epoch). */

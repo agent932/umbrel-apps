@@ -61,6 +61,7 @@ export class Matchmaker {
     }
     const [waiting] = line.splice(i, 1) as [Seeker];
     this.queues.set(key, line);
+    // The first argument is the host: whoever was waiting first.
     const gameId = await this.rooms.create(waiting, seeker, rulesFor(menu), menu.ranked);
     waiting.client.send({ t: "matched", gameId });
     seeker.client.send({ t: "matched", gameId });
@@ -87,6 +88,7 @@ export class Matchmaker {
     if ((await this.blockedWith(guest.userId)).has(invite.host.userId))
       throw new RoomError("That invite isn't available");
     this.invites.delete(code.toUpperCase());
+    // The first argument is the host: the player who made the invite.
     const gameId = await this.rooms.create(
       invite.host,
       guest,
@@ -123,6 +125,7 @@ export class Matchmaker {
       return null;
     }
     this.rematches.delete(gameId);
+    // The same host as the game before (rematchInfo puts them first), whoever asked first.
     const newId = await this.rooms.create(info.players[0], info.players[1], info.rules, false);
     for (const p of info.players) this.presence.notify(p.userId, { t: "matched", gameId: newId });
     return newId;
@@ -176,6 +179,7 @@ export class Matchmaker {
       throw new RoomError("That challenge is no longer open");
     }
     this.challenges.delete(challengeId);
+    // The first argument is the host: the player who sent the challenge.
     const gameId = await this.rooms.create(c.from, guest, rulesFor(c.menu), c.menu.ranked);
     c.from.client.send({ t: "matched", gameId });
     guest.client.send({ t: "matched", gameId });
