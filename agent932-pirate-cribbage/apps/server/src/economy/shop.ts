@@ -37,7 +37,7 @@ const itemColumns = {
 };
 
 /** Shop order: boards, then card backs, each by sort, then id. */
-const shopOrder = [asc(shopItems.type), asc(shopItems.sort), asc(shopItems.id)];
+export const shopOrder = [asc(shopItems.type), asc(shopItems.sort), asc(shopItems.id)];
 
 /** 1500 → "1,500". */
 const amount = (n: number) => n.toLocaleString("en-US");

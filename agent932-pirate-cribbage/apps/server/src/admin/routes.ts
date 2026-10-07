@@ -8,7 +8,17 @@ import { hashPassword } from "../auth/password.js";
 import { parseBody } from "../auth/routes.js";
 import { deleteUserSessions } from "../auth/sessions.js";
 import type { Db } from "../db/client.js";
-import { games, matchPlayers, matches, users, walletLedger } from "../db/schema.js";
+import {
+  games,
+  inventory,
+  matchPlayers,
+  matches,
+  shopItems,
+  users,
+  walletLedger,
+} from "../db/schema.js";
+import { shopOrder } from "../economy/shop.js";
+import { saveShopSwitch, shopSwitch } from "../economy/shopSwitch.js";
 import { OverdrawError, credit, lockWallets } from "../economy/wallet.js";
 import type { Presence } from "../online/presence.js";
 import type { RoomManager } from "../online/rooms.js";
@@ -286,6 +296,47 @@ export async function adminRoutes(
       .orderBy(desc(walletLedger.createdAt), desc(walletLedger.id))
       .limit(100);
     return { rows };
+  });
+
+  /**
+   * The shop switch, and every item (on sale or not) with how many players bought it. `saved` is
+   * false until the switch is first saved: closed by default.
+   */
+  app.get("/api/admin/shop", async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const bought = db
+      .select({ itemId: inventory.itemId, n: count().as("n") })
+      .from(inventory)
+      .groupBy(inventory.itemId)
+      .as("bought");
+    const rows = await db
+      .select({
+        id: shopItems.id,
+        type: shopItems.type,
+        name: shopItems.name,
+        price: shopItems.price,
+        isDefault: shopItems.isDefault,
+        available: shopItems.available,
+        owners: sql<number>`coalesce(${bought.n}, 0)`.mapWith(Number),
+      })
+      .from(shopItems)
+      .leftJoin(bought, eq(bought.itemId, shopItems.id))
+      .orderBy(...shopOrder);
+    return {
+      ...(await shopSwitch(db)),
+      // A free item is everyone's, so there are no owners to count.
+      items: rows.map((i) => ({ ...i, owners: i.price === 0 ? null : i.owners })),
+    };
+  });
+
+  /** Open or close the shop to players. Admins see it either way (a preview). */
+  app.post("/api/admin/shop", async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const body = parseBody(z.object({ open: z.boolean() }), req.body, reply);
+    if (!body) return;
+    await saveShopSwitch(db, body.open);
+    audit(req, body.open ? "shop-open" : "shop-close", {});
+    return { open: body.open };
   });
 
   app.get("/api/admin/games", async (req, reply) => {

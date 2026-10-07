@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { matches } from "../db/schema.js";
+import { SHOP_ITEMS, type ShopItemDef } from "@pirate/engine";
+import { matches, settings, shopItems } from "../db/schema.js";
 import { credit } from "../economy/wallet.js";
 import type { ServerMessage } from "../online/protocol.js";
 import { doubloonsOf, expectLedgerMatches, ledgerRows } from "../test/ledger.js";
+import { expectPurchasesMatch } from "../test/shop.js";
 import { signUp, testApp } from "../test/testApp.js";
 import { LONG, matchedPair, playOut } from "../test/wsClient.js";
 
@@ -270,6 +272,143 @@ describe("doubloons", () => {
       { id: bonny.id, username: "Bonny", doubloons: 75 },
       { id: caraId, username: "Cara", doubloons: 10 },
     ]);
+  });
+});
+
+describe("the shop", () => {
+  /** A signed-up account with its id. The first one is the admin. */
+  async function player(name: string) {
+    const { cookie } = await signUp(t.app, name);
+    const { id, isAdmin } = await me(cookie);
+    return { cookie, id: id as string, isAdmin: isAdmin as boolean };
+  }
+  const withCookie = (cookie?: string) => (cookie ? { cookie } : {});
+  const setSwitch = (cookie: string, open: boolean) =>
+    api("POST", "/api/admin/shop", cookie, { open });
+  const adminShop = async (cookie: string) => (await api("GET", "/api/admin/shop", cookie)).json();
+  /** The switch as /api/auth/me tells the app (signed in or not). */
+  const shopOpen = async (cookie?: string) =>
+    (await t.app.inject({ url: "/api/auth/me", headers: withCookie(cookie) })).json().shopOpen;
+  const shop = async (cookie?: string) =>
+    (await t.app.inject({ url: "/api/shop", headers: withCookie(cookie) })).json();
+  const buy = (cookie: string, itemId: string, price: number) =>
+    api("POST", "/api/shop/buy", cookie, { itemId, price });
+  /** The release gate reads this row by its key: select value from settings where key = 'shop'. */
+  const savedRow = () =>
+    t.db.select({ value: settings.value }).from(settings).where(eq(settings.key, "shop"));
+
+  it("keeps everyone else out", async () => {
+    await player("Captain");
+    const bonny = await player("Bonny");
+    expect(bonny.isAdmin).toBe(false);
+    const url = "/api/admin/shop";
+    for (const [method, payload] of [
+      ["GET", undefined],
+      ["POST", { open: true }],
+    ] as const) {
+      expect((await api(method, url, bonny.cookie, payload)).statusCode).toBe(403);
+      expect((await t.app.inject({ method, url, payload })).statusCode).toBe(401);
+    }
+    expect(await shopOpen(bonny.cookie)).toBe(false);
+    expect(await savedRow()).toEqual([]);
+  });
+
+  it("starts closed and unsaved, saves closed, and opens and closes the shop to players", async () => {
+    const captain = await player("Captain");
+    const bonny = await player("Bonny");
+    expect(bonny.isAdmin).toBe(false);
+    await credit(t.db, bonny.id, 3000, "admin", randomUUID());
+    expect(await adminShop(captain.cookie)).toMatchObject({ open: false, saved: false });
+
+    // Saving it closed changes nothing for players, but the row now exists.
+    expect((await setSwitch(captain.cookie, false)).json()).toEqual({ open: false });
+    expect(await adminShop(captain.cookie)).toMatchObject({ open: false, saved: true });
+    expect(await savedRow()).toEqual([{ value: { open: false } }]);
+    expect(await shopOpen(bonny.cookie)).toBe(false);
+    expect((await shop(bonny.cookie)).open).toBe(false);
+    expect((await buy(bonny.cookie, "board.treasure-map", 1500)).statusCode).toBe(403);
+
+    expect((await setSwitch(captain.cookie, true)).json()).toEqual({ open: true });
+    expect(await adminShop(captain.cookie)).toMatchObject({ open: true, saved: true });
+    for (const cookie of [undefined, bonny.cookie, captain.cookie])
+      expect(await shopOpen(cookie)).toBe(true);
+    const open = await shop(bonny.cookie);
+    expect(open).toMatchObject({ open: true, doubloons: 3000 });
+    expect(open.items).toHaveLength(SHOP_ITEMS.length);
+    // Open to everyone, so it's no longer a preview for the admin.
+    expect(await shop(captain.cookie)).not.toHaveProperty("preview");
+    expect((await buy(bonny.cookie, "board.treasure-map", 1500)).statusCode).toBe(200);
+
+    expect((await setSwitch(captain.cookie, false)).json()).toEqual({ open: false });
+    expect(await adminShop(captain.cookie)).toMatchObject({ open: false, saved: true });
+    expect(await savedRow()).toEqual([{ value: { open: false } }]);
+    for (const cookie of [undefined, bonny.cookie, captain.cookie])
+      expect(await shopOpen(cookie)).toBe(false);
+    expect(await shop()).toEqual({ open: false, items: [] });
+    expect((await shop(captain.cookie)).preview).toBe(true);
+    const closed = await buy(bonny.cookie, "deck.crimson", 1000);
+    expect(closed.statusCode).toBe(403);
+    expect(closed.json().code).toBe("closed");
+    // What she bought while it was open is still hers.
+    expect((await shop(bonny.cookie)).owned).toContain("board.treasure-map");
+    expect(await doubloonsOf(t.db, bonny.id)).toBe(1500);
+    await expectLedgerMatches(t.db);
+    await expectPurchasesMatch(t.db);
+  });
+
+  it("checks the switch's body", async () => {
+    const captain = await player("Captain");
+    for (const payload of [undefined, {}, { open: "true" }, { open: 1 }, { open: null }]) {
+      const res = await api("POST", "/api/admin/shop", captain.cookie, payload);
+      expect(res.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+    expect(await adminShop(captain.cookie)).toMatchObject({ open: false, saved: false });
+  });
+
+  it("lists every item, on sale or not, with how many players bought it", async () => {
+    const captain = await player("Captain");
+    const bonny = await player("Bonny");
+    const cara = await player("Cara");
+    expect([bonny.isAdmin, cara.isAdmin]).toEqual([false, false]);
+    await setSwitch(captain.cookie, true);
+    // Bonny also earned 25 by playing today.
+    await credit(t.db, bonny.id, 1500, "admin", randomUUID());
+    await credit(t.db, bonny.id, 25, "daily", new Date().toISOString().slice(0, 10));
+    await credit(t.db, cara.id, 2500, "admin", randomUUID());
+    expect((await buy(bonny.cookie, "board.treasure-map", 1500)).statusCode).toBe(200);
+    expect((await buy(cara.cookie, "board.treasure-map", 1500)).statusCode).toBe(200);
+    expect((await buy(cara.cookie, "deck.crimson", 1000)).statusCode).toBe(200);
+    // Taken off sale after Cara bought it: still listed, with its owner.
+    await t.db.update(shopItems).set({ available: false }).where(eq(shopItems.id, "deck.crimson"));
+
+    const owners: Record<string, number> = { "board.treasure-map": 2, "deck.crimson": 1 };
+    const byShopOrder = (a: ShopItemDef, b: ShopItemDef) =>
+      a.type.localeCompare(b.type) || a.sort - b.sort || a.id.localeCompare(b.id);
+    expect((await adminShop(captain.cookie)).items).toEqual(
+      [...SHOP_ITEMS].sort(byShopOrder).map(({ id, type, name, price, isDefault }) => ({
+        id,
+        type,
+        name,
+        price,
+        isDefault,
+        available: id !== "deck.crimson",
+        // Free items are everyone's: there's nothing to count.
+        owners: price === 0 ? null : (owners[id] ?? 0),
+      })),
+    );
+
+    // The player's ledger shows the purchase, and spending isn't taken off today's payouts.
+    const { rows } = (
+      await api("GET", `/api/admin/users/${bonny.id}/ledger`, captain.cookie)
+    ).json();
+    expect(rows.filter((r: { reason: string }) => r.reason === "purchase")).toMatchObject([
+      { delta: -1500, ref: "board.treasure-map", actor: null },
+    ]);
+    const overview = (await api("GET", "/api/admin/overview", captain.cookie)).json();
+    expect(overview.doubloonsIssuedToday).toBe(25);
+    expect(overview.topEarnersToday).toEqual([{ id: bonny.id, username: "Bonny", doubloons: 25 }]);
+    await expectLedgerMatches(t.db);
+    await expectPurchasesMatch(t.db);
   });
 });
 

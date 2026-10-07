@@ -1,15 +1,12 @@
 import { expect } from "vitest";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db/client.js";
-import { inventory, settings, walletLedger } from "../db/schema.js";
-import { SHOP_SETTING } from "../economy/shopSwitch.js";
+import { inventory, walletLedger } from "../db/schema.js";
+import { saveShopSwitch } from "../economy/shopSwitch.js";
 
 /** Open or close the shop to players, as Admin → Shop does. */
 export async function setShopOpen(db: Db, open: boolean) {
-  await db
-    .insert(settings)
-    .values({ key: SHOP_SETTING, value: { open } })
-    .onConflictDoUpdate({ target: settings.key, set: { value: { open }, updatedAt: new Date() } });
+  await saveShopSwitch(db, open);
 }
 
 /** The item ids in a player's inventory, sorted. */
