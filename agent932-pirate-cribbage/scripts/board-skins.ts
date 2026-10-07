@@ -54,9 +54,9 @@ const reefBoard = (id: string, name: string, image: string) =>
       pegRadius: 0.02,
       pegSprite: { me: "peg-blue.webp", opponent: "peg-red.webp", size: [72, 199], height: 0.18 },
       safeBox: [0.08, 0.03, 0.92, 0.96],
-      // The Pirate Cribbage logo, centred on the blank of the foot plate (clear of the start holes
-      // on its left, and of Royal Navy's plank seams).
-      brand: [0.26, 0.911, 0.74, 0.951],
+      // The Pirate Cribbage logo on one line, filling the blank of the foot plate right of the two
+      // start holes (they end at x ≈ 0.22).
+      brand: [0.25, 0.909, 0.91, 0.953],
     },
   });
 reefBoard("serpent-reef", "Serpent Reef", "board-serpent.webp");

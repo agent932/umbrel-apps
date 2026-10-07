@@ -150,7 +150,7 @@ describe("PaintedBoard", () => {
       />,
     );
     const logo = container.querySelector("image[data-brand]")!;
-    expect(Number(logo.getAttribute("y"))).toBeCloseTo(0.911 * layout.size[1]);
+    expect(Number(logo.getAttribute("y"))).toBeCloseTo(0.909 * layout.size[1]);
   });
 
   it("keeps you in the right lane from seat 1, and lays the board on its side in portrait", () => {
