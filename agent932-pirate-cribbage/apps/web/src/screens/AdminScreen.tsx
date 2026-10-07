@@ -189,8 +189,8 @@ function PlayersTab() {
             <tr className="text-left text-parchment/70">
               <th className="py-1">Player</th>
               <th className="py-1">Joined</th>
-              <th className="py-1 text-right">Games</th>
-              <th className="py-1 text-right">Rating</th>
+              <th className="py-1 pl-3 text-right">Games</th>
+              <th className="py-1 pl-3 text-right">Rating</th>
               <th className="py-1 pl-3 text-right">Doubloons</th>
               <th className="py-1 text-right">Actions</th>
             </tr>
@@ -218,8 +218,8 @@ function PlayersTab() {
                   <div className="text-xs text-parchment/60">{u.email}</div>
                 </td>
                 <td className="py-1.5">{date(u.createdAt)}</td>
-                <td className="py-1.5 text-right tabular-nums">{u.matches}</td>
-                <td className="py-1.5 text-right tabular-nums">
+                <td className="py-1.5 pl-3 text-right tabular-nums">{u.matches}</td>
+                <td className="py-1.5 pl-3 text-right tabular-nums">
                   {u.rating} <span className="text-xs text-parchment/60">{u.tier}</span>
                 </td>
                 <td className="py-1.5 pl-3 text-right tabular-nums">
