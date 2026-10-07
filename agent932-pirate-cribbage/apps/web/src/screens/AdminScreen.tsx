@@ -3,6 +3,8 @@ import { NavBar } from "../components/NavBar.js";
 import { ApiError, type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { CRIBBAGE_HOME } from "../routes.js";
+import { DoubloonsSheet } from "../components/AdminDoubloons.js";
+import { DoubloonIcon } from "../components/Doubloons.js";
 import { EmailSettingsPanel } from "../components/EmailSettingsPanel.js";
 import { SupportInbox } from "../components/SupportInbox.js";
 
@@ -14,6 +16,11 @@ interface Overview {
   matchesToday: Record<string, number>;
   liveOnlineGames: number;
   liveBotGames: number;
+  /** Doubloons paid for play since 00:00 UTC (admin adjustments aren't counted). Optional, like
+   * every doubloon field here: the app may reach a server older than itself. */
+  doubloonsIssuedToday?: number;
+  /** Who earned the most today, to spot farming. */
+  topEarnersToday?: { id: string; username: string; doubloons: number }[];
   season: Season;
   version: string;
   uptimeSeconds: number;
@@ -29,6 +36,7 @@ interface AdminUser {
   isAdmin: boolean;
   disabledAt: string | null;
   createdAt: string;
+  doubloons?: number;
   matches: number;
   online: boolean;
 }
@@ -92,15 +100,48 @@ function OverviewTab() {
         value={uptime(o.uptimeSeconds)}
         note={`up · build ${o.version.slice(0, 7)}`}
       />
+      <Tile
+        label="Doubloons issued today"
+        value={(o.doubloonsIssuedToday ?? 0).toLocaleString()}
+        note="for play, since 00:00 UTC"
+      />
+      <section className="panel col-span-2 p-3 sm:col-span-3" aria-labelledby="top-earners-heading">
+        <h2 id="top-earners-heading" className="text-xs text-parchment/70">
+          Top earners today
+        </h2>
+        {o.topEarnersToday?.length ? (
+          <ol className="mt-1 flex flex-col text-sm">
+            {o.topEarnersToday.map((e, i) => (
+              <li
+                key={e.id}
+                className="flex justify-between gap-3 border-t border-parchment/10 py-1 first:border-0"
+              >
+                <span>
+                  {i + 1}. <b>{e.username}</b>
+                </span>
+                <span className="inline-flex items-center gap-1 text-gold tabular-nums">
+                  <DoubloonIcon className="h-4 w-4" />
+                  {e.doubloons.toLocaleString()}
+                  <span className="sr-only"> doubloons</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-1 text-sm text-parchment/60">No doubloons earned yet today.</p>
+        )}
+      </section>
     </div>
   );
 }
 
 function PlayersTab() {
-  const { user: me } = useAuth();
+  const { user: me, refresh } = useAuth();
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<AdminUser[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The player whose doubloons are open. */
+  const [wallet, setWallet] = useState<AdminUser | null>(null);
   const load = useCallback(
     () =>
       api<{ users: AdminUser[] }>(`/api/admin/users?q=${encodeURIComponent(q)}`).then((r) =>
@@ -150,6 +191,7 @@ function PlayersTab() {
               <th className="py-1">Joined</th>
               <th className="py-1 text-right">Games</th>
               <th className="py-1 text-right">Rating</th>
+              <th className="py-1 text-right">Doubloons</th>
               <th className="py-1 text-right">Actions</th>
             </tr>
           </thead>
@@ -180,66 +222,93 @@ function PlayersTab() {
                 <td className="py-1.5 text-right tabular-nums">
                   {u.rating} <span className="text-xs text-parchment/60">{u.tier}</span>
                 </td>
+                <td className="py-1.5 text-right tabular-nums">
+                  {(u.doubloons ?? 0).toLocaleString()}
+                </td>
                 <td className="py-1.5 text-right">
-                  {u.id !== me?.id && (
-                    <span className="flex flex-wrap justify-end gap-1">
-                      <button
-                        type="button"
-                        className="btn-secondary px-2 py-0.5 text-xs"
-                        onClick={() =>
-                          void run(
-                            u.username,
-                            `/api/admin/users/${u.id}/reset-password`,
-                            {},
-                            `Reset ${u.username}'s password? They'll be signed out.`,
-                          )
-                        }
-                      >
-                        Reset password
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary px-2 py-0.5 text-xs"
-                        onClick={() =>
-                          void run(u.username, `/api/admin/users/${u.id}/admin`, {
-                            isAdmin: !u.isAdmin,
-                          })
-                        }
-                      >
-                        {u.isAdmin ? "Remove admin" : "Make admin"}
-                      </button>
-                      {u.disabledAt ? (
+                  <span className="flex flex-wrap justify-end gap-1">
+                    {/* Any admin may change anyone's doubloons, their own included. */}
+                    <button
+                      type="button"
+                      className="btn-secondary px-2 py-0.5 text-xs"
+                      aria-label={`Doubloons for ${u.username}`}
+                      onClick={() => setWallet(u)}
+                    >
+                      Doubloons…
+                    </button>
+                    {u.id !== me?.id && (
+                      <>
                         <button
                           type="button"
                           className="btn-secondary px-2 py-0.5 text-xs"
-                          onClick={() => void run(u.username, `/api/admin/users/${u.id}/enable`)}
-                        >
-                          Enable
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="rounded-xl border border-red-400/60 px-2 py-0.5 text-xs text-red-200 hover:bg-red-900/40"
                           onClick={() =>
                             void run(
                               u.username,
-                              `/api/admin/users/${u.id}/disable`,
+                              `/api/admin/users/${u.id}/reset-password`,
                               {},
-                              `Disable ${u.username}? They'll be signed out and can't log in.`,
+                              `Reset ${u.username}'s password? They'll be signed out.`,
                             )
                           }
                         >
-                          Disable
+                          Reset password
                         </button>
-                      )}
-                    </span>
-                  )}
+                        <button
+                          type="button"
+                          className="btn-secondary px-2 py-0.5 text-xs"
+                          onClick={() =>
+                            void run(u.username, `/api/admin/users/${u.id}/admin`, {
+                              isAdmin: !u.isAdmin,
+                            })
+                          }
+                        >
+                          {u.isAdmin ? "Remove admin" : "Make admin"}
+                        </button>
+                        {u.disabledAt ? (
+                          <button
+                            type="button"
+                            className="btn-secondary px-2 py-0.5 text-xs"
+                            onClick={() => void run(u.username, `/api/admin/users/${u.id}/enable`)}
+                          >
+                            Enable
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="rounded-xl border border-red-400/60 px-2 py-0.5 text-xs text-red-200 hover:bg-red-900/40"
+                            onClick={() =>
+                              void run(
+                                u.username,
+                                `/api/admin/users/${u.id}/disable`,
+                                {},
+                                `Disable ${u.username}? They'll be signed out and can't log in.`,
+                              )
+                            }
+                          >
+                            Disable
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </span>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {wallet && (
+        <DoubloonsSheet
+          player={{ ...wallet, doubloons: wallet.doubloons ?? 0 }}
+          onClose={() => setWallet(null)}
+          onChanged={(doubloons) => {
+            setRows(
+              (all) => all?.map((u) => (u.id === wallet.id ? { ...u, doubloons } : u)) ?? null,
+            );
+            // Your own balance shows in the account bar too.
+            if (wallet.id === me?.id) void refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
