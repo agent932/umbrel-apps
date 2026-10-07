@@ -191,7 +191,7 @@ export function HomeScreen({
         <p className="text-center text-xs text-parchment/60">
           {user
             ? "This game counts toward your Ship's Log."
-            : "Playing as a guest: sign up to keep your stats."}
+            : "Playing as a guest: sign up to keep your stats and earn doubloons."}
         </p>
       </section>
 

@@ -189,7 +189,26 @@ describe("online game screen", () => {
     ws.push({ t: "emote", gameId, seat: 1, emote: "shiver" });
     expect(screen.getByLabelText("Bonny")).toHaveTextContent("Shiver me timbers!");
 
+    // The state that ends the game brings your doubloons; later ones don't, and they stay.
+    ws.push({
+      ...message({ ...viewFor(state, 0), phase: "gameOver", winner: 0, skunk: 0 }),
+      reward: {
+        lines: [
+          { reason: "onlineWin", delta: 50 },
+          { reason: "firstWinOfDay", delta: 50 },
+        ],
+        total: 100,
+        balance: 100,
+        note: null,
+        unlocked: [],
+      },
+    } as ServerMessage);
     ws.push(message({ ...viewFor(state, 0), phase: "gameOver", winner: 0, skunk: 0 }));
+    const end = screen.getByRole("dialog", { name: "Victory!" });
+    expect(within(end).getByRole("status")).toHaveTextContent("+100 doubloons");
+    expect(within(end).getByRole("list", { name: "Doubloons earned" })).toHaveTextContent(
+      /Online win\s*\+50\s*First win of the day\s*\+50/,
+    );
     ws.push({ t: "rematchOffer", gameId, from: "Bonny" });
     expect(screen.getByText("Bonny wants a rematch!")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Accept rematch" }));

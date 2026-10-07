@@ -48,9 +48,19 @@ interface Props {
   myAvatar?: number | null;
   /** "Learn to play": Peggy explains each step. */
   tutorial?: boolean;
+  /** Playing as a guest, so the result says how to earn doubloons. */
+  guest?: boolean;
 }
 
-export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutorial }: Props) {
+export function GameScreen({
+  game,
+  onExit,
+  onPlayAgain,
+  instant,
+  myAvatar,
+  tutorial,
+  guest,
+}: Props) {
   const { p, names: label, act, error, online } = game;
   const view = p.view;
   // Seat-relative: online you may be seat 1.
@@ -389,6 +399,9 @@ export function GameScreen({ game, onExit, onPlayAgain, instant, myAvatar, tutor
           online={online}
           ranked={game.ranked}
           instant={instant}
+          reward={game.reward ?? null}
+          guest={!!guest}
+          level={game.level}
           onReveal={shown.reveal}
           onPlayAgain={onPlayAgain}
           onExit={onExit}

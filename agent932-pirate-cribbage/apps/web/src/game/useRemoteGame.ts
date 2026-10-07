@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ApiError, type GameResponse, type Step, api } from "../api.js";
+import { ApiError, type GameResponse, type Reward, type Step, api } from "../api.js";
 import { names as botNames } from "./localGame.js";
 import { initialPresentation, present } from "./present.js";
 import { BELAY_WINDOW_MS, BOT_DELAY_MS } from "./useLocalGame.js";
@@ -21,6 +21,8 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
   const [queue, setQueue] = useState<Step[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Your doubloons, from the response that finished the game.
+  const [reward, setReward] = useState<Reward | null>(null);
   // Ignore clicks while a move is in flight or the bot's moves are still playing out.
   const busy = useRef(false);
   useLayoutEffect(() => {
@@ -40,6 +42,8 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
         const [mine, ...rest] = res.steps;
         if (mine) setP((prev) => present(prev, mine.events, mine.view, label));
         setQueue(rest);
+        // Safe to keep while the last steps still play out: it shows only once the game is over.
+        if (res.reward) setReward(res.reward);
         setError(null);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Lost contact with the ship. Try again.");
@@ -81,5 +85,13 @@ export function useRemoteGame(initial: GameResponse, botDelay = BOT_DELAY_MS): G
     return () => clearTimeout(t);
   }, [pausedForBelay, send, botDelay, p]);
 
-  return { p, names: label, level: initial.level, act: (a) => void send(a), error, ranked: true };
+  return {
+    p,
+    names: label,
+    level: initial.level,
+    act: (a) => void send(a),
+    error,
+    ranked: true,
+    reward,
+  };
 }

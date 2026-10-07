@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Seat } from "@pirate/engine";
+import type { Reward, Seat } from "@pirate/engine";
 import { initialPresentation, present } from "../game/present.js";
 import type { GameController, Presentation, UiAction } from "../game/types.js";
 import type { Emote, StateMessage } from "./protocol.js";
@@ -18,6 +18,8 @@ interface OnlineState {
   returnBy: [number | null, number | null];
   nextRoundReady: Seat[];
   forfeitedBy: Seat | null;
+  /** Your doubloons, sent with the state that ends the game. */
+  reward: Reward | null;
   error: string | null;
 }
 
@@ -42,6 +44,7 @@ export function useOnlineGame(
     returnBy: [null, null],
     nextRoundReady: [],
     forfeitedBy: null,
+    reward: null,
     error: null,
   });
 
@@ -69,6 +72,7 @@ export function useOnlineGame(
               online: m.online,
               returnBy: m.returnBy ?? [null, null],
               nextRoundReady: m.nextRoundReady,
+              reward: m.reward ?? prev.reward,
               error: null,
             };
           });
@@ -113,6 +117,7 @@ export function useOnlineGame(
     act: (action: UiAction) => socket.send({ t: "act", gameId, action }),
     error: s.error,
     ranked: true,
+    reward: s.reward,
     online: {
       avatars: s.avatars,
       ranked: s.ranked,

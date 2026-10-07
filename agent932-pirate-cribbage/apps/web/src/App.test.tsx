@@ -101,6 +101,11 @@ describe("playing vs the bot", () => {
     }
     const end = screen.getByRole("dialog", { name: /Victory|Defeat/ });
     expect(within(end).getByText(/121/)).toBeInTheDocument();
+    // A guest earns nothing, but is told how to.
+    expect(within(end).getByRole("link", { name: /^Sign in to earn/ })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   }, 60_000);
 
   it("cuts for the deal before the first hand", async () => {

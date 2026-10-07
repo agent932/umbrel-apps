@@ -1,6 +1,14 @@
-import { type Card as CardType, type Seat, other } from "@pirate/engine";
+import {
+  BOT_WIN,
+  type BotLevel,
+  type Card as CardType,
+  type Reward,
+  type Seat,
+  other,
+} from "@pirate/engine";
 import { NewAchievements } from "../Achievements.js";
 import { CountThenShow } from "../Counting.js";
+import { EarnHint, RewardSummary } from "../Doubloons.js";
 import { Modal, ShowList } from "../RoundSummary.js";
 import type { OnlineInfo, ShowEvent } from "../../game/types.js";
 import flagUrl from "../../assets/ui/icon-flag.webp";
@@ -17,6 +25,9 @@ export function GameOverPanel({
   online,
   ranked,
   instant,
+  reward,
+  guest,
+  level,
   onReveal,
   onPlayAgain,
   onExit,
@@ -31,6 +42,12 @@ export function GameOverPanel({
   online?: OnlineInfo;
   ranked: boolean;
   instant?: boolean;
+  /** What the server paid you for this game (signed-in games, once it's over). */
+  reward?: Reward | null;
+  /** Playing as a guest: doubloons need an account, so say so. */
+  guest?: boolean;
+  /** The computer's level, for games against it. */
+  level?: BotLevel | null;
   /** How many hands have been counted out, so the board can move their pegs. */
   onReveal?: (counted: number) => void;
   onPlayAgain: () => void;
@@ -51,8 +68,15 @@ export function GameOverPanel({
           {winner === me ? "Ye won" : `${oppName} won`} {scores[me]}–{scores[opp]}
           {skunk === 2 ? " — a double skunk!" : skunk === 1 ? " — a skunk!" : "."}
         </p>
+        {/* The reward lists any new achievements itself; without one, ask the server for them. */}
+        {reward && (
+          <RewardSummary reward={reward} level={level} oppName={oppName} className="mb-3" />
+        )}
+        {guest && (
+          <EarnHint amount={winner === me && level ? BOT_WIN[level] : undefined} className="mb-3" />
+        )}
         {show.length > 0 && <ShowList show={show} cut={cut} names={label} />}
-        {ranked && <NewAchievements />}
+        {ranked && !reward && <NewAchievements />}
         <div className="mt-4 flex gap-2">
           {!online && (
             <button type="button" className="btn-primary flex-1" onClick={onPlayAgain} autoFocus>

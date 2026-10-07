@@ -51,6 +51,8 @@ function LocalPlay({ game, botDelay, ...rest }: PlayProps & { game: LocalGame })
       instant={botDelay === 0}
       myAvatar={user?.avatar ?? null}
       tutorial={!!game.options.practice}
+      // A signed-in player's tutorial is played in the browser too, so ask who's signed in.
+      guest={!user}
       {...rest}
     />
   );
@@ -155,10 +157,13 @@ function Routes({ botDelay }: { botDelay?: number }) {
   const playProps: PlayProps = {
     botDelay,
     onExit: () => {
+      // A finished game may have paid doubloons; the account bar shows the new balance.
+      if (user) void refreshUser();
       setRefresh((n) => n + 1);
       navigate(CRIBBAGE_HOME);
     },
     onPlayAgain: () => {
+      if (user) void refreshUser();
       if (lastChoice) void start(lastChoice);
       else navigate(CRIBBAGE_HOME);
     },
