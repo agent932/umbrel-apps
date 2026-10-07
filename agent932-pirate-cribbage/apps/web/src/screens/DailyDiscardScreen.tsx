@@ -3,6 +3,8 @@ import { NavBar } from "../components/NavBar.js";
 import {
   ACHIEVEMENTS,
   type Card as CardType,
+  DAILY_BEST,
+  DAILY_PLAYED,
   type DiscardAnalysis,
   analyzeDiscard,
   cardLabel,
@@ -10,10 +12,11 @@ import {
   parseCard,
   sameCard,
 } from "@pirate/engine";
-import { ApiError, api } from "../api.js";
+import { ApiError, type Reward, api } from "../api.js";
 import { useAuth } from "../auth.js";
 import { achievementArt } from "../components/Achievements.js";
 import { Card, cardName } from "../components/Card.js";
+import { EarnHint, RewardSummary } from "../components/Doubloons.js";
 import { CRIBBAGE_HOME } from "../routes.js";
 
 const STORE = "pc.daily";
@@ -84,6 +87,7 @@ export function DailyDiscardScreen() {
 }
 
 function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
+  const { refresh } = useAuth();
   const day = today();
   const { hand, isDealer } = useMemo(() => dailyDeal(day), [day]);
   const [record, setRecord] = useState(load);
@@ -95,6 +99,8 @@ function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
   // Signed in: the server's verdict and streak, once loaded.
   const [server, setServer] = useState<{ best: boolean | null; streak: number } | null>(null);
   const [unlocked, setUnlocked] = useState<string[]>([]);
+  // What this throw paid (only when it's thrown here, not one made earlier or on another device).
+  const [reward, setReward] = useState<Reward | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,12 +145,19 @@ function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
       setBusy(true);
       setError(null);
       try {
-        const r = await api<{ result: ServerResult; streak: number; unlocked: string[] }>(
-          "/api/daily",
-          { body: { day, cards: picked.map(cardLabel) } },
-        );
+        const r = await api<{
+          result: ServerResult;
+          streak: number;
+          unlocked: string[];
+          reward?: Reward;
+        }>("/api/daily", { body: { day, cards: picked.map(cardLabel) } });
         showServer(r.result, r.streak);
         setUnlocked(r.unlocked);
+        if (r.reward) {
+          setReward(r.reward);
+          // The account bar's balance.
+          void refresh();
+        }
       } catch (e) {
         // Already played on another device: show that answer instead.
         if (e instanceof ApiError && e.status === 409) await fetchServer();
@@ -254,20 +267,29 @@ function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
             Points expected: your hand over every possible cut, {isDealer ? "plus" : "minus"} the
             average crib those two cards make. A new hand comes tomorrow.
           </p>
+          {!signedIn && (
+            <EarnHint>
+              Sign in to earn doubloons for the daily discard ({DAILY_PLAYED}, or {DAILY_BEST} for
+              the best throw).
+            </EarnHint>
+          )}
         </div>
       )}
-      {unlocked.map((key) => (
-        <p
-          key={key}
-          className="flex items-center gap-2 rounded-xl border border-gold/60 bg-gold/15 p-2 text-sm"
-        >
-          <img src={achievementArt(key)} alt="" className="h-9 w-9 object-contain" />
-          <span>
-            <b className="text-gold">New achievement:</b>{" "}
-            {ACHIEVEMENTS.find((a) => a.key === key)?.name ?? key}
-          </span>
-        </p>
-      ))}
+      {/* The reward lists any new achievement itself, with what it paid. */}
+      {reward && <RewardSummary reward={reward} className="w-full" />}
+      {!reward &&
+        unlocked.map((key) => (
+          <p
+            key={key}
+            className="flex items-center gap-2 rounded-xl border border-gold/60 bg-gold/15 p-2 text-sm"
+          >
+            <img src={achievementArt(key)} alt="" className="h-9 w-9 object-contain" />
+            <span>
+              <b className="text-gold">New achievement:</b>{" "}
+              {ACHIEVEMENTS.find((a) => a.key === key)?.name ?? key}
+            </span>
+          </p>
+        ))}
       <p className="text-sm text-parchment/80">
         Best-throw streak: <b className="text-gold">{streak}</b> day{streak === 1 ? "" : "s"}
       </p>
