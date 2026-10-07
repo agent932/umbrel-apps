@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -13,7 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { GameState, PowerUse, RuleSet } from "@pirate/engine";
+import type { GameState, LedgerReason, PowerUse, RuleSet } from "@pirate/engine";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
@@ -38,6 +39,8 @@ export const users = pgTable(
     unsubscribeToken: uuid("unsubscribe_token").notNull().defaultRandom(),
     /** Can use the admin pages. The first account created is an admin. */
     isAdmin: boolean("is_admin").notNull().default(false),
+    /** Doubloons on hand: a cache of sum(wallet_ledger.delta). Only economy/wallet.ts changes it. */
+    doubloons: integer("doubloons").notNull().default(0),
     /** Disabled accounts can't sign in. */
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -46,6 +49,7 @@ export const users = pgTable(
     // Case-insensitive uniqueness: "CaroS" and "caros" are the same pirate.
     uniqueIndex("users_username_lower").on(sql`lower(${t.username})`),
     uniqueIndex("users_email_lower").on(sql`lower(${t.email})`),
+    check("users_doubloons_nonneg", sql`${t.doubloons} >= 0`),
   ],
 );
 
@@ -268,6 +272,31 @@ export const dailyResults = pgTable(
     playedAt: timestamp("played_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.day] })],
+);
+
+/** Append-only record of every doubloon change. (user, reason, ref) is unique, so no event pays twice. */
+export const walletLedger = pgTable(
+  "wallet_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    reason: text("reason").$type<LedgerReason>().notNull(),
+    /** What paid it: match id, UTC day, puzzle day, achievement key, or the request id for admin rows. */
+    refId: text("ref_id").notNull(),
+    /** Admin rows: why. Shown in Admin only. */
+    note: text("note"),
+    /** Admin rows: who made the change. */
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("wallet_ledger_event").on(t.userId, t.reason, t.refId),
+    index("wallet_ledger_user_time").on(t.userId, t.createdAt),
+    check("wallet_ledger_delta_nonzero", sql`${t.delta} <> 0`),
+  ],
 );
 
 export const settings = pgTable("settings", {
