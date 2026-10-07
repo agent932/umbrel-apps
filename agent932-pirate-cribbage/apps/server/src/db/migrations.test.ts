@@ -73,6 +73,11 @@ describe("migrations", () => {
         expect.arrayContaining(["users_doubloons_nonneg", "wallet_ledger_delta_nonzero"]),
       );
       await expect(db.execute(sql`update users set doubloons = -1`)).rejects.toThrow();
+      // Deleting a player clears actor_id on the ledger; an index saves reading the whole ledger.
+      const indexes = await db.execute<{ indexdef: string }>(
+        sql`select indexdef from pg_indexes where indexname = 'wallet_ledger_actor'`,
+      );
+      expect(indexes.rows[0]?.indexdef).toMatch(/\(actor_id\) WHERE \(actor_id IS NOT NULL\)/);
       const applied = await db.execute(sql`select * from drizzle.__drizzle_migrations`);
       expect(applied.rows).toHaveLength(readJournal(folder).entries.length);
     } finally {

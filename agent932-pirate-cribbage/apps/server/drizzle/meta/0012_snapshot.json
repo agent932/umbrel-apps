@@ -1513,6 +1513,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "wallet_ledger_actor": {
+          "name": "wallet_ledger_actor",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"wallet_ledger\".\"actor_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {

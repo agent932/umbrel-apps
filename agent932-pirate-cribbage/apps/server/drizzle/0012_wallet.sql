@@ -15,4 +15,5 @@ ALTER TABLE "wallet_ledger" ADD CONSTRAINT "wallet_ledger_user_id_users_id_fk" F
 ALTER TABLE "wallet_ledger" ADD CONSTRAINT "wallet_ledger_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "wallet_ledger_event" ON "wallet_ledger" USING btree ("user_id","reason","ref_id");--> statement-breakpoint
 CREATE INDEX "wallet_ledger_user_time" ON "wallet_ledger" USING btree ("user_id","created_at");--> statement-breakpoint
+CREATE INDEX "wallet_ledger_actor" ON "wallet_ledger" USING btree ("actor_id") WHERE "wallet_ledger"."actor_id" is not null;--> statement-breakpoint
 ALTER TABLE "users" ADD CONSTRAINT "users_doubloons_nonneg" CHECK ("users"."doubloons" >= 0);

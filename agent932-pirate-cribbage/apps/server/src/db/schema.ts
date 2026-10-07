@@ -295,6 +295,10 @@ export const walletLedger = pgTable(
   (t) => [
     uniqueIndex("wallet_ledger_event").on(t.userId, t.reason, t.refId),
     index("wallet_ledger_user_time").on(t.userId, t.createdAt),
+    // Deleting a player clears actor_id on the admin rows they made; this finds them quickly.
+    index("wallet_ledger_actor")
+      .on(t.actorId)
+      .where(sql`${t.actorId} is not null`),
     check("wallet_ledger_delta_nonzero", sql`${t.delta} <> 0`),
   ],
 );
