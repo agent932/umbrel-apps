@@ -7,6 +7,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { testApp } from "../../server/src/test/testApp.js";
 import { App } from "./App.js";
+import { noteText } from "./economy.js";
 
 let server: Awaited<ReturnType<typeof testApp>>;
 let cookie = "";
@@ -100,6 +101,10 @@ describe("signed-in play, end to end", () => {
     }
     const end = screen.getByRole("dialog", { name: /Victory|Defeat/ });
     expect(within(end).getByText(/121/)).toBeInTheDocument();
+    // At full bot speed the game is over in seconds, too quick to pay for the win, and it says so.
+    if (end.getAttribute("aria-label") === "Victory!")
+      expect(within(end).getByText(noteText("short", ""))).toBeInTheDocument();
+    expect(within(end).queryByRole("link", { name: /Sign in to earn/ })).toBeNull();
 
     await user.click(within(end).getByRole("button", { name: "Harbour" }));
     await user.click(await screen.findByRole("link", { name: "Ship's Log" }));
@@ -133,6 +138,11 @@ describe("daily discard, signed in", () => {
     await user.click(screen.getByRole("button", { name: "Throw to the crib" }));
     expect(await screen.findByText(/out of 100|The best throw/)).toBeInTheDocument();
     expect(screen.getByText(/Best-throw streak/)).toBeInTheDocument();
+    // The throw pays 10 doubloons, or 25 for the best one.
+    const paid = await screen.findByRole("list", { name: "Doubloons earned" });
+    const reward = paid.closest("[role=status]")!;
+    expect(reward).toHaveTextContent(/\+(10|25) doubloons/);
+    const earned = reward.textContent!.includes("+25") ? "25" : "10";
     // Nothing kept in this browser: it's on the server.
     expect(localStorage.getItem("pc.daily")).toBeNull();
     unmount();
@@ -142,5 +152,9 @@ describe("daily discard, signed in", () => {
     render(<App botDelay={0} />);
     expect(await screen.findByText(/out of 100|The best throw/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Throw to the crib" })).toBeNull();
+    // Shown again, the answer pays nothing more, but the balance in the account bar has it.
+    expect(screen.queryByRole("list", { name: "Doubloons earned" })).toBeNull();
+    await user.click(screen.getAllByRole("link", { name: /Harbour/ })[0]!);
+    expect(await screen.findByTitle("Doubloons")).toHaveTextContent(`${earned} doubloons`);
   }, 60_000);
 });
