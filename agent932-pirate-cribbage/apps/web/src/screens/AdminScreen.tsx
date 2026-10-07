@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavBar } from "../components/NavBar.js";
 import { ApiError, type Season, api } from "../api.js";
 import { useAuth } from "../auth.js";
@@ -53,7 +53,30 @@ interface LiveGame {
   startedAt: string;
 }
 
-const TABS = ["Overview", "Players", "Live games", "Seasons", "Support", "Email"] as const;
+interface AdminShopItem {
+  id: string;
+  /** "board" or "deck" (a card back). */
+  type: string;
+  name: string;
+  /** In doubloons; 0 = free, owned by everyone. */
+  price: number;
+  isDefault: boolean;
+  /** False once taken off sale: its owners keep it. */
+  available: boolean;
+  /** Players who bought it; null for a free item, which everyone has. */
+  owners: number | null;
+}
+
+/** GET /api/admin/shop. */
+interface AdminShop {
+  open: boolean;
+  /** The switch has been saved. Until then the shop is closed by default. */
+  saved: boolean;
+  /** Every item, on sale or not, in shop order. */
+  items: AdminShopItem[];
+}
+
+const TABS = ["Overview", "Players", "Live games", "Seasons", "Shop", "Support", "Email"] as const;
 type Tab = (typeof TABS)[number];
 
 function uptime(s: number) {
@@ -425,6 +448,257 @@ function SeasonsTab() {
   );
 }
 
+const TYPE_NAMES: Record<string, string> = { board: "Board", deck: "Card back" };
+
+/**
+ * The shop switch, and every item with how many players bought it. Opening or closing asks twice.
+ * The list is read only: prices and items change with a release, and a mistaken purchase is put
+ * right with a doubloon adjustment (the player keeps the item). The buttons are never `disabled`
+ * while busy (Safari would drop focus): they say aria-disabled and do nothing.
+ */
+function ShopTab() {
+  const { refresh } = useAuth();
+  const [shop, setShop] = useState<AdminShop | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  /** Open or Close was pressed once, and waits for "Yes". */
+  const [asking, setAsking] = useState(false);
+  /** The switch's height when it was pressed: the question takes its place at least that tall, so
+   *  "Yes" never lands where the switch was and a double click can't open or close the shop. */
+  const [switchHeight, setSwitchHeight] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const switchButton = useRef<HTMLButtonElement>(null);
+  const question = useRef<HTMLParagraphElement>(null);
+  /** The button that had focus has gone: give focus to the switch once it's back on the page. */
+  const refocus = useRef(false);
+
+  useEffect(() => {
+    let live = true;
+    api<AdminShop>("/api/admin/shop").then(
+      (r) => live && setShop(r),
+      () => live && setFailed(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, [attempt]);
+
+  // Focus goes to the question, not to "Yes", so a double Enter can't answer it either. Tab is next.
+  useEffect(() => {
+    if (asking) question.current?.focus();
+  }, [asking]);
+  useEffect(() => {
+    if (!refocus.current || !switchButton.current) return;
+    refocus.current = false;
+    switchButton.current.focus();
+  });
+
+  async function save(open: boolean, done: string) {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    let ok = false;
+    try {
+      const r = await api<{ open: boolean }>("/api/admin/shop", { body: { open } });
+      setShop((s) => s && { ...s, open: r.open, saved: true });
+      setNotice({ ok: true, text: done });
+      ok = true;
+      // Your own Shop links change with it ("Shop (preview)" while it's closed).
+      void refresh().catch(() => {});
+    } catch (e) {
+      setNotice({
+        ok: false,
+        text: e instanceof ApiError ? e.message : "Couldn't reach the server",
+      });
+    }
+    // "Yes" goes either way, and "Save as closed" once it's saved.
+    refocus.current = asking || ok;
+    setAsking(false);
+    setBusy(false);
+  }
+
+  if (failed)
+    return (
+      <div role="alert" className="flex flex-col items-start gap-2">
+        <p className="text-red-300">Couldn't load the shop</p>
+        <button
+          type="button"
+          className="btn-secondary min-h-11"
+          onClick={() => {
+            setFailed(false);
+            setAttempt((n) => n + 1);
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  if (!shop) return <p className="text-parchment/60">Loading…</p>;
+  const opening = !shop.open;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="panel flex flex-col gap-3 p-4">
+        <p className="font-semibold">
+          {shop.open
+            ? "The shop is open."
+            : "The shop is closed to players. Admins can preview it; items you use show only to you."}
+        </p>
+        {!shop.saved && (
+          <p className="text-sm text-parchment/80">
+            Not saved yet: closed by default. Save it once, so your choice stays if a later release
+            changes the default.
+          </p>
+        )}
+        {asking ? (
+          <div role="group" aria-labelledby="shop-ask" className="flex flex-col gap-2">
+            <p
+              ref={question}
+              id="shop-ask"
+              tabIndex={-1}
+              style={{ minHeight: switchHeight }}
+              className="text-sm outline-none"
+            >
+              {opening
+                ? "Open the shop to every player? They'll see the Shop links and can buy."
+                : "Close the shop? Players can't buy until it opens again, but they keep what they own and can still use it."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-primary min-h-11"
+                aria-disabled={busy || undefined}
+                aria-busy={busy || undefined}
+                onClick={() =>
+                  void save(
+                    opening,
+                    opening
+                      ? "The shop is open to players."
+                      : "The shop is closed to players. They keep what they bought.",
+                  )
+                }
+              >
+                {busy
+                  ? opening
+                    ? "Opening…"
+                    : "Closing…"
+                  : opening
+                    ? "Yes, open it"
+                    : "Yes, close it"}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary min-h-11"
+                aria-disabled={busy || undefined}
+                onClick={() => {
+                  if (busy) return;
+                  refocus.current = true;
+                  setAsking(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <button
+              ref={switchButton}
+              type="button"
+              className={`${opening ? "btn-primary" : "btn-secondary"} min-h-11`}
+              aria-disabled={busy || undefined}
+              onClick={(e) => {
+                if (busy) return;
+                setNotice(null);
+                setSwitchHeight(e.currentTarget.offsetHeight);
+                setAsking(true);
+              }}
+            >
+              {opening ? "Open the shop to players" : "Close the shop"}
+            </button>
+            {!shop.saved && (
+              <button
+                type="button"
+                className="btn-secondary min-h-11"
+                aria-disabled={busy || undefined}
+                aria-busy={busy || undefined}
+                onClick={() => void save(false, "Saved as closed.")}
+              >
+                {busy ? "Saving…" : "Save as closed"}
+              </button>
+            )}
+          </div>
+        )}
+        {/* Always on the page, so what they say is announced. */}
+        <p role="status" className={notice?.ok ? "text-gold" : "sr-only"}>
+          {notice?.ok ? notice.text : ""}
+        </p>
+        <p role="alert" className={notice && !notice.ok ? "text-red-300" : "sr-only"}>
+          {notice && !notice.ok ? notice.text : ""}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <caption className="pb-1 text-left text-xs text-parchment/70">
+            Every item, on sale or not
+          </caption>
+          <thead>
+            <tr className="text-left text-parchment/70">
+              <th className="py-1">Item</th>
+              <th className="py-1 pl-3">Type</th>
+              <th className="py-1 pl-3 text-right">Price</th>
+              <th className="py-1 pl-3 text-right">Owners</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shop.items.map((i) => (
+              <tr key={i.id} className="border-t border-parchment/10">
+                <td className="py-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <b>{i.name}</b>
+                    {i.isDefault && (
+                      <span className="rounded bg-gold/25 px-1 text-[10px] text-gold uppercase">
+                        Default
+                      </span>
+                    )}
+                    {!i.available && (
+                      <span className="rounded bg-red-900/60 px-1 text-[10px] uppercase">
+                        Off sale
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-parchment/60">{i.id}</div>
+                </td>
+                <td className="py-1.5 pl-3">{TYPE_NAMES[i.type] ?? i.type}</td>
+                <td className="py-1.5 pl-3 text-right tabular-nums">
+                  {i.price === 0 ? (
+                    "Free"
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-gold">
+                      <DoubloonIcon className="h-4 w-4" />
+                      {i.price.toLocaleString()}
+                      <span className="sr-only"> doubloons</span>
+                    </span>
+                  )}
+                </td>
+                <td className="py-1.5 pl-3 text-right tabular-nums">
+                  {/* A free item is everyone's: there are no buyers to count. */}
+                  {i.owners === null ? "Everyone" : i.owners.toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-parchment/60">
+        Read only: prices and items change with a new release. To put a mistaken purchase right,
+        give the doubloons back under Players; the player keeps the item.
+      </p>
+    </div>
+  );
+}
+
 export function AdminScreen() {
   const [tab, setTab] = useState<Tab>("Overview");
   return (
@@ -451,6 +725,7 @@ export function AdminScreen() {
           {tab === "Players" && <PlayersTab />}
           {tab === "Live games" && <GamesTab />}
           {tab === "Seasons" && <SeasonsTab />}
+          {tab === "Shop" && <ShopTab />}
           {tab === "Support" && <SupportInbox />}
           {tab === "Email" && <EmailSettingsPanel />}
         </section>

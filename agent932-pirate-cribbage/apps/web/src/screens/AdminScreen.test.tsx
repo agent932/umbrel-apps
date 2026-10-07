@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AuthProvider } from "../auth.js";
 import type { LedgerRow } from "../components/AdminDoubloons.js";
@@ -44,6 +44,33 @@ const ledgerRow = (i: number, extra: Partial<LedgerRow> = {}): LedgerRow => ({
   ...extra,
 });
 
+/** An item as GET /api/admin/shop lists it. */
+const shopItem = (
+  id: string,
+  name: string,
+  price: number,
+  owners: number | null,
+  extra: { isDefault?: boolean; available?: boolean } = {},
+) => ({
+  id,
+  type: id.split(".")[0]!,
+  name,
+  price,
+  isDefault: false,
+  available: true,
+  owners,
+  ...extra,
+});
+
+const SHOP_LIST = [
+  shopItem("board.serpent-reef", "Serpent Reef", 0, null, { isDefault: true }),
+  shopItem("board.treasure-map", "Treasure Map", 1500, 2),
+  shopItem("deck.cribbage-logo", "Pirate Cribbage", 0, null, { isDefault: true }),
+  shopItem("deck.moon-compass", "Moon and Compass", 0, null),
+  shopItem("deck.crimson", "Crimson", 1000, 1, { available: false }),
+  shopItem("deck.ghost", "Ghost", 1000, 0),
+];
+
 interface Server {
   /** Every request, as "METHOD path". */
   calls: string[];
@@ -51,16 +78,40 @@ interface Server {
   adjustments: { path: string; body: { delta: number; note: string; requestId: string } }[];
   /** How the next adjustment goes: its balance, or a failure. */
   next: (number | "offline" | { status: number; error: string })[];
+  /** The shop switch as the server has it (a setting saved or not). */
+  shop: { open: boolean; saved: boolean };
+  /** The bodies posted to the shop switch, in order. */
+  switches: unknown[];
+  /** Failures for the next shop requests (GET or POST), in order; empty means they work. */
+  shopFails: ("offline" | { status: number; error: string })[];
 }
 
-/** The admin's server: overview, players, ledgers and adjustments. */
+/** The admin's server: overview, players, ledgers and adjustments, and the shop. */
 function stubServer(ledger: LedgerRow[] = [ledgerRow(0)]): Server {
-  const server: Server = { calls: [], adjustments: [], next: [] };
+  const server: Server = {
+    calls: [],
+    adjustments: [],
+    next: [],
+    shop: { open: false, saved: false },
+    switches: [],
+    shopFails: [],
+  };
   const players = [person(ADMIN, "Don", 40, true), person(ANNE, "Anne", 500)];
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
     const method = init.method ?? "GET";
     server.calls.push(`${method} ${url}`);
-    if (url === "/api/auth/me") return json({ user: { ...players[0], doubloons: 40 } });
+    if (url === "/api/auth/me")
+      return json({ user: { ...players[0], doubloons: 40 }, shopOpen: server.shop.open });
+    if (url === "/api/admin/shop") {
+      if (method === "POST") server.switches.push(JSON.parse(init.body as string));
+      const fail = server.shopFails.shift();
+      if (fail === "offline") throw new TypeError("Failed to fetch");
+      if (fail) return json({ error: fail.error }, fail.status);
+      if (method === "GET") return json({ ...server.shop, items: SHOP_LIST });
+      const { open } = server.switches.at(-1) as { open: boolean };
+      server.shop = { open, saved: true };
+      return json({ open });
+    }
     if (url === "/api/admin/overview")
       return json({
         players: 2,
@@ -275,5 +326,198 @@ describe("admin: doubloons", () => {
     const history = await within(sheet).findByRole("list", { name: "Doubloon history" });
     expect(within(history).getAllByRole("listitem")).toHaveLength(50);
     expect(within(sheet).getByRole("heading", { name: "Last 50 changes" })).toBeInTheDocument();
+  });
+});
+
+/** Open the Shop tab and wait for its list. */
+async function openShop() {
+  const user = userEvent.setup();
+  renderAdmin();
+  await user.click(screen.getByRole("tab", { name: "Shop" }));
+  await screen.findByRole("table", { name: "Every item, on sale or not" });
+  return user;
+}
+
+const CLOSED =
+  /^The shop is closed to players\. Admins can preview it; items you use show only to you\.$/;
+const meReads = (server: Server) => server.calls.filter((c) => c === "GET /api/auth/me").length;
+
+describe("admin: the shop", () => {
+  it("lists every item, on sale or not, with its type, price and owners", async () => {
+    const server = stubServer();
+    await openShop();
+    const table = screen.getByRole("table", { name: "Every item, on sale or not" });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual(["Item", "Type", "Price", "Owners"]);
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(
+      rows.map((r) =>
+        within(r)
+          .getAllByRole("cell")
+          .map((c) => c.textContent),
+      ),
+    ).toEqual([
+      // Free items are everyone's, so there are no buyers to count.
+      ["Serpent ReefDefaultboard.serpent-reef", "Board", "Free", "Everyone"],
+      ["Treasure Mapboard.treasure-map", "Board", `${num(1500)} doubloons`, "2"],
+      ["Pirate CribbageDefaultdeck.cribbage-logo", "Card back", "Free", "Everyone"],
+      ["Moon and Compassdeck.moon-compass", "Card back", "Free", "Everyone"],
+      // Taken off sale: still listed, with its owner.
+      ["CrimsonOff saledeck.crimson", "Card back", `${num(1000)} doubloons`, "1"],
+      ["Ghostdeck.ghost", "Card back", `${num(1000)} doubloons`, "0"],
+    ]);
+    // A fresh server: closed, and nothing saved yet. Nothing is sent just by looking.
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+    expect(screen.getByText(/^Not saved yet: closed by default\./)).toBeInTheDocument();
+    expect(server.calls.filter((c) => c.endsWith("/api/admin/shop"))).toEqual([
+      "GET /api/admin/shop",
+    ]);
+  });
+
+  it("opens the shop only on the second press, then reads you again for your own links", async () => {
+    const server = stubServer();
+    server.shop = { open: false, saved: true };
+    const user = await openShop();
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+    // Saved already: nothing to save as closed.
+    expect(screen.queryByText(/^Not saved yet/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save as closed" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Open the shop to players" }));
+    expect(server.switches).toEqual([]);
+    const ask = screen.getByRole("group", { name: /^Open the shop to every player\?/ });
+    // Focus is on the question, so it's read out; "Yes" is the next stop.
+    expect(within(ask).getByText(/^Open the shop to every player\?/)).toHaveFocus();
+    await user.tab();
+    expect(within(ask).getByRole("button", { name: "Yes, open it" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByText("The shop is open.")).toBeInTheDocument();
+    expect(server.switches).toEqual([{ open: true }]);
+    expect(screen.getByRole("status")).toHaveTextContent("The shop is open to players.");
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+    expect(screen.queryByRole("group")).toBeNull();
+    // Focus moves to the switch, which now closes it.
+    expect(screen.getByRole("button", { name: "Close the shop" })).toHaveFocus();
+    // The account bar's Shop link loses its "(preview)".
+    await waitFor(() => expect(meReads(server)).toBe(2));
+  });
+
+  it("asks before closing it too", async () => {
+    const server = stubServer();
+    server.shop = { open: true, saved: true };
+    const user = await openShop();
+    expect(screen.getByText("The shop is open.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close the shop" }));
+    expect(server.switches).toEqual([]);
+    expect(
+      screen.getByRole("group", {
+        name: /^Close the shop\? Players can't buy until it opens again/,
+      }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Yes, close it" }));
+    expect(await screen.findByText(CLOSED)).toBeInTheDocument();
+    expect(server.switches).toEqual([{ open: false }]);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "The shop is closed to players. They keep what they bought.",
+    );
+    expect(screen.getByRole("button", { name: "Open the shop to players" })).toHaveFocus();
+    await waitFor(() => expect(meReads(server)).toBe(2));
+  });
+
+  it("doesn't take a double Enter on the switch as the second step", async () => {
+    const server = stubServer();
+    const user = await openShop();
+    screen.getByRole("button", { name: "Open the shop to players" }).focus();
+    await user.keyboard("{Enter}{Enter}");
+    expect(screen.getByRole("button", { name: "Yes, open it" })).toBeInTheDocument();
+    expect(server.switches).toEqual([]);
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+  });
+
+  it("sends nothing when the second step is cancelled", async () => {
+    const server = stubServer();
+    const user = await openShop();
+    await user.click(screen.getByRole("button", { name: "Open the shop to players" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(server.switches).toEqual([]);
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open the shop to players" })).toHaveFocus();
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+    expect(meReads(server)).toBe(1);
+  });
+
+  it("saves the switch closed in one press while nothing is saved", async () => {
+    const server = stubServer();
+    const user = await openShop();
+    await user.click(screen.getByRole("button", { name: "Save as closed" }));
+    await waitFor(() => expect(screen.queryByText(/^Not saved yet/)).toBeNull());
+    expect(server.switches).toEqual([{ open: false }]);
+    expect(screen.getByRole("status")).toHaveTextContent("Saved as closed.");
+    // Still closed; the button has gone, so focus moves to the switch.
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save as closed" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open the shop to players" })).toHaveFocus();
+  });
+
+  it("says why a switch failed, and changes nothing", async () => {
+    const server = stubServer();
+    server.shop = { open: false, saved: true };
+    const user = await openShop();
+    server.shopFails.push({ status: 403, error: "Admins only" }, "offline");
+
+    await user.click(screen.getByRole("button", { name: "Open the shop to players" }));
+    await user.click(screen.getByRole("button", { name: "Yes, open it" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Admins only"));
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(screen.getByRole("button", { name: "Open the shop to players" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Open the shop to players" }));
+    await user.click(screen.getByRole("button", { name: "Yes, open it" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach the server"),
+    );
+    expect(screen.getByText(CLOSED)).toBeInTheDocument();
+    // Nothing changed, so your own links are not read again.
+    expect(meReads(server)).toBe(1);
+
+    // The third try works.
+    await user.click(screen.getByRole("button", { name: "Open the shop to players" }));
+    await user.click(screen.getByRole("button", { name: "Yes, open it" }));
+    expect(await screen.findByText("The shop is open.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+    expect(server.switches).toEqual([{ open: true }, { open: true }, { open: true }]);
+  });
+
+  it("keeps a failed Save as closed in place", async () => {
+    const server = stubServer();
+    const user = await openShop();
+    server.shopFails.push("offline");
+    const save = screen.getByRole("button", { name: "Save as closed" });
+    await user.click(save);
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach the server"),
+    );
+    expect(screen.getByText(/^Not saved yet/)).toBeInTheDocument();
+    expect(save).toBeInTheDocument();
+    expect(save).toHaveFocus();
+  });
+
+  it("says when the list won't load, and Try again reads it again", async () => {
+    const server = stubServer();
+    server.shopFails.push({ status: 500, error: "Something broke" });
+    const user = userEvent.setup();
+    renderAdmin();
+    await user.click(screen.getByRole("tab", { name: "Shop" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load the shop");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByRole("table", { name: "Every item, on sale or not" }),
+    ).toBeInTheDocument();
+    expect(server.calls.filter((c) => c === "GET /api/admin/shop")).toHaveLength(2);
   });
 });
