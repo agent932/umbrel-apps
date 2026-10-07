@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
-import { games, matches, walletLedger } from "../db/schema.js";
+import { games, matchPlayers, matches, users, walletLedger } from "../db/schema.js";
 import { expectLedgerMatches } from "../test/ledger.js";
 import { signUp, testApp } from "../test/testApp.js";
 import {
@@ -310,15 +310,30 @@ describe("online play", () => {
       await expectLedgerMatches(t.db);
     }, 60_000);
 
+    /** Make inserts into `table` fail: the first `times` of them, or every one. */
+    async function failInserts(table: "matches" | "wallet_ledger", times = Infinity) {
+      await t.db.execute(sql`create sequence boom_count`);
+      const limit = Number.isFinite(times) ? String(times) : "null";
+      await t.db.execute(
+        sql.raw(`
+        create function boom() returns trigger language plpgsql as $$
+        begin
+          if ${limit} is null or nextval('boom_count') <= ${limit} then raise exception 'boom'; end if;
+          return new;
+        end $$`),
+      );
+      await t.db.execute(
+        sql.raw(
+          `create trigger boom before insert on ${table} for each row execute function boom()`,
+        ),
+      );
+    }
+    const QUICK_AWAY: Timing = { turnMs: 60_000, nextRoundMs: 60_000, disconnectMs: 100 };
+
     it("keeps nothing when paying fails at the end of a game, and carries on", async () => {
       const { gameId, a, b } = await pair();
       await backdate(gameId);
-      await t.db.execute(sql`
-        create function boom() returns trigger language plpgsql as $$
-        begin raise exception 'boom'; end $$`);
-      await t.db.execute(
-        sql`create trigger boom before insert on wallet_ledger for each row execute function boom()`,
-      );
+      await failInserts("wallet_ledger");
       await expect(playOut(gameId, [a, b])).rejects.toThrow("Something went wrong");
       expect(await t.db.select().from(matches)).toEqual([]);
       expect(await t.db.select().from(walletLedger)).toEqual([]);
@@ -336,28 +351,77 @@ describe("online play", () => {
       await expectLedgerMatches(t.db);
     }, 60_000);
 
-    it("survives a forfeit that can't be saved while nobody is watching", async () => {
-      const { gameId, a, b } = await pair({
-        turnMs: 60_000,
-        nextRoundMs: 60_000,
-        disconnectMs: 100,
-      });
-      await t.db.execute(sql`
-        create function boom() returns trigger language plpgsql as $$
-        begin raise exception 'boom'; end $$`);
-      await t.db.execute(
-        sql`create trigger boom before insert on matches for each row execute function boom()`,
-      );
+    it("tries a failed disconnect forfeit again, rather than playing the absent seat out", async () => {
+      const { a, b } = await pair(QUICK_AWAY);
+      const anneSeat = a.latestState()!.seat;
+      await failInserts("matches", 1);
       a.ws.terminate();
-      // The forfeit clock runs out and fails; the server logs it and keeps going.
-      await new Promise((r) => setTimeout(r, 500));
+      // The first forfeit fails; the clock to come back starts again, and the next one is saved.
+      expect(await b.next((m) => m.t === "forfeit")).toMatchObject({ seat: anneSeat });
+      const [match] = await t.db.select().from(matches);
+      expect(match!.forfeitedBy).toBe(anneSeat);
+      expect(match!.winner).toBe(1 - anneSeat);
+    });
+
+    it("stops after 3 failed saves in a row, and the game picks up again on rejoining", async () => {
+      const { gameId, a, b } = await pair(QUICK_AWAY);
+      await failInserts("matches");
+      a.ws.terminate();
+      // The forfeit clock runs out and fails, three times; the server says so and keeps going.
+      expect(await b.next((m) => m.t === "error")).toMatchObject({
+        gameId,
+        message: "This game couldn't be saved. Try Resume later to finish it.",
+      });
       expect(b.messages.some((m) => m.t === "forfeit")).toBe(false);
       const [game] = await t.db.select().from(games).where(eq(games.id, gameId));
       expect(game!.finishedAt).toBeNull();
       expect((await t.app.inject({ url: "/api/health" })).statusCode).toBe(200);
-      await expect(
-        move(b, gameId, nextMove(b.latestState()!.step.view, false)!),
-      ).resolves.toBeTruthy();
+      // No more tries on its own.
+      await new Promise((r) => setTimeout(r, 400));
+      expect(b.messages.filter((m) => m.t === "error")).toHaveLength(1);
+
+      const mark = b.messages.length;
+      b.send({ t: "watch", gameId });
+      const s = await b.after<StateMsg>(mark, (m) => m.t === "state");
+      await expect(move(b, gameId, nextMove(s.step.view, false)!)).resolves.toBeTruthy();
+    });
+
+    it("forfeits a player's games when they delete their account, so the opponent's win counts", async () => {
+      // Bonny deletes hers (Anne signed up first, so she's the only admin and can't).
+      const { gameId, a, b, bonny } = await pair();
+      const bonnySeat = b.latestState()!.seat;
+      const res = await t.app.inject({
+        method: "POST",
+        url: "/api/auth/delete",
+        headers: { cookie: bonny.cookie },
+        payload: { password: "parrots-and-rum" },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(await a.next((m) => m.t === "forfeit")).toMatchObject({ gameId, seat: bonnySeat });
+      const [match] = await t.db.select().from(matches).where(eq(matches.id, gameId));
+      expect(match!.winner).toBe(1 - bonnySeat);
+      // The match stays in Anne's history, without Bonny's account.
+      const seats = await t.db.select().from(matchPlayers).where(eq(matchPlayers.matchId, gameId));
+      expect(seats.find((p) => p.seat === bonnySeat)!.userId).toBeNull();
+      expect(seats.find((p) => p.seat !== bonnySeat)!.userId).not.toBeNull();
+    });
+
+    it("still records a ranked game whose other player's account is already gone", async () => {
+      t = await testApp(undefined, LONG);
+      const { gameId, a, b } = await matchedPair(t, { variant: "classic", ranked: true });
+      const anneSeat = a.latestState()!.seat;
+      // Anne's account goes without the forfeit (as if deleted while the game was finishing).
+      await t.db.delete(users).where(eq(users.username, "Anne"));
+      b.send({ t: "forfeit", gameId });
+      expect(await b.next((m) => m.t === "forfeit")).toMatchObject({ seat: 1 - anneSeat });
+      const [match] = await t.db.select().from(matches).where(eq(matches.id, gameId));
+      expect(match!.winner).toBe(anneSeat);
+      const seats = await t.db.select().from(matchPlayers).where(eq(matchPlayers.matchId, gameId));
+      expect(seats.find((p) => p.seat === anneSeat)!.userId).toBeNull();
+      // Nobody's rating moves in a game that can't be rated.
+      const [bonny] = await t.db.select().from(users).where(eq(users.username, "Bonny"));
+      expect(bonny).toMatchObject({ rating: 1000, rankedGames: 0 });
+      expect(b.messages.some((m) => m.t === "error")).toBe(false);
     });
   });
 

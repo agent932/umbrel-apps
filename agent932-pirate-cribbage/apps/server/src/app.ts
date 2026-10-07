@@ -124,9 +124,6 @@ export async function buildApp({
     });
   });
 
-  attachSessions(app, db);
-  await app.register(authRoutes, { db });
-  await app.register(gameRoutes, { db });
   // Shared so friend lists can show who's online and challenges reach the right people.
   const presence = new Presence();
   // Online games live here; the admin page lists and can end them.
@@ -138,6 +135,10 @@ export async function buildApp({
     app.log,
   );
   app.addHook("onClose", async () => rooms.close());
+
+  attachSessions(app, db);
+  await app.register(authRoutes, { db, beforeDelete: (userId) => rooms.forfeitAllFor(userId) });
+  await app.register(gameRoutes, { db });
   await app.register(onlineRoutes, {
     db,
     rooms,

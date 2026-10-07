@@ -24,6 +24,7 @@ import {
 import type { Db } from "../db/client.js";
 import { games, users } from "../db/schema.js";
 import type { ClientAction } from "../games/actions.js";
+import { lockWallets } from "../economy/wallet.js";
 import { type RatingChange, type Tx, recordMatch } from "../games/record.js";
 import { toEngineAction } from "../games/toEngine.js";
 import { isBlocking } from "../players/blocks.js";
@@ -32,6 +33,9 @@ import type { Emote, ServerMessage } from "./protocol.js";
 
 /** The shortest gap between one player's emotes. */
 const EMOTE_GAP_MS = 2500;
+
+/** Failed tries in a row at saving a finished game before the room stops trying on its own. */
+export const MAX_FINISH_FAILURES = 3;
 
 export interface Timing {
   /** Time to make a move before the server makes a sensible one for you. */
@@ -92,6 +96,8 @@ class Room {
   ];
   /** When each disconnected player forfeits unless they're back (ms since epoch), or null. */
   returnBy: [number | null, number | null] = [null, null];
+  /** Failed tries in a row at saving the finished game (see finish()). */
+  finishFailures = 0;
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -242,8 +248,9 @@ export class RoomManager {
     });
   }
 
-  private awayClock(room: Room, seat: Seat) {
-    if (room.state.phase !== "gameOver") {
+  /** Start `seat`'s clock to come back. `notify` sends the opt-in email (not again on a retry). */
+  private awayClock(room: Room, seat: Seat, notify = true) {
+    if (notify && room.state.phase !== "gameOver") {
       this.onAway?.(room.players[seat].userId, room.players[other(seat)].username, room.id);
     }
     room.returnBy[seat] = Date.now() + this.timing.disconnectMs;
@@ -251,7 +258,18 @@ export class RoomManager {
     room.disconnectTimers[seat] = setTimeout(() => {
       void room
         .run(() => this.forfeit(room, seat))
-        .catch((err: unknown) => this.log.error({ err, gameId: room.id }, "forfeit failed"));
+        .catch((err: unknown) => {
+          this.log.error({ err, gameId: room.id }, "forfeit failed");
+          // Still away: start the clock again, so the forfeit is tried again rather than the
+          // server playing out (and maybe winning) the absent player's seat.
+          void room.run(async () => {
+            room.disconnectTimers[seat] = null;
+            const live = this.rooms.get(room.id) === room;
+            if (live && !room.online(seat) && room.state.phase !== "gameOver") {
+              this.awayClock(room, seat, false);
+            }
+          });
+        });
     }, this.timing.disconnectMs);
   }
 
@@ -311,6 +329,19 @@ export class RoomManager {
     const seat = room?.seatOf(userId);
     if (!room || seat == null) throw new RoomError("You're not in that game");
     await room.run(() => this.forfeit(room, seat));
+  }
+
+  /**
+   * Forfeit every unfinished online game a player is in (their account is about to be deleted),
+   * so each opponent's win is recorded while both accounts still exist. A forfeit that fails is
+   * logged and skipped: finish() can still record that game without the deleted player.
+   */
+  async forfeitAllFor(userId: string): Promise<void> {
+    for (const gameId of await this.activeFor(userId)) {
+      await this.forfeitByUser(gameId, userId).catch((err: unknown) =>
+        this.log.error({ err, gameId }, "forfeit before account deletion failed"),
+      );
+    }
   }
 
   /** Both players see the show; the next round starts when both are ready (or time runs out). */
@@ -385,6 +416,8 @@ export class RoomManager {
    * Save the finished game (room.state), rate it, record it and pay doubloons, all in one
    * transaction. If anything fails, nothing is kept: the game goes back to `before` (which is
    * still what's saved), its clock restarts so play can carry on, and the error is passed on.
+   * After MAX_FINISH_FAILURES failures in a row the room stops retrying on its own and closes;
+   * the game stays saved at `before`, so rejoining picks it up again.
    * Returns what each player earned, by user id.
    */
   private async finish(
@@ -395,12 +428,22 @@ export class RoomManager {
     let rewards: Map<string, Reward>;
     try {
       rewards = await this.db.transaction(async (tx) => {
+        const ids = [room.players[0].userId, room.players[1].userId];
+        // Lock both players first (see lockWallets). One who deleted their account mid-game is
+        // gone: their seat is recorded without an account, like the computer's, and nobody's
+        // rating moves, so the other player's result still counts.
+        const present = new Set((await lockWallets(tx, ids)).map((u) => u.id));
+        const players = ids.map((id) => (present.has(id) ? id : null)) as [
+          string | null,
+          string | null,
+        ];
         // The saved start time is the authority (the room's copy is only a fallback).
         const [g] = await tx
           .select({ createdAt: games.createdAt })
           .from(games)
           .where(eq(games.id, room.id));
-        const ratings = room.ranked ? await this.rate(tx, room) : null;
+        const rated = room.ranked && present.size === 2;
+        const ratings = rated ? await this.rate(tx, room) : null;
         const seasonId = room.ranked ? (await currentSeason(tx)).id : null;
         const paid = await recordMatch(
           tx,
@@ -412,7 +455,7 @@ export class RoomManager {
             ranked: room.ranked,
             seasonId,
           },
-          [room.players[0].userId, room.players[1].userId],
+          players,
           room.state,
           forfeitedBy,
           ratings,
@@ -425,7 +468,19 @@ export class RoomManager {
       });
     } catch (err) {
       room.state = before;
-      this.schedule(room);
+      room.finishFailures++;
+      if (room.finishFailures < MAX_FINISH_FAILURES) {
+        this.schedule(room);
+      } else {
+        // Something keeps failing: stop the clocks rather than replaying the last move forever.
+        this.clearTimers(room);
+        this.rooms.delete(room.id);
+        this.broadcast(room, () => ({
+          t: "error",
+          gameId: room.id,
+          message: "This game couldn't be saved. Try Resume later to finish it.",
+        }));
+      }
       throw err;
     }
     this.clearTimers(room);
@@ -433,14 +488,17 @@ export class RoomManager {
     return rewards;
   }
 
-  /** Update both players' Elo ratings (rows locked, so two games ending at once can't clash). */
+  /**
+   * Update both players' Elo ratings (rows locked, so two games ending at once can't clash). The
+   * caller has locked them already (lockWallets); the same lock here keeps that true on its own.
+   */
   private async rate(tx: Tx, room: Room): Promise<RatingChange[]> {
     const rows = await tx
       .select({ id: users.id, rating: users.rating })
       .from(users)
       .where(or(eq(users.id, room.players[0].userId), eq(users.id, room.players[1].userId)))
       .orderBy(users.id)
-      .for("update");
+      .for("no key update");
     const seats = [0, 1] as Seat[];
     const before = seats.map((s) => rows.find((r) => r.id === room.players[s].userId)!.rating);
     const w = room.state.winner!;

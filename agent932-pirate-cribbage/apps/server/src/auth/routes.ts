@@ -87,7 +87,17 @@ export function attachSessions(app: FastifyInstance, db: Db) {
   });
 }
 
-export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
+export async function authRoutes(
+  app: FastifyInstance,
+  {
+    db,
+    beforeDelete,
+  }: {
+    db: Db;
+    /** Runs just before an account is deleted (online games forfeit, so opponents keep their wins). */
+    beforeDelete?: (userId: string) => Promise<void>;
+  },
+) {
   /** Sign in: a cookie for the web, or the token in the response for the app (which has no cookies). */
   async function startSession(
     req: FastifyRequest,
@@ -254,7 +264,8 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
 
   /**
    * Delete your own account for good. Your sessions, friends, stats, achievements, daily discards, doubloons and unfinished games go with it;
-   * finished matches stay in your opponents' history without your name.
+   * finished matches stay in your opponents' history without your name. Online games you're
+   * still in are forfeited first, so your opponents' wins are recorded.
    */
   app.post("/api/auth/delete", authLimit, async (req, reply) => {
     const user = requireUser(req, reply);
@@ -279,6 +290,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
           .send({ error: "You're the only admin. Make another player an admin first." });
       }
     }
+    await beforeDelete?.(user.id);
     await db.delete(users).where(eq(users.id, user.id));
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
