@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { signUp, testApp } from "../test/testApp.js";
+import { credit } from "../economy/wallet.js";
 import { hashPassword, verifyPassword } from "./password.js";
 
 let t: Awaited<ReturnType<typeof testApp>>;
@@ -94,6 +95,20 @@ describe("auth routes", () => {
       });
       expect(res.statusCode).toBe(200);
     }
+  });
+
+  it("shows the player's doubloons after signing up, logging in, and on /me", async () => {
+    const { res, cookie } = await signUp(t.app);
+    expect(res.json().user.doubloons).toBe(0);
+    await credit(t.db, res.json().user.id, 85, "daily", "2026-10-06");
+    const login = await t.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { login: "CaroS", password: "parrots-and-rum" },
+    });
+    expect(login.json().user.doubloons).toBe(85);
+    const me = await t.app.inject({ url: "/api/auth/me", headers: { cookie } });
+    expect(me.json().user.doubloons).toBe(85);
   });
 
   it("gives the same error for a wrong password and an unknown user", async () => {

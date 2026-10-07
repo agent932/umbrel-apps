@@ -174,6 +174,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
         rankedGames: row.rankedGames,
         avatar: row.avatar,
         isAdmin: row.isAdmin,
+        doubloons: row.doubloons,
       },
     };
   });
@@ -252,7 +253,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Db }) {
   });
 
   /**
-   * Delete your own account for good. Your sessions, friends, stats, achievements, daily discards and unfinished games go with it;
+   * Delete your own account for good. Your sessions, friends, stats, achievements, daily discards, doubloons and unfinished games go with it;
    * finished matches stay in your opponents' history without your name.
    */
   app.post("/api/auth/delete", authLimit, async (req, reply) => {

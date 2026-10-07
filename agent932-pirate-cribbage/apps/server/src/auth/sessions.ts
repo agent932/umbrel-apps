@@ -17,6 +17,8 @@ export interface SessionUser {
   /** Painted crew portrait 1-8, or null for their initial. */
   avatar: number | null;
   isAdmin: boolean;
+  /** Doubloons on hand, as of the start of this request. */
+  doubloons: number;
 }
 
 /** The columns a signed-in user (and the browser) gets to see. Never the password hash. */
@@ -28,6 +30,7 @@ export const userColumns = {
   rankedGames: users.rankedGames,
   avatar: users.avatar,
   isAdmin: users.isAdmin,
+  doubloons: users.doubloons,
 };
 
 export async function createSession(
