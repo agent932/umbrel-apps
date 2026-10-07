@@ -101,8 +101,24 @@ export async function move(page: Page) {
   return tryClick(cards.first(), CORNER);
 }
 
-/** Plays one or more players' moves until the game ends for all of them. */
-export async function playToTheEnd(pages: Page[], timeout = 200_000) {
+/**
+ * Waits for the table to stop moving (the deal, cards sliding into place): every animation that
+ * ends has ended. A slow machine takes longer than a fixed pause would allow.
+ */
+export async function settle(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity),
+  );
+}
+
+/**
+ * Plays one or more players' moves until the game ends for all of them. A whole game takes a
+ * minute or three here and several times that on a CI machine: the test (marked slow) times out
+ * first if something is really stuck.
+ */
+export async function playToTheEnd(pages: Page[], timeout = 690_000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
     let over = 0;

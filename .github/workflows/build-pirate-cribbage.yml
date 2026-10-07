@@ -43,10 +43,15 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Real browsers (Chromium, and WebKit on an iPhone-sized screen) playing the production build.
+  # Real browsers playing the production build: Chromium on a desktop and WebKit on an
+  # iPhone-sized screen, side by side on two machines.
   e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, iphone]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -55,13 +60,13 @@ jobs:
           cache: npm
           cache-dependency-path: agent932-pirate-cribbage/package-lock.json
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run e2e
+      - run: npx playwright install --with-deps ${{ matrix.project == 'iphone' && 'webkit' || 'chromium' }}
+      - run: npm run e2e -- --project=${{ matrix.project }}
       - name: Keep the report, screenshots and traces of a failed run
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: |
             agent932-pirate-cribbage/playwright-report
             agent932-pirate-cribbage/test-results

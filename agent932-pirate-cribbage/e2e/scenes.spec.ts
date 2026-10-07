@@ -66,9 +66,9 @@ test.describe("with reduced motion", () => {
     // About three minutes (the crew waits for a Belay That! before each card it plays): one
     // browser is enough, and the iPhone runs the scene tests above.
     test.skip(info.project.name !== "chromium", "A long game; once is enough");
-    test.setTimeout(420_000);
+    test.slow();
     await startCrewGame(page, "Pirate");
-    await playToTheEnd([page], 400_000);
+    await playToTheEnd([page]);
     await expect(gameOver(page)).toContainText("121");
   });
 });

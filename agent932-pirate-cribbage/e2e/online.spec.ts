@@ -5,6 +5,7 @@ test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("two players play a whole game online through an invite link", async ({ signedIn }) => {
+    test.slow();
     const anne = await signedIn("Anne");
     const bonny = await signedIn("Bonny");
     await inviteGame(anne, bonny);

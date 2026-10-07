@@ -4,7 +4,7 @@
  */
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
-import { cutForDeal, hand, startCrewGame } from "./table.js";
+import { cutForDeal, hand, settle, startCrewGame } from "./table.js";
 
 type Box = { left: number; top: number; right: number; bottom: number };
 
@@ -86,8 +86,7 @@ async function tableAt(page: Page, width: number, height: number, rules: "Classi
   await page.setViewportSize({ width, height });
   await startCrewGame(page, rules);
   await expect(page.getByRole("button", { name: "Throw to crib" })).toBeVisible();
-  // Let the deal finish moving.
-  await page.waitForTimeout(800);
+  await settle(page);
   return measure(page);
 }
 
@@ -154,7 +153,7 @@ for (const screen of UPRIGHT.slice(0, 2)) {
     await expect(hand(page).getByRole("button")).toHaveCount(6);
     const tip = page.getByLabel("Peggy's tip");
     await expect(tip).toBeVisible();
-    await page.waitForTimeout(800);
+    await settle(page);
     const { found } = await measure(page);
     const tipBox = (await tip.boundingBox())!;
     const withTip = {

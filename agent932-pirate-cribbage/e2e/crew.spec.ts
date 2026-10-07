@@ -6,6 +6,7 @@ test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("a guest plays a whole game against the crew", async ({ page }) => {
+    test.slow();
     await startCrewGame(page);
     await playToTheEnd([page]);
     await expect(gameOver(page)).toContainText("121");
