@@ -1,5 +1,5 @@
 import type { Emote } from "../online/protocol.js";
-import type { BotLevel, Card, GameEvent, PlayerView, Seat } from "@pirate/engine";
+import type { BotLevel, Card, GameEvent, PlayerView, Reward, Seat } from "@pirate/engine";
 
 /** What the table asks for. Seats and randomness are filled in by whoever runs the game. */
 export type UiAction =
@@ -90,4 +90,6 @@ export interface GameController {
   /** True when the game counts toward stats (server games). */
   ranked: boolean;
   online?: OnlineInfo;
+  /** The server's doubloons for a finished game; undefined for games played in the browser. */
+  reward?: Reward | null;
 }

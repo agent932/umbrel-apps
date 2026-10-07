@@ -1,5 +1,7 @@
-import type { BotLevel, GameEvent, PlayerStats, PlayerView } from "@pirate/engine";
+import type { BotLevel, GameEvent, PlayerStats, PlayerView, Reward } from "@pirate/engine";
 import { API_ORIGIN, appToken, isNativeApp, setAppToken } from "./native.js";
+
+export type { DoubloonLine, Reward } from "@pirate/engine";
 
 export class ApiError extends Error {
   constructor(
@@ -46,6 +48,8 @@ export interface User {
   /** Painted crew portrait 1-8, or null for their initial. */
   avatar: number | null;
   isAdmin: boolean;
+  /** Doubloons on hand. Optional so older servers still fit; read it as `?? 0`. */
+  doubloons?: number;
 }
 
 export interface Season {
@@ -78,6 +82,8 @@ export interface GameResponse {
   gameId: string;
   level: BotLevel;
   steps: Step[];
+  /** Your doubloons for the game, on the response that finishes it. */
+  reward?: Reward;
 }
 
 export interface StatsResponse {

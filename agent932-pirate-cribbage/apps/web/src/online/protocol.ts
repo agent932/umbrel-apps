@@ -1,4 +1,4 @@
-import type { GameEvent, PlayerView, Seat } from "@pirate/engine";
+import type { GameEvent, PlayerView, Reward, Seat } from "@pirate/engine";
 import type { UiAction } from "../game/types.js";
 
 /** Mirrors apps/server/src/online/protocol.ts. */
@@ -48,6 +48,8 @@ export type StateMessage = {
   /** When a disconnected player forfeits unless they're back (ms since epoch). */
   returnBy: [number | null, number | null];
   nextRoundReady: Seat[];
+  /** Your doubloons, on the gameOver state sent as the game finishes. */
+  reward?: Reward;
 };
 
 export type ServerMessage =
