@@ -8,6 +8,7 @@ import {
   type DiscardAnalysis,
   analyzeDiscard,
   cardLabel,
+  cardText,
   dailyDeal,
   parseCard,
   sameCard,
@@ -62,7 +63,8 @@ export function bestStreak(days: Record<string, number>, day: string) {
   return streak;
 }
 
-const twoCards = (cards: readonly CardType[]) => cards.map(cardLabel).join(" ");
+/** "3♠ 4♦", as the round summary writes a throw. */
+const twoCards = (cards: readonly CardType[]) => cards.map(cardText).join(" ");
 
 /** What the server says about a day (see apps/server/src/daily/routes.ts). */
 interface ServerResult {
@@ -178,7 +180,8 @@ function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
     setRecord(next);
     save(next);
     try {
-      localStorage.setItem(`${STORE}.${day}`, twoCards(picked));
+      // Saved as labels ("3S 4D"), which is how earlier visits saved it too.
+      localStorage.setItem(`${STORE}.${day}`, picked.map(cardLabel).join(" "));
     } catch {
       // ignore
     }
@@ -256,16 +259,23 @@ function DailyPuzzle({ signedIn }: { signedIn: boolean }) {
               {result.best.ev.toFixed(1)} points expected; yours {result.chosen.ev.toFixed(1)}).
             </p>
           )}
-          <ol className="mx-auto w-full max-w-sm text-left text-sm">
-            {result.choices.slice(0, 5).map((ch, i) => (
-              <li
-                key={twoCards(ch.discard)}
-                className={`flex justify-between rounded px-2 py-0.5 ${ch === result.chosen ? "bg-gold/20 font-bold" : ""}`}
-              >
-                <span>
-                  {i + 1}. Throw {twoCards(ch.discard)}
+          {/* Numbered by the list itself (once, also for screen readers); suits as symbols, read
+              out as names. */}
+          <ol className="mx-auto w-full max-w-sm list-decimal pl-7 text-left text-sm marker:text-parchment/70">
+            {result.choices.slice(0, 5).map((ch) => (
+              <li key={twoCards(ch.discard)} className={ch === result.chosen ? "font-bold" : ""}>
+                <span
+                  className={`flex justify-between gap-3 rounded px-2 py-0.5 ${ch === result.chosen ? "bg-gold/20" : ""}`}
+                >
+                  <span>
+                    Throw <span aria-hidden>{twoCards(ch.discard)}</span>
+                    <span className="sr-only">{ch.discard.map(cardName).join(" and ")}</span>
+                  </span>{" "}
+                  <span className="tabular-nums">
+                    {ch.ev.toFixed(1)}
+                    <span className="sr-only"> points</span>
+                  </span>
                 </span>
-                <span className="tabular-nums">{ch.ev.toFixed(1)}</span>
               </li>
             ))}
           </ol>

@@ -78,6 +78,20 @@ describe("daily discard", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
+  it("lists the best throws with suit symbols, read out as names, and numbered once", async () => {
+    render(<Screen />);
+    await throwTwo();
+    const list = screen.getAllByRole("list").find((l) => l.textContent?.includes("Throw"))!;
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(5);
+    for (const item of items) {
+      // "Throw 3♠ 4♦", then "3 of spades and 4 of diamonds" for screen readers, then the points.
+      expect(item.textContent).toMatch(
+        /^Throw \S+[♠♥♦♣] \S+[♠♥♦♣]\S+ of \w+ and .+ of \w+ \d+\.\d points$/,
+      );
+    }
+  });
+
   it("tells a guest that signing in pays doubloons for the daily discard", async () => {
     render(<Screen />);
     await throwTwo();
