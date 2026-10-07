@@ -23,6 +23,23 @@ defaults:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    # A real Postgres for the doubloon and shop races (races.pg.test.ts): the tests' in-memory
+    # database runs one transaction at a time, so it can't catch a missing lock.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pirate
+          POSTGRES_PASSWORD: pirate
+          POSTGRES_DB: pirate_cribbage
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pirate -d pirate_cribbage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://pirate:pirate@localhost:5432/pirate_cribbage
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

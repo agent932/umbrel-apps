@@ -155,9 +155,30 @@ describe("the ledger is append-only", () => {
     expect(where(/\$\{walletLedger\}/)).toEqual([]);
   });
 
+  // A purchase's ledger row is keyed by the item, so each item is charged once, ever. That is
+  // only fair while a bought item can't be taken away.
+  it("has inventory rows added only by economy/shop.ts, after a wallet lock, and never changed or deleted", () => {
+    expect(where(/insert\(inventory\)/)).toEqual(["economy/shop.ts"]);
+    expect(where(/(update|delete)\(inventory\)/)).toEqual([]);
+    expect(where(/(insert\s+into|update|delete\s+from)\s+"?inventory\b/i)).toEqual([]);
+    // Each insert is inside a transaction that locked the wallet first.
+    const shop = files.find((f) => f.path === "economy/shop.ts")!.text;
+    const inserts = [...shop.matchAll(/insert\(inventory\)/g)];
+    expect(inserts.length).toBeGreaterThan(0);
+    for (const m of inserts) {
+      const before = shop.slice(0, m.index);
+      const tx = before.lastIndexOf(".transaction(");
+      expect(tx).toBeGreaterThan(-1);
+      expect(before.slice(tx)).toMatch(/lockWallets\(tx, \[[\w.]+\]\)/);
+    }
+  });
+
   it("is checked by these patterns (they catch a direct write)", () => {
     const bad = "await db.update(users).set({ doubloons: sql`0` }); db.delete(walletLedger);";
     expect(/\.(set|values)\(\s*\{[^}]*\bdoubloons\b/.test(bad)).toBe(true);
     expect(/(update|delete)\(walletLedger\)/.test(bad)).toBe(true);
+    const careless = 'await tx.delete(inventory); await db.execute(sql`delete from "inventory"`);';
+    expect(/(update|delete)\(inventory\)/.test(careless)).toBe(true);
+    expect(/(insert\s+into|update|delete\s+from)\s+"?inventory\b/i.test(careless)).toBe(true);
   });
 });

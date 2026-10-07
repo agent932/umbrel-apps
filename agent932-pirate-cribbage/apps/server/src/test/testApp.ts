@@ -43,11 +43,19 @@ export async function testApp(
   };
 }
 
-/** Sign up and return a cookie header for later requests. */
-export async function signUp(app: Awaited<ReturnType<typeof testApp>>["app"], username = "CaroS") {
+/**
+ * Sign up and return a cookie header for later requests. `ip` is the visitor's address: give each
+ * signup its own when one app signs up more than the signup limit allows (10 a minute).
+ */
+export async function signUp(
+  app: Awaited<ReturnType<typeof testApp>>["app"],
+  username = "CaroS",
+  ip?: string,
+) {
   const res = await app.inject({
     method: "POST",
     url: "/api/auth/signup",
+    ...(ip && { headers: { "cf-connecting-ip": ip } }),
     payload: {
       username,
       email: `${username.toLowerCase()}@example.test`,

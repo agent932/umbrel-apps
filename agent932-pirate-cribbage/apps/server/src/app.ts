@@ -13,6 +13,7 @@ import { friendRoutes } from "./friends/routes.js";
 import { achievementRoutes } from "./achievements/routes.js";
 import { dailyRoutes } from "./daily/routes.js";
 import { economyRoutes } from "./economy/routes.js";
+import { shopRoutes } from "./economy/shop.js";
 import { emailRoutes } from "./email/routes.js";
 import { supportRoutes } from "./support/routes.js";
 import { playerRoutes } from "./players/routes.js";
@@ -150,6 +151,7 @@ export async function buildApp({
   await app.register(achievementRoutes, { db });
   await app.register(dailyRoutes, { db });
   await app.register(economyRoutes, { db });
+  await app.register(shopRoutes, { db });
   await app.register(emailRoutes, { db, mailer });
   await app.register(supportRoutes, { db, mailer });
   await app.register(playerRoutes, { db, mailer, presence });
