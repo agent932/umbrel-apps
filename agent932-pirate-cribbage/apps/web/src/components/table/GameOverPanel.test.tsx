@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import type { BotLevel, Reward, Seat } from "@pirate/engine";
+import { resetTime } from "../../economy.js";
 import { GameOverPanel } from "./GameOverPanel.js";
 
 /** The panel on its own, props only: no AuthProvider (the game screen's tests have none). */
@@ -93,9 +94,10 @@ describe("doubloons at the end of a game", () => {
 
   it("says when the daily bot bounty is reached, and when it resets", () => {
     renderPanel({ reward: reward({ note: "botCap" }) });
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /Daily bot bounty reached \(10 wins\)\. Online wins still pay\. Resets at \d+:\d\d/,
-    );
+    // The reset time is in the player's own language and time zone, so build it the same way
+    // (with plain spaces, as the text is compared).
+    const text = `Daily bot bounty reached (10 wins). Online wins still pay. Resets at ${resetTime()}.`;
+    expect(screen.getByRole("status")).toHaveTextContent(text.replace(/\s/g, " "));
   });
 
   it("says nothing about doubloons after a loss that paid nothing", () => {

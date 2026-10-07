@@ -49,7 +49,6 @@ describe("why a win paid nothing or half", () => {
     expect(resetTime(now)).toBe(
       midnightUtc.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
     );
-    expect(resetTime(now)).toMatch(/\d:\d\d/);
   });
 });
 

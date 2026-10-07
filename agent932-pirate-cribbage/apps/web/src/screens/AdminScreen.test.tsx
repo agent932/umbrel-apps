@@ -9,6 +9,12 @@ const ADMIN = "00000000-0000-4000-8000-000000000001";
 const ANNE = "00000000-0000-4000-8000-000000000002";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
+/**
+ * A number as this machine's language writes it, with the plain spaces Testing Library compares
+ * against (Finnish and French group thousands with a no-break space).
+ */
+const num = (n: number) => n.toLocaleString().replace(/\s/g, " ");
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -129,13 +135,13 @@ describe("admin: doubloons", () => {
     stubServer();
     renderAdmin();
     expect(await screen.findByText("Doubloons issued today")).toBeInTheDocument();
-    expect(screen.getByText((1234).toLocaleString())).toBeInTheDocument();
+    expect(screen.getByText(num(1234))).toBeInTheDocument();
     const top = screen.getByRole("region", { name: "Top earners today" });
     expect(
       within(top)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual([`1. Anne${(935).toLocaleString()} doubloons`, "2. Don299 doubloons"]);
+    ).toEqual([`1. Anne${num(935)} doubloons`, "2. Don299 doubloons"]);
   });
 
   it("lists each player's doubloons", async () => {
@@ -188,7 +194,7 @@ describe("admin: doubloons", () => {
     for (const amount of ["abc", "0", "1.5", "100001", ""]) {
       await adjust(user, sheet, "Add", amount, "bonus");
       expect(within(sheet).getByRole("alert")).toHaveTextContent(
-        `Enter a whole number from 1 to ${(100_000).toLocaleString()}`,
+        `Enter a whole number from 1 to ${num(100_000)}`,
       );
     }
     await adjust(user, sheet, "Add", "10", "");
