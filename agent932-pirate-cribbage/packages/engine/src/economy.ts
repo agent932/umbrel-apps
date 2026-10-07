@@ -5,7 +5,10 @@
 import type { BotLevel } from "./bot.js";
 import type { GameState } from "./game.js";
 
-/** Why a player's doubloons changed. Each (player, reason, ref) pays at most once. */
+/**
+ * Why a player's doubloons changed. Each (player, reason, ref) pays at most once. A "purchase"
+ * spends: its ref is the shop item's id, so each item is charged at most once.
+ */
 export type LedgerReason =
   | "botWin"
   | "onlineWin"
@@ -14,7 +17,8 @@ export type LedgerReason =
   | "firstWinOfDay"
   | "daily"
   | "achievement"
-  | "admin";
+  | "admin"
+  | "purchase";
 
 /** Why a win paid nothing, or only half. */
 export type WinNote =

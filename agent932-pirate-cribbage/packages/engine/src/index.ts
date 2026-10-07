@@ -11,3 +11,4 @@ export * from "./rating.js";
 export * from "./achievements.js";
 export * from "./daily.js";
 export * from "./economy.js";
+export * from "./shop.js";
