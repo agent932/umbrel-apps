@@ -101,7 +101,7 @@ export async function createAiGame(
     await tx
       .update(games)
       .set({ finishedAt: new Date() })
-      .where(and(eq(games.userId, userId), isNull(games.finishedAt)));
+      .where(and(eq(games.userId, userId), eq(games.mode, "ai"), isNull(games.finishedAt)));
     const [row] = await tx
       .insert(games)
       .values({ userId, mode: "ai", aiLevel: level, state })
@@ -120,7 +120,7 @@ export async function actInAiGame(
     const [row] = await tx
       .select()
       .from(games)
-      .where(and(eq(games.id, gameId), eq(games.userId, userId)))
+      .where(and(eq(games.id, gameId), eq(games.userId, userId), eq(games.mode, "ai")))
       .for("update");
     if (!row || row.finishedAt) throw new GameNotFoundError();
     const level = row.aiLevel as BotLevel;
@@ -155,7 +155,7 @@ export async function activeAiGame(db: Db, userId: string): Promise<GameResponse
   const [row] = await db
     .select()
     .from(games)
-    .where(and(eq(games.userId, userId), isNull(games.finishedAt)))
+    .where(and(eq(games.userId, userId), eq(games.mode, "ai"), isNull(games.finishedAt)))
     .limit(1);
   if (!row) return null;
   return {
@@ -169,5 +169,12 @@ export async function abandonAiGame(db: Db, userId: string, gameId: string) {
   await db
     .update(games)
     .set({ finishedAt: new Date() })
-    .where(and(eq(games.id, gameId), eq(games.userId, userId), isNull(games.finishedAt)));
+    .where(
+      and(
+        eq(games.id, gameId),
+        eq(games.userId, userId),
+        eq(games.mode, "ai"),
+        isNull(games.finishedAt),
+      ),
+    );
 }

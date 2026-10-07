@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.30.3"
+version: "0.30.4"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,8 +37,9 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Peggy's tutorial tips no longer cover the table: while a tip is showing,
-  the table and any open panel make room for it.
+  Fixes a bug where starting a game against the crew could end an online game
+  you were hosting. Peggy's tutorial tips now make room instead of covering
+  the table.
 
 
 developer: agent932
