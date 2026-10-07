@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.31.0"
+version: "0.32.0"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,11 +37,12 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Doubloons: signed-in players now earn doubloons for wins against the crew
-  and online, the first win of the day, the daily discard and achievements,
-  shown on the result screen and next to your name. Admins can see what's
-  been earned and adjust balances. Also new: recorded card, shuffle, peg and
-  coin sounds.
+  Pirate scenes (the Kraken, treasure, powers and more) now wait for you to
+  tap Carry on, and the game pauses behind them; online, play goes on once
+  both players have carried on. The Ship's Log counts your forfeits, and a
+  ranked game forfeited early no longer moves anyone's rating. Wide screens
+  and iPads keep your name plate clear of your hand. New FAQ answers on
+  doubloons and forfeits, and the peg sound plays again.
 
 
 developer: agent932
