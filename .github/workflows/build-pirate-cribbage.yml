@@ -65,7 +65,7 @@ jobs:
   # Chromium only), the rest of Chromium, and the iPhone. The two Chromium machines split the
   # project with the same tag, so every Chromium test runs on one of them.
   # Each machine runs Playwright's default two workers: three games at once on four cores would
-  # slow each other, and the pirate game alone takes about as long as the other two together.
+  # slow each other.
   e2e:
     name: e2e (${{ matrix.machine }})
     runs-on: ubuntu-24.04
