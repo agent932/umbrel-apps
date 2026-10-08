@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-pirate-cribbage
 category: gaming
 name: Deckhand Games
-version: "0.33.1"
+version: "0.33.2"
 tagline: Self-hosted card games with friends, starting with Pirate Cribbage
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-pirate-cribbage/assets/agent932-pirate-cribbage.png
 description: >-
@@ -37,9 +37,10 @@ description: >-
 
   - Daily database backups
 releaseNotes: >-
-  Fixes: card backs that showed a broken image for some players after the
-  last update now load again, and the daily discard lists the best throws
-  with suit symbols (3♠ 4♦) instead of letters.
+  The boards now carry the Pirate Cribbage name on the plate at their foot.
+  Fixes: when the last card of a round goes down, the counting no longer
+  flashes up for a moment, and the cards on the table stay put instead of
+  jumping back in.
 
 
 developer: agent932
