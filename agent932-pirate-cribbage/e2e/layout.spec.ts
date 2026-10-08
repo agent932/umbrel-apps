@@ -3,8 +3,9 @@
  * nothing scrolls sideways. These are the problems we used to find by eye on a phone.
  *
  * Each game is turned and resized to every screen in turn, as a player turns a phone or an iPad,
- * rather than dealt afresh for each one: the table settles exactly where a fresh game at that size
- * puts it (each test checks this again at the end).
+ * rather than dealt afresh for each one. A one-off comparison found a resized table sits exactly
+ * where a fresh game at that size puts it. Each test checks this again only for the screen it
+ * started on: after the tour, that screen must look exactly as it did when the game was dealt.
  */
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
@@ -185,6 +186,13 @@ for (const rules of ["Classic", "Pirate"] as const) {
         await onScreen(page, where, async () => {
           const { found, width, height, scrollWidth, nameCut } = await lookAt(page, screen);
           fresh ??= found;
+          // A hidden part still has a place on the page (at 0×0), so look for the button itself.
+          await expect
+            .soft(
+              page.getByRole("button", { name: "Throw to crib" }),
+              problem(where, "Throw to crib isn't showing"),
+            )
+            .toBeVisible();
           if (screen.upright) {
             expect
               .soft(Object.keys(found), problem(where, "the board or your cards are missing"))
@@ -206,8 +214,9 @@ for (const rules of ["Classic", "Pirate"] as const) {
         });
       }
 
-      // Back where the game started: everything sits where it did on the fresh start, so each
-      // screen above was measured as a fresh game there would be.
+      // Back where the game started, reached this time by resizing: everything must sit where the
+      // fresh deal put it, so the tour hasn't left the table out of place. (The other screens aren't
+      // compared with fresh games here.)
       const back = `${rules} table back on ${first.on} (${first.width}×${first.height})`;
       await onScreen(page, back, async () => {
         const { found } = await lookAt(page, first);
@@ -235,7 +244,9 @@ test("Peggy's tips don't cover the table on an iPhone SE or an iPhone 13", async
     const where = `Peggy's tips on ${screen.on} (${screen.width}×${screen.height})`;
     await onScreen(page, where, async () => {
       const { found } = await lookAt(page, screen);
-      const tipBox = (await tip.boundingBox())!;
+      await expect.soft(tip, `${where}: the tip isn't showing`).toBeVisible();
+      const tipBox = await tip.boundingBox();
+      if (!tipBox) return;
       const withTip = {
         ...found,
         "Peggy's tip": {

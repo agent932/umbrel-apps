@@ -67,12 +67,18 @@ test.describe("with reduced motion", () => {
     "a guest plays a whole pirate game against the crew",
     { tag: "@game" },
     async ({ page }, info) => {
-      // About a minute: one browser is enough, and the iPhone runs the scene tests above.
+      // About a minute and a half: one browser is enough, and the iPhone runs the scene tests above.
       test.skip(info.project.name !== "chromium", "A long game; once is enough");
       test.slow();
       await startCrewGame(page, "Pirate");
       // Until you've used Belay That!, the crew waits for it before answering each card you play.
-      // Take back your first card with it: the card comes back, and the game goes quicker after.
+      // The first round plays out that way, Go and 31 included.
+      let first: Awaited<ReturnType<typeof nextMove>>;
+      do first = await nextMove(page);
+      while (first !== "Next round" && first !== "over");
+      expect(first, "the first round ends with Next round").toBe("Next round");
+      // Then take back your first card of the next round with it: the card comes back, and the
+      // rest of the game goes quicker.
       while ((await nextMove(page)) !== "card");
       await usePower(page, "Belay That!");
       const scene = page.getByRole("dialog", { name: /You cry "Belay that!"/ });

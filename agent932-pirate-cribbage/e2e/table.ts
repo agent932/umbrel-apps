@@ -217,7 +217,12 @@ export async function playToTheEnd(pages: Page[], timeout = 690_000) {
   const end = Date.now() + timeout;
   // Like players at their own tables, each makes their moves while the others make theirs.
   const play = async (page: Page) => {
-    while ((await nextMove(page, end - Date.now())) !== "over");
+    for (;;) {
+      while ((await nextMove(page, end - Date.now())) !== "over");
+      // A skunk's scene comes up a frame or two after the result: look again before calling it over.
+      await page.waitForTimeout(500);
+      if ((await nextMove(page, end - Date.now())) === "over") return;
+    }
   };
   await Promise.all(pages.map(play)).catch((e: unknown) => {
     throw e instanceof errors.TimeoutError ? new Error("The game didn't finish in time") : e;
