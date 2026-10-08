@@ -5,7 +5,9 @@ test.describe("with reduced motion", () => {
   // A player's setting: the hand counts are shown at once, so a whole game takes about a minute.
   test.use({ reducedMotion: "reduce" });
 
-  test("a guest plays a whole game against the crew", async ({ page }) => {
+  test("a guest plays a whole game against the crew", { tag: "@game" }, async ({ page }, info) => {
+    // About a minute: one browser is enough, and the iPhone runs the shorter table tests.
+    test.skip(info.project.name !== "chromium", "A long game; once is enough");
     test.slow();
     await startCrewGame(page);
     await playToTheEnd([page]);

@@ -5,6 +5,7 @@ import {
   hand,
   inviteGame,
   move,
+  nextMove,
   playToTheEnd,
   startCrewGame,
   usePower,
@@ -62,13 +63,24 @@ test("online, a pirate scene waits for both players to carry on", async ({ signe
 test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
-  test("a guest plays a whole pirate game against the crew", async ({ page }, info) => {
-    // About three minutes (the crew waits for a Belay That! before each card it plays): one
-    // browser is enough, and the iPhone runs the scene tests above.
-    test.skip(info.project.name !== "chromium", "A long game; once is enough");
-    test.slow();
-    await startCrewGame(page, "Pirate");
-    await playToTheEnd([page]);
-    await expect(gameOver(page)).toContainText("121");
-  });
+  test(
+    "a guest plays a whole pirate game against the crew",
+    { tag: "@game" },
+    async ({ page }, info) => {
+      // About a minute: one browser is enough, and the iPhone runs the scene tests above.
+      test.skip(info.project.name !== "chromium", "A long game; once is enough");
+      test.slow();
+      await startCrewGame(page, "Pirate");
+      // Until you've used Belay That!, the crew waits for it before answering each card you play.
+      // Take back your first card with it: the card comes back, and the game goes quicker after.
+      while ((await nextMove(page)) !== "card");
+      await usePower(page, "Belay That!");
+      const scene = page.getByRole("dialog", { name: /You cry "Belay that!"/ });
+      await scene.getByRole("button", { name: "Carry on" }).click();
+      await expect(scene).toBeHidden();
+      await expect(hand(page).getByRole("button")).toHaveCount(4);
+      await playToTheEnd([page]);
+      await expect(gameOver(page)).toContainText("121");
+    },
+  );
 });

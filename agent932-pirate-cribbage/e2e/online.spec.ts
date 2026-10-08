@@ -4,17 +4,23 @@ import { gameOver, inviteGame, lobby, playToTheEnd } from "./table.js";
 test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
-  test("two players play a whole game online through an invite link", async ({ signedIn }) => {
-    test.slow();
-    const anne = await signedIn("Anne");
-    const bonny = await signedIn("Bonny");
-    await inviteGame(anne, bonny);
-    await playToTheEnd([anne, bonny]);
-    // One winner, one loser, and both see 121 on the board.
-    const won = [anne, bonny].map((p) => p.getByRole("dialog", { name: "Victory!" }));
-    expect((await won[0]!.count()) + (await won[1]!.count())).toBe(1);
-    for (const p of [anne, bonny]) await expect(gameOver(p)).toContainText("121");
-  });
+  test(
+    "two players play a whole game online through an invite link",
+    { tag: "@game" },
+    async ({ signedIn }, info) => {
+      // About a minute: one browser is enough, and the iPhone runs the shorter table tests.
+      test.skip(info.project.name !== "chromium", "A long game; once is enough");
+      test.slow();
+      const anne = await signedIn("Anne");
+      const bonny = await signedIn("Bonny");
+      await inviteGame(anne, bonny);
+      await playToTheEnd([anne, bonny]);
+      // One winner, one loser, and both see 121 on the board.
+      const won = [anne, bonny].map((p) => p.getByRole("dialog", { name: "Victory!" }));
+      expect((await won[0]!.count()) + (await won[1]!.count())).toBe(1);
+      for (const p of [anne, bonny]) await expect(gameOver(p)).toContainText("121");
+    },
+  );
 });
 
 test("quick match pairs two players who are looking", async ({ signedIn }, info) => {

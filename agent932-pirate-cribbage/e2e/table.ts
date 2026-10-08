@@ -1,15 +1,20 @@
 /** Playing at the table the way a player does: by the names on the buttons. */
-import { expect, type Locator, type Page } from "@playwright/test";
+import { errors, expect, type Locator, type Page } from "@playwright/test";
 
-/** Clicks if the control is there and enabled right now; the table moves on between looks. */
-async function tryClick(target: Locator, position?: { x: number; y: number }) {
+/** Clicks, unless the control goes before it can be clicked: the table moves on between looks. */
+async function tap(target: Locator, position?: { x: number; y: number }) {
   try {
-    if (!(await target.isVisible()) || !(await target.isEnabled())) return false;
     await target.click({ timeout: 1_500, position });
     return true;
   } catch {
     return false;
   }
+}
+
+/** Clicks if the control is there and enabled right now. */
+async function tryClick(target: Locator, position?: { x: number; y: number }) {
+  const ready = (await target.isVisible()) && (await target.isEnabled().catch(() => false));
+  return ready && tap(target, position);
 }
 
 export const gameOver = (page: Page) => page.getByRole("dialog", { name: /Victory|Defeat/ });
@@ -76,34 +81,114 @@ export async function cutForDeal(page: Page) {
   }).toPass({ timeout: 30_000 });
 }
 
+/** A move at the table: the button it takes, or "card" to play the first card that can be played. */
+type Move = "Carry on" | "Next round" | "Cut the deck" | "Set sail" | "Throw to crib" | "card";
+
 /**
- * Makes this player's next move if there is one: carry on past a pirate scene, next round, cut,
- * set sail, throw two to the crib, or play the first card that can be played. Returns false when there's nothing to do yet.
+ * What a look at the table finds: a move, the name of what to tap for it (a card's name, say) and
+ * of the dialog it's in, if it's in one.
  */
-export async function move(page: Page) {
-  // While a dialog (a pirate scene, or the Show) covers the table, only its buttons work.
-  const dialog = page.getByRole("dialog");
-  if (await dialog.count()) {
-    for (const name of ["Carry on", "Next round"]) {
-      if (await tryClick(dialog.getByRole("button", { name, exact: true }))) return true;
+type Look = { move: Move; name: string; dialog?: string } | "over" | "";
+
+/**
+ * One look at the table, from inside the page: the move this player can make now, "over" once the
+ * result shows with no scene (a skunk's) still up over it, or "" while there's nothing to do yet.
+ * Like a player, it only counts what can be tapped: shown, enabled, and on top where the tap
+ * lands (not behind a dialog, a pirate scene or the cards cut for the deal).
+ */
+function lookAtTable(corner: { x: number; y: number }): Look {
+  const shown = (el: Element) => el.getClientRects().length > 0;
+  const button = (within: ParentNode, name: string) =>
+    [...within.querySelectorAll("button")].find((b) => b.textContent?.trim() === name && shown(b));
+  const tappable = (el: HTMLButtonElement | undefined, at?: { x: number; y: number }) => {
+    if (!el || el.disabled || el.closest("[inert]")) return false;
+    const box = el.getBoundingClientRect();
+    const x = box.left + (at?.x ?? box.width / 2);
+    const y = box.top + (at?.y ?? box.height / 2);
+    // Off the screen, it's scrolled into view to be clicked.
+    if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return true;
+    const top = document.elementFromPoint(x, y);
+    return !!top && el.contains(top);
+  };
+  // While a dialog (a pirate scene, the show, the result) covers the table, only its buttons work.
+  const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter(shown);
+  if (dialogs.length) {
+    const scene = dialogs.some((d) => button(d, "Carry on"));
+    const result = dialogs.some((d) => /Victory|Defeat/.test(d.getAttribute("aria-label") ?? ""));
+    if (result && !scene) return "over";
+    for (const move of ["Carry on", "Next round"] as const) {
+      const dialog = dialogs.find((d) => tappable(button(d, move)));
+      if (dialog) return { move, name: move, dialog: dialog.getAttribute("aria-label") ?? "" };
     }
-    return false;
+    return "";
   }
   // Cut for the starter; in pirate games, set sail without using a power before pegging.
-  for (const name of ["Cut the deck", "Set sail"]) {
-    if (await tryClick(page.getByRole("button", { name, exact: true }))) return true;
+  for (const move of ["Cut the deck", "Set sail"] as const) {
+    if (tappable(button(document, move))) return { move, name: move };
   }
-  const cards = hand(page).locator("button:enabled");
-  const toCrib = page.getByRole("button", { name: "Throw to crib" });
-  if (await toCrib.isVisible().catch(() => false)) {
+  const cards = [
+    ...document.querySelectorAll<HTMLButtonElement>('[aria-label="Your hand"] button:enabled'),
+  ];
+  const toCrib = button(document, "Throw to crib");
+  if (toCrib) {
+    // Two cards to pick first, unless they're picked.
+    const unpicked = cards.find((c) => c.getAttribute("aria-pressed") !== "true");
+    const ready = toCrib.disabled ? tappable(unpicked, corner) : tappable(toCrib);
+    return ready ? { move: "Throw to crib", name: "Throw to crib" } : "";
+  }
+  const card = cards[0];
+  return tappable(card, corner) ? { move: "card", name: card!.getAttribute("aria-label")! } : "";
+}
+
+/**
+ * Makes the move a look found, then waits for the table to take it (online, that's once the
+ * server has it) so the next look doesn't find the same move again. False if the table moved on
+ * before the tap.
+ */
+async function make(page: Page, { move, name, dialog }: Exclude<Look, string>) {
+  const target = (
+    move === "card"
+      ? hand(page)
+      : dialog !== undefined
+        ? page.getByRole("dialog", { name: dialog, exact: true })
+        : page
+  ).getByRole("button", { name, exact: true });
+  if (move === "Throw to crib") {
     // Pick unpicked cards until two are picked (tapping a picked card puts it back).
     const unpicked = hand(page).locator("button:enabled:not([aria-pressed=true])");
-    for (let i = 0; i < 2 && (await toCrib.isDisabled().catch(() => false)); i++) {
-      await tryClick(unpicked.first(), CORNER);
+    for (let i = 0; i < 2 && (await target.isDisabled().catch(() => false)); i++) {
+      await tap(unpicked.first(), CORNER);
     }
-    return tryClick(toCrib);
   }
-  return tryClick(cards.first(), CORNER);
+  if (!(await tap(target, move === "card" ? CORNER : undefined))) return false;
+  await target.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+  return true;
+}
+
+/**
+ * Makes this player's next move if there is one: carry on past a pirate scene, next round, cut,
+ * set sail, throw two to the crib, or play the first card that can be played. Returns the move,
+ * or false when there's nothing to do yet.
+ */
+export async function move(page: Page) {
+  const look = await page.evaluate(lookAtTable, CORNER);
+  return typeof look !== "string" && (await make(page, look)) && look.move;
+}
+
+/**
+ * Waits for this player's next move, watching the table every frame, and makes it. Returns the
+ * move, or "over" once the game is.
+ */
+export async function nextMove(page: Page, timeout = 60_000): Promise<Move | "over"> {
+  const end = Date.now() + timeout;
+  for (;;) {
+    const found = await page.waitForFunction(lookAtTable, CORNER, {
+      timeout: Math.max(1, end - Date.now()),
+    });
+    const look = await found.jsonValue();
+    if (look === "over") return look;
+    if (look && (await make(page, look))) return look.move;
+  }
 }
 
 /**
@@ -119,23 +204,17 @@ export async function settle(page: Page) {
 }
 
 /**
- * Plays one or more players' moves until the game ends for all of them. A whole game takes a
- * minute or three here and several times that on a CI machine: the test (marked slow) times out
- * first if something is really stuck.
+ * Plays one or more players' moves, each as soon as it comes up, until the game ends for all of
+ * them. A whole game takes about a minute here and several times that on a CI machine: the test
+ * (marked slow) times out first if something is really stuck.
  */
 export async function playToTheEnd(pages: Page[], timeout = 690_000) {
   const end = Date.now() + timeout;
-  while (Date.now() < end) {
-    let over = 0;
-    let moved = false;
-    for (const page of pages) {
-      // Over once the result shows with no scene (a skunk's) still up over it.
-      const scene = page.getByRole("button", { name: "Carry on" });
-      if ((await gameOver(page).isVisible()) && !(await scene.count())) over++;
-      else if (await move(page)) moved = true;
-    }
-    if (over === pages.length) return;
-    if (!moved) await pages[0]!.waitForTimeout(150);
-  }
-  throw new Error("The game didn't finish in time");
+  // Like players at their own tables, each makes their moves while the others make theirs.
+  const play = async (page: Page) => {
+    while ((await nextMove(page, end - Date.now())) !== "over");
+  };
+  await Promise.all(pages.map(play)).catch((e: unknown) => {
+    throw e instanceof errors.TimeoutError ? new Error("The game didn't finish in time") : e;
+  });
 }
