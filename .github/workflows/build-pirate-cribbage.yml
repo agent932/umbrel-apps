@@ -61,14 +61,29 @@ jobs:
       - run: npm run build
 
   # Real browsers playing the production build: Chromium on a desktop and WebKit on an
-  # iPhone-sized screen, side by side on two machines.
+  # iPhone-sized screen, on three machines side by side: the whole games (tagged @game, played in
+  # Chromium only), the rest of Chromium, and the iPhone. The two Chromium machines split the
+  # project with the same tag, so every Chromium test runs on one of them.
+  # Each machine runs Playwright's default two workers: three games at once on four cores would
+  # slow each other, and the pirate game alone takes about as long as the other two together.
   e2e:
+    name: e2e (${{ matrix.machine }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        project: [chromium, iphone]
+        include:
+          - machine: chromium-games
+            project: chromium
+            tests: --grep @game
+          - machine: chromium
+            project: chromium
+            tests: --grep-invert @game
+          # Its whole project: the whole games skip themselves on the iPhone.
+          - machine: iphone
+            project: iphone
+            tests: ""
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -77,16 +92,18 @@ jobs:
           cache: npm
           cache-dependency-path: agent932-pirate-cribbage/package-lock.json
       - run: npm ci
+      # Not cached: most of this step is the browser's system packages, which a cache can't hold.
       - run: npx playwright install --with-deps ${{ matrix.project == 'iphone' && 'webkit' || 'chromium' }}
-      # The shop-closed setup project runs first, in this machine's browser.
-      - run: npm run e2e -- --project=${{ matrix.project }}
+      # The shop-closed setup project runs first, in this machine's browser. The --grep doesn't
+      # reach it: Playwright runs a project's dependencies in full.
+      - run: npm run e2e -- --project=${{ matrix.project }} ${{ matrix.tests }}
         env:
           E2E_DEVICE: ${{ matrix.project }}
       - name: Keep the report, screenshots and traces of a failed run
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.project }}
+          name: playwright-report-${{ matrix.machine }}
           path: |
             agent932-pirate-cribbage/playwright-report
             agent932-pirate-cribbage/test-results

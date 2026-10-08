@@ -5,6 +5,10 @@ import { BASE_URL, PORT } from "./e2e/players.js";
  * End-to-end tests: real browsers against the production build and the real server (on an
  * in-memory database). Chromium plays on a desktop; WebKit plays on an iPhone-sized screen, the
  * same engine as the iPhone app.
+ *
+ * Whole games take minutes each, so they're tagged @game and play in Chromium only. The quick set
+ * is every other test, in both browsers: npm run e2e:quick. CI runs all of them, the games on a
+ * machine of their own.
  */
 export default defineConfig({
   testDir: "e2e",
