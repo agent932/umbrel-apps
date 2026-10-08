@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, renderHook } from "@testing-library/react";
-import { type GameEvent, parseCard } from "@pirate/engine";
-import { useLastPlay, useResetHold } from "./GameScreen.js";
+import { act, render, renderHook } from "@testing-library/react";
+import { CLASSIC_RULES, type GameEvent, botAction, parseCard } from "@pirate/engine";
+import {
+  BOT,
+  type LocalGame,
+  YOU,
+  houseAction,
+  names,
+  newLocalGame,
+  step,
+} from "../game/localGame.js";
+import type { GameController } from "../game/types.js";
+import { GameScreen, useLastPlay, useResetHold } from "./GameScreen.js";
 
 describe("the last cards of a round", () => {
   afterEach(() => vi.useRealTimers());
@@ -32,6 +42,24 @@ describe("the last cards of a round", () => {
 
     act(() => vi.advanceTimersByTime(3600));
     expect(result.current).toBeNull();
+  });
+
+  it("are held from the very first frame after the last card, never a frame late", () => {
+    const first = [{ card: parseCard("7H"), seat: 0 as const }];
+    const frames: (ReturnType<typeof useLastPlay> | undefined)[] = [];
+    const { rerender } = renderHook(
+      ({ pile, count, pegging, events }) => {
+        const held = useLastPlay(pile, count, pegging, events, false);
+        frames.push(held);
+        return held;
+      },
+      { initialProps: { pile: first, count: 7, pegging: true, events: [] as GameEvent[] } },
+    );
+    frames.length = 0;
+    rerender({ pile: [], count: 0, pegging: false, events: [played(1, "8D", 15)] });
+    // A frame without the hold would show the counting and drop the pile, then bring both back.
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.map((f) => f?.count)).toEqual(frames.map(() => 15));
   });
 
   it("hold their full time when more news arrives meanwhile, then clear", () => {
@@ -130,6 +158,23 @@ describe("a run of play that ends on 31 or a Go", () => {
     expect(result.current).toBeNull();
   });
 
+  it("is held from the very first frame after the run ends, never a frame late", () => {
+    const frames: (ReturnType<typeof useResetHold> | undefined)[] = [];
+    const { rerender } = renderHook(
+      ({ pile, count, events }) => {
+        const held = useResetHold(pile, count, true, events, false);
+        frames.push(held);
+        return held;
+      },
+      { initialProps: { pile: start, count: 20, events: [] as GameEvent[] } },
+    );
+    frames.length = 0;
+    rerender({ pile: [], count: 0, events: [played(1, "AS", 21), { type: "reset" }] });
+    // A frame with an empty pile would make the run's cards fly in again a moment later.
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.map((f) => f?.count)).toEqual(frames.map(() => 21));
+  });
+
   it("shows the 31 and its count", () => {
     vi.useFakeTimers();
     const { result, rerender } = setup();
@@ -173,5 +218,62 @@ describe("a run of play that ends on 31 or a Go", () => {
       events: [played(1, "AS", 21), { type: "reset" }, played(1, "5H", 5)],
     });
     expect(result.current).toBeNull();
+  });
+});
+
+/** A classic game against the crew, one card from the end of a round's play, with cards on the pile. */
+function atLastCard(): { before: LocalGame; after: LocalGame } {
+  for (let tries = 0; tries < 30; tries++) {
+    let game = newLocalGame({ level: "easy", rules: CLASSIC_RULES });
+    for (let i = 0; i < 200 && game.state.phase !== "roundEnd"; i++) {
+      const { state } = game;
+      const move =
+        houseAction(state) ?? botAction(state, YOU, "easy") ?? botAction(state, BOT, "easy");
+      const left = state.hands[0].length + state.hands[1].length;
+      if (state.phase === "pegging" && left === 1 && state.pegging!.pile.length > 0)
+        return { before: game, after: step(game, move!) };
+      game = step(game, move!);
+    }
+  }
+  throw new Error("No game reached its last card with cards on the pile");
+}
+
+const controller = (game: LocalGame): GameController => ({
+  p: game.p,
+  names: names("easy"),
+  level: "easy",
+  act: () => {},
+  error: null,
+  ranked: false,
+});
+
+describe("the last card of a round, at the table", () => {
+  it("stays on the pile with the others while the counting waits: no flash of it, no cards flying in again", () => {
+    const { before, after } = atLastCard();
+    expect(after.state.phase).toBe("roundEnd");
+    const table = (game: LocalGame) => (
+      <GameScreen game={controller(game)} onExit={() => {}} onPlayAgain={() => {}} />
+    );
+    const { container, rerender } = render(table(before));
+    const onPile = [...container.querySelectorAll(".t-pile-card")];
+    expect(onPile.length).toBe(before.state.pegging!.pile.length);
+
+    // Everything added to the page, frame by frame, as the last card goes down.
+    const added: Node[] = [];
+    const watch = new MutationObserver((records) =>
+      records.forEach((r) => added.push(...r.addedNodes)),
+    );
+    watch.observe(document.body, { childList: true, subtree: true });
+    rerender(table(after));
+    watch.takeRecords().forEach((r) => added.push(...r.addedNodes));
+    watch.disconnect();
+
+    const dialog = (n: Node) =>
+      n instanceof Element && (n.matches("[role=dialog]") || !!n.querySelector("[role=dialog]"));
+    expect(added.filter(dialog)).toEqual([]);
+    // The cards already down are the very same ones (not taken away and dealt in again), plus the last.
+    const now = [...container.querySelectorAll(".t-pile-card")];
+    expect(now).toHaveLength(onPile.length + 1);
+    onPile.forEach((card, i) => expect(now[i]).toBe(card));
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Card as CardType, GameEvent, Seat } from "@pirate/engine";
 import type { Presentation, RevealStage } from "../../game/types.js";
 import type { Emote } from "../../online/protocol.js";
@@ -23,6 +23,42 @@ export function useUpright() {
 export const LAST_PLAY_MS = 3500;
 
 export type PilePlay = { card: CardType; seat: Seat };
+type Table = { pile: PilePlay[]; count: number };
+
+/**
+ * A hold on the table, worked out while each step of the game is drawn rather than in an effect
+ * just after it, so the step's very first frame has it. (The step that ends a round also brings on
+ * the counting: one frame without the hold flashed the counting up and took the pile away, and its
+ * cards flew in again a moment later.) `look` gets what was kept from the step before, the table to
+ * start from and the hold, and says what to keep now. The timer belongs to the hold itself, so new
+ * events can't cancel it and leave the cards stuck.
+ */
+function useStepHold(
+  pegging: boolean,
+  events: GameEvent[],
+  look: (kept: { table: Table; held: Table | null }) => { table: Table; held: Table | null },
+  start: Table,
+  holdMs: number,
+) {
+  const [kept, setKept] = useState({ pegging, events, table: start, held: null as Table | null });
+  let now = kept;
+  // Only when the game moves on, not for every re-render of the same step.
+  if (pegging !== kept.pegging || events !== kept.events) {
+    now = { ...look(kept), pegging, events };
+    setKept(now);
+  }
+  const held = now.held;
+  useEffect(() => {
+    if (!held) return;
+    const t = setTimeout(
+      () => setKept((k) => (k.held === held ? { ...k, held: null } : k)),
+      holdMs,
+    );
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [held]);
+  return held;
+}
 
 /**
  * The cards and count from the end of pegging, held for a few seconds after the round moves on
@@ -37,20 +73,13 @@ export function useLastPlay(
   instant: boolean,
   holdMs = LAST_PLAY_MS,
 ) {
-  const last = useRef<{ pile: PilePlay[]; count: number }>({ pile: [], count: 0 });
-  const [held, setHeld] = useState<{ pile: PilePlay[]; count: number } | null>(null);
-  useEffect(() => {
-    if (pegging) {
-      last.current = { pile: livePile, count };
-      // Play has started again (a new round), so nothing from the last one is held.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setHeld(null);
-      return;
-    }
-    if (instant || !events.some((e) => e.type === "played")) return;
+  const look = (kept: { table: Table; held: Table | null }) => {
+    // Play has started again (a new round), so nothing from the last one is held.
+    if (pegging) return { table: { pile: livePile, count }, held: null };
+    if (instant || !events.some((e) => e.type === "played")) return kept;
     // Start from the table as it was, then add the plays that ended the round.
-    let pile = [...last.current.pile];
-    let shown = last.current.count;
+    let pile = [...kept.table.pile];
+    let shown = kept.table.count;
     let reset = false;
     for (const e of events) {
       if (e.type === "reset") reset = true;
@@ -61,18 +90,9 @@ export function useLastPlay(
         shown = e.count;
       }
     }
-    setHeld({ pile, count: shown });
-    // Re-run only when the game moves on, not for every re-render of the same step.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pegging, events]);
-  // The timer belongs to the hold itself, so new events can't cancel it and leave the cards stuck.
-  useEffect(() => {
-    if (!held) return;
-    const t = setTimeout(() => setHeld(null), holdMs);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [held]);
-  return held;
+    return { table: kept.table, held: { pile, count: shown } };
+  };
+  return useStepHold(pegging, events, look, { pile: livePile, count }, holdMs);
 }
 
 /** How long a finished run of play (31, or a Go) stays on the table before the pile clears (normal speed). */
@@ -91,20 +111,13 @@ export function useResetHold(
   instant: boolean,
   holdMs = RESET_HOLD_MS,
 ) {
-  // The table as it was before the latest step.
-  const before = useRef<{ pile: PilePlay[]; count: number }>({ pile: [], count: 0 });
-  const [held, setHeld] = useState<{ pile: PilePlay[]; count: number } | null>(null);
-  useEffect(() => {
-    const prev = before.current;
-    before.current = { pile: livePile, count };
-    if (!pegging || instant) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setHeld(null);
-      return;
-    }
-    let pile = [...prev.pile];
-    let shown = prev.count;
-    let finished: { pile: PilePlay[]; count: number } | null = null;
+  const look = (kept: { table: Table; held: Table | null }) => {
+    // The next step starts from the table as this one leaves it.
+    const table = { pile: livePile, count };
+    if (!pegging || instant) return { table, held: null };
+    let pile = [...kept.table.pile];
+    let shown = kept.table.count;
+    let finished: Table | null = null;
     for (const e of events) {
       if (e.type === "played") {
         pile.push({ card: e.card, seat: e.seat });
@@ -117,16 +130,12 @@ export function useResetHold(
       }
     }
     // Only while the new pile is still empty (a card led in the same step shows instead).
-    setHeld(finished && pile.length === 0 && finished.pile.length > 0 ? finished : null);
-    // Re-run only when the game moves on, not for every re-render of the same step.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pegging, events]);
-  useEffect(() => {
-    if (!held) return;
-    const t = setTimeout(() => setHeld(null), holdMs);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [held]);
+    return {
+      table,
+      held: finished && pile.length === 0 && finished.pile.length > 0 ? finished : null,
+    };
+  };
+  const held = useStepHold(pegging, events, look, { pile: livePile, count }, holdMs);
   // The next card played starts the new pile, so the old one goes.
   return held && livePile.length === 0 ? held : null;
 }
