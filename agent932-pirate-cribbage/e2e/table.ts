@@ -166,18 +166,9 @@ async function make(page: Page, { move, name, dialog }: Exclude<Look, string>) {
 }
 
 /**
- * Makes this player's next move if there is one: carry on past a pirate scene, next round, cut,
- * set sail, throw two to the crib, or play the first card that can be played. Returns the move,
- * or false when there's nothing to do yet.
- */
-export async function move(page: Page) {
-  const look = await page.evaluate(lookAtTable, CORNER);
-  return typeof look !== "string" && (await make(page, look)) && look.move;
-}
-
-/**
- * Waits for this player's next move, watching the table every frame, and makes it. Returns the
- * move, or "over" once the game is.
+ * Waits for this player's next move, watching the table every frame, and makes it: carry on past
+ * a pirate scene, next round, cut, set sail, throw two to the crib, or play the first card that
+ * can be played. Returns the move, or "over" once the game is.
  */
 export async function nextMove(page: Page, timeout = 60_000): Promise<Move | "over"> {
   const end = Date.now() + timeout;
@@ -188,6 +179,20 @@ export async function nextMove(page: Page, timeout = 60_000): Promise<Move | "ov
     const look = await found.jsonValue();
     if (look === "over") return look;
     if (look && (await make(page, look))) return look.move;
+  }
+}
+
+/**
+ * Makes this player's next move if one comes up within a moment (the cards cut for the deal may
+ * still be on show, say). Returns the move, or false when there's nothing to do yet.
+ */
+export async function move(page: Page) {
+  try {
+    const next = await nextMove(page, 1_500);
+    return next !== "over" && next;
+  } catch (e) {
+    if (e instanceof errors.TimeoutError) return false;
+    throw e;
   }
 }
 
