@@ -2,7 +2,7 @@ manifestVersion: 1
 id: agent932-teslamate
 category: automation
 name: TeslaMate
-version: "4.2.0"
+version: "4.3.0"
 tagline: A self-hosted data logger for your Tesla
 icon: https://raw.githubusercontent.com/agent932/umbrel-apps/main/agent932-teslamate/assets/agent932-teslamate.svg
 description: >-
@@ -53,25 +53,28 @@ description: >-
 
   - TeslaMate is not affiliated with, endorsed by, or sponsored by Tesla, Inc.
 releaseNotes: >-
-  Updates TeslaMate and its Grafana dashboards to 4.2.0.
+  Updates TeslaMate and its Grafana dashboards to 4.3.0.
 
 
-  With Fleet Telemetry streaming enabled, TeslaMate now checks every 10 minutes
-  instead of every 30 whether the car has fallen asleep, so sleep transitions
-  appear in the dashboards up to 20 minutes sooner. This costs no extra API
-  calls and does not keep the car awake.
+  Grafana is upgraded to 13.2. A new dashboard shows historical temperatures,
+  and the order of your vehicles can now be edited on the settings page.
 
 
-  Cybertruck is now identified correctly across the UI and MQTT, and a startup
-  crash in the charging recalculation on unusual DC charging data is fixed.
+  If a car is added to your Tesla account while TeslaMate is running, a reload
+  button now starts logging it without a restart. Geo-fence links in the Grafana
+  dashboards open in the same tab, so the Back button returns to the dashboard.
 
 
-  Home Assistant MQTT discovery users: discovery now uses Home Assistant's
-  device-based format and existing entities migrate automatically, but several
-  automation-visible changes come with it — the Health sensor is inverted, enum
-  states are humanised, the update-available sensor becomes an update entity,
-  active route distance reports miles instead of kilometres, and the derived psi
-  tire pressure sensors are removed.
+  Fixes include a crash that stopped logging when the car reported an outdated
+  timestamp after being offline or asleep, and a crash when cancelling an
+  update.
+
+
+  Home Assistant MQTT discovery users: TeslaMate no longer re-runs the discovery
+  migration on every restart, so entities are no longer briefly removed and
+  recreated. Home Assistant may log one harmless "conflicting MQTT discovery
+  message" warning per legacy topic after each restart. Upgrading directly from
+  4.1.x no longer preserves entity registry customizations.
 
 
   Full release notes: https://github.com/teslamate-org/teslamate/releases
